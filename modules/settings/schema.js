@@ -98,7 +98,6 @@ export const APPEARANCE_FONT_LIBRARY_LIMITS = Object.freeze({
 export const defaultSettings = {
     enabled: true,
     floatingToggleEnabled: true,
-    notificationBubblesEnabled: false,
     phoneToggleX: null,
     phoneToggleY: null,
     phoneContainerX: null,
@@ -154,6 +153,8 @@ export const defaultSettings = {
     },
 };
 
+export const REMOVED_SETTING_KEYS = new Set(['notificationBubblesEnabled']);
+
 const validationRules = {
     phoneContainerWidth: { ...PHONE_CONTAINER_SIZE_LIMITS.width, type: 'number' },
     phoneContainerHeight: { ...PHONE_CONTAINER_SIZE_LIMITS.height, type: 'number' },
@@ -166,7 +167,6 @@ const validationRules = {
     phoneToggleStyleShape: { enum: ['circle', 'rounded'], type: 'string' },
     enabled: { type: 'boolean' },
     floatingToggleEnabled: { type: 'boolean' },
-    notificationBubblesEnabled: { type: 'boolean' },
     hideTableCountBadge: { type: 'boolean' },
     homeAppLabelColorMode: { type: 'string', enum: ['white', 'black'] },
     phoneThemeMode: { type: 'string', enum: ['light', 'dark'] },
@@ -588,6 +588,10 @@ export function normalizePhoneAiInstructionSettings(raw) {
 }
 
 export function validateSetting(key, value) {
+    if (REMOVED_SETTING_KEYS.has(key)) {
+        return { valid: true, value: undefined, removed: true };
+    }
+
     const rule = validationRules[key];
 
     if (!rule) {
@@ -678,6 +682,9 @@ export function validateSettings(settings) {
 
     for (const [key, value] of Object.entries(settings)) {
         const result = validateSetting(key, value);
+        if (result.removed) {
+            continue;
+        }
         if (result.valid) {
             validated[key] = result.value;
         } else {

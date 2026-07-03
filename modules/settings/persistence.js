@@ -139,6 +139,11 @@ export function createSettingsPersistenceTools(options = {}) {
             }
 
             const result = validateSetting(key, value);
+            if (result.removed) {
+                delete settings[key];
+                schedulePersistSettings(ctx);
+                return true;
+            }
             if (!result.valid) {
                 logger.warn({
                     action: 'setting.validate',
@@ -193,6 +198,10 @@ export function createSettingsPersistenceTools(options = {}) {
             let hasInvalid = false;
             entries.forEach(([key, value]) => {
                 const result = validateSetting(key, value);
+                if (result.removed) {
+                    delete settings[key];
+                    return;
+                }
                 if (!result.valid) {
                     hasInvalid = true;
                     logger.warn({

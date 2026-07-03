@@ -5,9 +5,11 @@ const ROOT = process.cwd();
 
 const FILES = {
     settingsSchema: 'modules/settings/schema.js',
+    settingsPersistence: 'modules/settings/persistence.js',
     settingsPanel: 'modules/settings-panel.js',
     toggleButton: 'modules/bootstrap/toggle-button.js',
-    notifications: 'modules/phone-core/notifications.js',
+    homeRender: 'modules/phone-home/render.js',
+    shellCss: 'styles/phone-base/01-shell-system.css',
 };
 
 function read(relativePath) {
@@ -16,10 +18,6 @@ function read(relativePath) {
 
 function has(content, snippet) {
     return content.includes(snippet);
-}
-
-function indexOfOrMinusOne(content, snippet) {
-    return content.indexOf(snippet);
 }
 
 function check(results, fileKey, description, ok) {
@@ -42,8 +40,8 @@ function main() {
     check(
         results,
         'settingsSchema',
-        '默认禁用顶部通知气泡，避免更新弹窗遮挡手机视图',
-        has(contents.settingsSchema, 'notificationBubblesEnabled: false,')
+        '废弃顶部通知气泡设置不再进入默认设置',
+        !has(contents.settingsSchema, 'notificationBubblesEnabled: false,')
     );
     check(
         results,
@@ -54,8 +52,11 @@ function main() {
     check(
         results,
         'settingsSchema',
-        '通知气泡开关继续走 boolean 校验',
-        has(contents.settingsSchema, "notificationBubblesEnabled: { type: 'boolean' }")
+        '废弃顶部通知气泡设置通过 removed key 机制丢弃',
+        has(contents.settingsSchema, "export const REMOVED_SETTING_KEYS = new Set(['notificationBubblesEnabled']);")
+            && has(contents.settingsSchema, 'REMOVED_SETTING_KEYS.has(key)')
+            && has(contents.settingsSchema, 'return { valid: true, value: undefined, removed: true };')
+            && has(contents.settingsSchema, 'if (result.removed) {\n            continue;\n        }')
     );
 
     check(
@@ -139,49 +140,40 @@ function main() {
             && has(contents.toggleButton, 'bindPhoneToggleDraggable(btn, onToggle);\n    return btn;')
     );
 
-    const unreadUpdateIndex = indexOfOrMinusOne(
-        contents.notifications,
-        'state.unreadCounts[targetBadgeKey] = (state.unreadCounts[targetBadgeKey] || 0) + newCount;'
-    );
-    const notificationGateIndex = indexOfOrMinusOne(
-        contents.notifications,
-        'if (getPhoneSettings().notificationBubblesEnabled !== true) return;'
-    );
-    const containerLookupIndex = indexOfOrMinusOne(
-        contents.notifications,
-        "const container = document.getElementById('phone-notif-container');"
-    );
-
     check(
         results,
-        'notifications',
-        '通知模块读取 phone settings 以控制顶部气泡',
-        has(contents.notifications, "import { getPhoneSettings } from '../settings.js';")
+        'settingsPersistence',
+        '直接保存废弃顶部通知设置时会删除残留字段',
+        has(contents.settingsPersistence, 'if (result.removed) {\n                delete settings[key];\n                schedulePersistSettings(ctx);\n                return true;\n            }')
     );
     check(
         results,
-        'notifications',
-        '顶部通知气泡默认禁用时不会创建 DOM 气泡',
-        notificationGateIndex >= 0
+        'settingsPersistence',
+        '批量保存废弃顶部通知设置时会删除残留字段',
+        has(contents.settingsPersistence, 'if (result.removed) {\n                    delete settings[key];\n                    return;\n                }')
     );
     check(
         results,
-        'notifications',
-        '禁用通知气泡前仍先更新 unreadCounts',
-        unreadUpdateIndex >= 0 && notificationGateIndex > unreadUpdateIndex
+        'homeRender',
+        '首页表格数量角标继续使用独立 class',
+        has(contents.homeRender, "badge.className = 'phone-table-count-badge';")
     );
     check(
         results,
-        'notifications',
-        'DOM 容器缺失不会阻断 unreadCounts 更新',
-        unreadUpdateIndex >= 0 && containerLookupIndex > unreadUpdateIndex
+        'shellCss',
+        '首页表格数量角标样式保留完整徽标规则',
+        has(contents.shellCss, '.phone-table-count-badge {')
+            && has(contents.shellCss, 'position: absolute;')
+            && has(contents.shellCss, 'top: -4px;')
+            && has(contents.shellCss, 'right: -4px;')
     );
     check(
         results,
-        'notifications',
-        '通知气泡启用后仍保留点击跳转和清 badge 行为',
-        has(contents.notifications, 'clearUnreadBadge(targetBadgeKey);')
-            && has(contents.notifications, 'navigateTo(targetRoute);')
+        'shellCss',
+        '顶部通知 DOM/CSS 已移除且不会与首页数量角标混用',
+        !has(contents.shellCss, '#phone-notif-container')
+            && !has(contents.shellCss, '.phone-notif-bubble')
+            && !has(contents.shellCss, '.phone-notif-badge')
     );
 
     const failed = results.filter((item) => !item.ok);

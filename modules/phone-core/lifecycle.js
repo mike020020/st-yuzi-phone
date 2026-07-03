@@ -23,7 +23,6 @@ import {
     stopTableUpdateReviewService,
 } from '../table-update-review/service.js';
 import { getPhoneCoreState, phoneRuntime, resetPhoneCoreState, resetPhoneRuntimeScope } from './state.js';
-import { startDataWatcherForNotifications, stopDataWatcherForNotifications } from './notifications.js';
 import {
     ensureRouteRuntimeSubscription,
     clearRouteRuntimeSubscription,
@@ -109,61 +108,12 @@ function scheduleShellWindowInteractions(state = getPhoneCoreState()) {
     }, SHELL_INTERACTION_DELAY_MS);
 }
 
-function syncNotificationWatcher(active, state = getPhoneCoreState(), options = {}) {
-    const shouldStart = !!active
-        && !!state.isPhoneActive
-        && (options.force === true || !!state.isPhoneUiInitialized)
-        && !document.hidden;
-
-    if (shouldStart) {
-        startDataWatcherForNotifications();
-        logger.debug({
-            action: 'notifications.start',
-            message: '通知 watcher 已启动',
-            context: {
-                force: !!options.force,
-            },
-        });
-        return true;
-    }
-
-    stopDataWatcherForNotifications();
-    logger.debug({
-        action: 'notifications.stop',
-        message: '通知 watcher 已停止',
-        context: {
-            reason: active ? 'document-hidden-or-ui-inactive' : 'inactive',
-        },
-    });
-    return false;
-}
-
 function ensureRouteRenderSubscription(state = getPhoneCoreState()) {
     return ensureRouteRuntimeSubscription(state);
 }
 
 function clearRouteRenderSubscription(state = getPhoneCoreState()) {
     return clearRouteRuntimeSubscription(state);
-}
-
-function clearVisibilityLifecycle(state = getPhoneCoreState()) {
-    if (typeof state.visibilityCleanup === 'function') {
-        state.visibilityCleanup();
-        state.visibilityCleanup = null;
-    }
-}
-
-function ensureVisibilityLifecycle(state = getPhoneCoreState()) {
-    if (state.visibilityCleanup) {
-        return false;
-    }
-
-    state.visibilityCleanup = phoneRuntime.addEventListener(document, 'visibilitychange', () => {
-        const currentState = getPhoneCoreState();
-        syncNotificationWatcher(!document.hidden, currentState);
-    });
-
-    return true;
 }
 
 function initializePhoneRuntimeBindings(state = getPhoneCoreState()) {
@@ -174,7 +124,6 @@ function initializePhoneRuntimeBindings(state = getPhoneCoreState()) {
     startSmallCalendarDerivedFieldsInjection();
     startTableUpdateReviewService();
     scheduleShellWindowInteractions(state);
-    ensureVisibilityLifecycle(state);
 
     logger.debug({
         action: 'bindings.init',
@@ -212,20 +161,17 @@ function activatePhoneRuntimeState(state = getPhoneCoreState(), options = {}) {
     state.isDestroying = false;
     state.isPhoneActive = true;
     startStatusClock(state);
-    syncNotificationWatcher(true, state, { force: true });
     requestPhoneRuntimeActivationRoute(options);
 }
 
 function deactivatePhoneRuntimeState(state = getPhoneCoreState()) {
     state.isPhoneActive = false;
-    syncNotificationWatcher(false, state);
     clearStatusClockTimer(state);
     clearShellInteractionTimer(state);
 }
 
 function cleanupPhoneRuntimeBindings(state = getPhoneCoreState()) {
     clearIdleApiDebugTask(state);
-    clearVisibilityLifecycle(state);
     clearRouteRenderSubscription(state);
     stopSmallCalendarDerivedFieldsInjection();
     stopChronicleTodayRelationInjection();

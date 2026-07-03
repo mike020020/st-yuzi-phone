@@ -4,7 +4,6 @@ const path = require('path');
 const ROOT = process.cwd();
 
 const FILES = {
-    notifications: 'modules/phone-core/notifications.js',
     routing: 'modules/phone-core/routing.js',
     debugTools: 'modules/phone-core/data-api/debug-tools.js',
     panelActions: 'modules/phone-core/data-api/panel-actions.js',
@@ -18,6 +17,7 @@ const FILES = {
 
 const REMOVED_FILES = {
     legacyTemplateStore: 'modules/phone-core/chat-support/template-store.js',
+    notifications: 'modules/phone-core/notifications.js',
 };
 
 function read(relativePath) {
@@ -43,8 +43,7 @@ function main() {
 
     const results = [];
 
-    check(results, 'notifications', 'notifications 使用 scoped logger', has(contents.notifications, "const logger = Logger.withScope({ scope: 'phone-core/notifications', feature: 'notifications' });"));
-    check(results, 'notifications', 'notifications 轮询异常使用结构化日志', has(contents.notifications, "action: 'watcher.tick'"));
+    check(results, 'notifications', '顶部通知 watcher 模块已删除，不再要求旧通知轮询日志契约', !exists(REMOVED_FILES.notifications));
 
     check(results, 'routing', 'routing 使用 scoped logger', has(contents.routing, "const logger = Logger.withScope({ scope: 'phone-core/routing', feature: 'route' });"));
     check(results, 'routing', 'routing route callback 失败使用结构化日志', has(contents.routing, "action: 'change.emit'"));

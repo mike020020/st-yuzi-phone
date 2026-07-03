@@ -270,7 +270,6 @@ export function dispatchPhoneTableUpdated(sheetKey) {
     window.dispatchEvent(new CustomEvent('yuzi-phone-table-updated', {
         detail: {
             sheetKey: safeSheetKey,
-            data: getTableData(),
             version: `manual_${Date.now()}`,
         },
     }));

@@ -13,7 +13,6 @@ export function buildPhoneShellHtml() {
                 </span>
             </div>
             <div class="phone-screen"></div>
-            <div class="phone-notification-overlay" id="phone-notif-container"></div>
             <div class="phone-home-indicator"></div>
         </div>
         <div class="yuzi-phone-resize yuzi-phone-resize-e" data-dir="e"></div>

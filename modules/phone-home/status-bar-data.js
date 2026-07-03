@@ -1,5 +1,4 @@
 // modules/phone-home/status-bar-data.js
-import { processTableData } from '../phone-core/data-api.js';
 
 const GLOBAL_TABLE_NAME = '全局数据表';
 const CALENDAR_TABLE_NAME = '小日历表';
@@ -16,6 +15,23 @@ function readCell(row, index) {
     return String(row[index] ?? '').trim();
 }
 
+function findRawSheetByName(rawData, tableName) {
+    if (!rawData || typeof rawData !== 'object') return null;
+
+    for (const sheet of Object.values(rawData)) {
+        if (String(sheet?.name || '').trim() !== tableName) continue;
+        if (!Array.isArray(sheet?.content)) return null;
+        return sheet;
+    }
+
+    return null;
+}
+
+function readSheetHeaders(sheet) {
+    const headers = sheet?.content?.[0];
+    return Array.isArray(headers) ? headers : [];
+}
+
 export function resolveStatusBarData(rawData) {
     const result = {
         currentTime: null,
@@ -24,30 +40,39 @@ export function resolveStatusBarData(rawData) {
         weather: null,
         majorEvent: null
     };
-    const tables = processTableData(rawData);
-    if (!tables) return result;
 
     // 全局数据表 → 当前时间
-    const globalTable = tables[GLOBAL_TABLE_NAME];
+    const globalTable = findRawSheetByName(rawData, GLOBAL_TABLE_NAME);
     if (globalTable) {
-        const timeIndex = findHeaderIndex(globalTable.headers, HEADER_CURRENT_TIME);
-        if (timeIndex >= 0 && Array.isArray(globalTable.rows) && globalTable.rows.length > 0) {
-            const value = readCell(globalTable.rows[0], timeIndex);
+        const headers = readSheetHeaders(globalTable);
+        const timeIndex = findHeaderIndex(headers, HEADER_CURRENT_TIME);
+        const firstRow = globalTable.content[1];
+        if (timeIndex >= 0 && Array.isArray(firstRow)) {
+            const value = readCell(firstRow, timeIndex);
             if (value) result.currentTime = value;
         }
     }
 
     // 小日历表 → 今天行摘要
-    const calendarTable = tables[CALENDAR_TABLE_NAME];
+    const calendarTable = findRawSheetByName(rawData, CALENDAR_TABLE_NAME);
     if (calendarTable) {
-        const relationIndex = findHeaderIndex(calendarTable.headers, HEADER_TODAY_RELATION);
-        if (relationIndex >= 0 && Array.isArray(calendarTable.rows)) {
-            const todayRow = calendarTable.rows.find(row => readCell(row, relationIndex) === TODAY_RELATION_VALUE);
+        const headers = readSheetHeaders(calendarTable);
+        const relationIndex = findHeaderIndex(headers, HEADER_TODAY_RELATION);
+        if (relationIndex >= 0) {
+            const content = calendarTable.content;
+            let todayRow = null;
+            for (let index = 1; index < content.length; index += 1) {
+                const row = content[index];
+                if (readCell(row, relationIndex) === TODAY_RELATION_VALUE) {
+                    todayRow = row;
+                    break;
+                }
+            }
             if (todayRow) {
-                const weekdayVal = readCell(todayRow, findHeaderIndex(calendarTable.headers, '星期几'));
-                const statusVal = readCell(todayRow, findHeaderIndex(calendarTable.headers, '状态'));
-                const weatherVal = readCell(todayRow, findHeaderIndex(calendarTable.headers, '天气'));
-                const eventVal = readCell(todayRow, findHeaderIndex(calendarTable.headers, '大事件'));
+                const weekdayVal = readCell(todayRow, findHeaderIndex(headers, '星期几'));
+                const statusVal = readCell(todayRow, findHeaderIndex(headers, '状态'));
+                const weatherVal = readCell(todayRow, findHeaderIndex(headers, '天气'));
+                const eventVal = readCell(todayRow, findHeaderIndex(headers, '大事件'));
 
                 if (weekdayVal) result.weekday = weekdayVal;
                 if (statusVal) result.dayStatus = statusVal;

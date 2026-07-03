@@ -29,11 +29,7 @@ function createInitialState() {
         routeRenderRegistered: false,
         routeRenderCleanup: null,
         routeRenderToken: 0,
-        dataWatcherTimerId: null,
-        visibilityCleanup: null,
         idleApiDebugCancel: null,
-        lastTableRowsCount: {},
-        unreadCounts: {},
         currentViewingSheetKey: null,
         lastDataVersion: null,
         registeredTableUpdateCallback: null,
@@ -61,11 +57,7 @@ export function resetPhoneCoreState() {
     state.routeRenderRegistered = next.routeRenderRegistered;
     state.routeRenderCleanup = next.routeRenderCleanup;
     state.routeRenderToken = next.routeRenderToken;
-    state.dataWatcherTimerId = next.dataWatcherTimerId;
-    state.visibilityCleanup = next.visibilityCleanup;
     state.idleApiDebugCancel = next.idleApiDebugCancel;
-    state.lastTableRowsCount = next.lastTableRowsCount;
-    state.unreadCounts = next.unreadCounts;
     state.currentViewingSheetKey = next.currentViewingSheetKey;
     state.lastDataVersion = next.lastDataVersion;
     state.registeredTableUpdateCallback = next.registeredTableUpdateCallback;

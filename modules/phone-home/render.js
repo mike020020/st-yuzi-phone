@@ -102,7 +102,7 @@ export function patchHomeGrid(grid, apps = []) {
 
         if (item.badgeText) {
             const badge = document.createElement('div');
-            badge.className = 'phone-notif-badge phone-table-count-badge';
+            badge.className = 'phone-table-count-badge';
             badge.textContent = item.badgeText;
             badge.setAttribute('aria-label', `总条目数 ${item.totalCount}`);
             const iconWrap = app.querySelector('.phone-app-icon');

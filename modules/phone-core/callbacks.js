@@ -240,8 +240,19 @@ function computeDataVersion(data) {
     }
 }
 
-function shouldSkipSmartRefresh(state, newVersion) {
-    if (!state.currentViewingSheetKey) {
+function resolveUpdatedSheetData(newData, sheetKey) {
+    if (!newData || typeof newData !== 'object') return null;
+    if (Object.prototype.hasOwnProperty.call(newData, sheetKey)) {
+        return newData[sheetKey];
+    }
+    if (Array.isArray(newData?.content)) {
+        return newData;
+    }
+    return null;
+}
+
+function shouldSkipSmartRefresh(state, sheetKey, newVersion) {
+    if (!sheetKey) {
         logger.debug({
             action: 'smart-refresh.skip',
             message: 'smart refresh 跳过：当前无查看表',
@@ -256,7 +267,7 @@ function shouldSkipSmartRefresh(state, newVersion) {
             message: 'smart refresh 跳过：数据版本未变化',
             context: {
                 reason: 'same-version',
-                sheetKey: state.currentViewingSheetKey,
+                sheetKey,
                 version: newVersion,
             },
         });
@@ -266,10 +277,9 @@ function shouldSkipSmartRefresh(state, newVersion) {
     return false;
 }
 
-function dispatchSmartRefreshEvent(state, newData, newVersion) {
+function dispatchSmartRefreshEvent(sheetKey, newVersion) {
     const detail = {
-        sheetKey: state.currentViewingSheetKey,
-        data: newData,
+        sheetKey,
         version: newVersion,
     };
 
@@ -292,11 +302,18 @@ export function initSmartRefreshListener() {
 
     const registered = registerTableUpdateListener((newData) => {
         const state = getPhoneCoreState();
-        const newVersion = computeDataVersion(newData);
-        if (shouldSkipSmartRefresh(state, newVersion)) return;
+        const sheetKey = String(state.currentViewingSheetKey || '').trim();
+        if (!sheetKey) {
+            shouldSkipSmartRefresh(state, sheetKey, '');
+            return;
+        }
+
+        const sheetData = resolveUpdatedSheetData(newData, sheetKey);
+        const newVersion = computeDataVersion(sheetData);
+        if (shouldSkipSmartRefresh(state, sheetKey, newVersion)) return;
 
         state.lastDataVersion = newVersion;
-        dispatchSmartRefreshEvent(state, newData, newVersion);
+        dispatchSmartRefreshEvent(sheetKey, newVersion);
     });
 
     if (!registered) {

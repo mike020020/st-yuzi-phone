@@ -45,7 +45,6 @@
     --yuzi-phone-bg-overlay: rgba(0, 0, 0, 0.6);
     --yuzi-phone-bg-overlay-soft: rgba(0, 0, 0, 0.2);
     --yuzi-phone-bg-overlay-tint: rgba(0, 0, 0, 0.4);
-    --yuzi-phone-bg-notification: rgba(30, 30, 30, 0.75);
     --yuzi-phone-bg-input: rgba(255, 255, 255, 0.06);
     --yuzi-phone-bg-input-hover: rgba(255, 255, 255, 0.12);
     --yuzi-phone-bg-input-disabled: rgba(255, 255, 255, 0.04);
@@ -78,14 +77,12 @@
     --yuzi-phone-radius-xl: 12px;
     --yuzi-phone-radius-2xl: 14px;
     --yuzi-phone-radius-3xl: 16px;
-    --yuzi-phone-radius-notification: 22px;
     --yuzi-phone-radius-pill: 999px;
     --yuzi-phone-shell-radius: 55px;
 
     --yuzi-phone-shadow-soft: 0 8px 18px rgba(0, 0, 0, 0.18);
     --yuzi-phone-shadow-medium: 0 10px 30px rgba(0, 0, 0, 0.2);
     --yuzi-phone-shadow-strong: 0 8px 32px rgba(0, 0, 0, 0.4);
-    --yuzi-phone-shadow-notification: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.1);
     --yuzi-phone-shadow-shell-drop: 0 20px 50px rgba(0,0,0,0.6);
     --yuzi-phone-shadow-success: 0 8px 24px rgba(52, 199, 89, 0.3);
     --yuzi-phone-shadow-badge: 0 2px 4px rgba(0,0,0,0.3);

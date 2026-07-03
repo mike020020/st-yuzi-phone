@@ -21,7 +21,6 @@ const FILES = {
     diaryScene: 'modules/phone-theater/scenes/diary.js',
     homeViewModel: 'modules/phone-home/view-model.js',
     routeRenderer: 'modules/phone-core/route-renderer.js',
-    notifications: 'modules/phone-core/notifications.js',
     visibilitySettings: 'modules/settings-app/services/appearance-settings/visibility-settings.js',
     iconUploadService: 'modules/settings-app/services/appearance-settings/icon-upload-service.js',
     iconSlots: 'modules/settings-app/services/appearance-settings/icon-slots.js',
@@ -445,11 +444,6 @@ function main() {
     pushCheck(results, 'routeRenderer', 'route-renderer 调用 renderTheaterScene() 并传递 renderToken', has(contents.routeRenderer, 'renderTheaterScene(page, sceneId, { renderToken })'));
     pushCheck(results, 'routeRenderer', 'route-renderer 普通 app 子表兜底进入 theater scene', has(contents.routeRenderer, "import('./data-api.js')") && has(contents.routeRenderer, "import('../phone-theater/data.js')") && has(contents.routeRenderer, 'resolveTheaterSceneBySheetKey(getTableData(), sheetKey)') && has(contents.routeRenderer, "routeType: 'theater-app-redirect'") && has(contents.routeRenderer, 'renderTheaterScene(page, theaterScene.id, { renderToken })'));
     pushCheck(results, 'routeRenderer', 'route-renderer 支持 table-generic 强制通用表 route', has(contents.routeRenderer, 'TABLE_GENERIC_ROUTE_PREFIX') && has(contents.routeRenderer, "routeType: 'table-generic'") && has(contents.routeRenderer, 'forceGenericList: true'));
-
-    pushCheck(results, 'notifications', '通知导入 resolveTheaterSceneBySheetKey()', has(contents.notifications, "from '../phone-theater/data.js'"));
-    pushCheck(results, 'notifications', '通知使用组合 appKey 聚合未读', has(contents.notifications, 'const targetBadgeKey = theaterScene?.appKey || sheetKey'));
-    pushCheck(results, 'notifications', '通知点击进入组合 route', has(contents.notifications, 'const targetRoute = theaterScene?.route || `app:${sheetKey}`'));
-    pushCheck(results, 'notifications', '通知清理组合 badge key', has(contents.notifications, 'clearUnreadBadge(targetBadgeKey)'));
 
     pushCheck(results, 'visibilitySettings', '隐藏设置导入组合数据函数', has(contents.visibilitySettings, "from '../../../phone-theater/data.js'"));
     pushCheck(results, 'visibilitySettings', '隐藏设置生成组合项', has(contents.visibilitySettings, 'const theaterItems = getAvailableTheaterScenes(rawData).map'));
