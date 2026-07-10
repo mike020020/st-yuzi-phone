@@ -18,6 +18,7 @@ import {
     buildGenericRowViewModel,
 } from './row-view-model.js';
 import { getUpdatedRowsForSheet } from '../table-update-review/store.js';
+import { buildTableNavigationControlState } from '../table-navigation/controls.js';
 
 const logger = Logger.withScope({ scope: 'table-viewer/list-page-renderer', feature: 'table-viewer' });
 
@@ -62,6 +63,8 @@ function buildGenericListPageViewModel(options = {}) {
         rawHeaders = [],
         genericMatch,
         sheetKey = '',
+        navigationSheetKey = sheetKey,
+        rawData,
         searchQueryOverride,
     } = options;
 
@@ -75,6 +78,14 @@ function buildGenericListPageViewModel(options = {}) {
     const selectedDeleteRows = new Set(normalizeSelectedDeleteRowIndexes(state.selectedDeleteRowIndexes || [])
         .filter((rowIndex) => rowIndex < totalRowCount && !lockRows.has(rowIndex)));
     const deletingAny = state.deletingRowIndex >= 0 || !!state.deletingSelection;
+    const navigationBlocked = !!state.lockManageMode
+        || !!state.deleteManageMode
+        || deletingAny;
+    const navigationControlState = buildTableNavigationControlState(
+        rawData,
+        navigationSheetKey,
+        { blocked: navigationBlocked },
+    );
     const genericStylePayload = createGenericTemplateStylePayload(genericMatch, 'list');
     const toolbarOptions = genericStylePayload.structureOptions?.toolbar || {};
     const listItemOptions = genericStylePayload.structureOptions?.listItem || {};
@@ -206,6 +217,9 @@ function buildGenericListPageViewModel(options = {}) {
         lockManageMode: state.lockManageMode,
         deleteManageMode: state.deleteManageMode,
         sortDescending: !!state.listSortDescending,
+        navigationSheetKey,
+        navigationBlocked,
+        navigationControlState,
     };
 }
 
@@ -361,6 +375,8 @@ function resolveGenericListRegionPatchPlan(changedKeys = []) {
     return {
         preserveToolbarSearch: true,
         updateNav: changedKeySet.has('deleteManageMode')
+            || changedKeySet.has('lockManageMode')
+            || changedKeySet.has('deletingRowIndex')
             || changedKeySet.has('listSearchQuery')
             || changedKeySet.has('listSortDescending')
             || changedKeySet.has('onlyShowReviewUpdates')
@@ -459,6 +475,7 @@ export function renderGenericListPage(options = {}) {
         container,
         state,
         sheetKey,
+        navigationSheetKey = sheetKey,
         tableName = '',
         headers = [],
         rawHeaders = [],
@@ -512,11 +529,13 @@ export function renderGenericListPage(options = {}) {
 
     const getVisibleDeleteRowIndexes = (searchQueryOverride) => buildGenericListPageViewModel({
         state,
+        rawData: getTableData(),
         rows,
         headers,
         rawHeaders,
         genericMatch,
         sheetKey,
+        navigationSheetKey,
         searchQueryOverride,
     }).selectableDeleteRowIndexes || [];
 
@@ -524,11 +543,13 @@ export function renderGenericListPage(options = {}) {
         state.syncLockState(getTableLockState(sheetKey));
         const nextViewModel = buildGenericListPageViewModel({
             state,
+            rawData: getTableData(),
             rows,
             headers,
             rawHeaders,
             genericMatch,
             sheetKey,
+            navigationSheetKey,
         });
         const nextRegionHtml = buildGenericListRegionHtml(tableName, nextViewModel);
         const patchPlan = resolveGenericListRegionPatchPlan(changedKeys);
@@ -544,6 +565,7 @@ export function renderGenericListPage(options = {}) {
             container,
             state,
             sheetKey,
+            navigationSheetKey,
             navigateBack,
             captureListScroll,
             render,
@@ -568,11 +590,13 @@ export function renderGenericListPage(options = {}) {
 
     const viewModel = buildGenericListPageViewModel({
         state,
+        rawData: getTableData(),
         rows,
         headers,
         rawHeaders,
         genericMatch,
         sheetKey,
+        navigationSheetKey,
     });
     const regionHtml = buildGenericListRegionHtml(tableName, viewModel);
     const canPatchExistingList = !!container.querySelector(GENERIC_LIST_ROOT_SELECTOR);
@@ -590,6 +614,7 @@ export function renderGenericListPage(options = {}) {
         container,
         state,
         sheetKey,
+        navigationSheetKey,
         navigateBack,
         captureListScroll,
         render,

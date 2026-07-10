@@ -97,6 +97,7 @@ export function createGenericTableViewerRuntime(container, context, hooks = {}) 
     const {
         sheet,
         sheetKey,
+        navigationSheetKey = sheetKey,
         tableName,
         headers,
         rawHeaders,
@@ -281,6 +282,7 @@ export function createGenericTableViewerRuntime(container, context, hooks = {}) 
             container,
             state,
             sheetKey,
+            navigationSheetKey,
             tableName,
             headers,
             rawHeaders,

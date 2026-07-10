@@ -31,6 +31,7 @@ export function renderTableViewer(container, sheetKey, options = {}) {
     }
 
     const forceGenericList = options?.forceGenericList === true;
+    const navigationSheetKey = String(options?.navigationSheetKey || sheetKey || '').trim();
     const rerenderViewer = (nextContainer, nextSheetKey) => {
         renderTableViewer(nextContainer, nextSheetKey, options);
     };
@@ -88,6 +89,7 @@ export function renderTableViewer(container, sheetKey, options = {}) {
     if (specialType) {
         const specialRuntime = createSpecialTableViewerRuntime(container, {
             sheetKey,
+            navigationSheetKey,
             tableName,
             rows,
             headers,
@@ -108,6 +110,7 @@ export function renderTableViewer(container, sheetKey, options = {}) {
 
     renderGenericTableViewer(container, {
         sheetKey,
+        navigationSheetKey,
         tableName,
         headers,
         rawHeaders,

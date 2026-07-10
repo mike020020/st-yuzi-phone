@@ -159,7 +159,7 @@ const indexSource = sources.index;
 const interactions = sources.interactions;
 
 assert(
-    routeRenderer.includes('async function loadRouteRenderer(route, renderToken)')
+    /async function loadRouteRenderer\s*\(\s*route\s*,\s*renderToken(?:\s*,[^)]*)?\)/.test(routeRenderer)
         && routeRenderer.includes('renderVariableManager(page, { renderToken });'),
     'variable-manager route 必须把 renderToken 显式传给 renderVariableManager',
 );

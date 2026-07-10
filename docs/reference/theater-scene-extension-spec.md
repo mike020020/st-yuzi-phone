@@ -98,10 +98,26 @@ editableTables: Object.freeze([
 2. 当前 scene 只有一个可用编辑表时，右上“编辑”按钮直接导航到 `table-generic:<sheetKey>`。
 3. 当前 scene 有多个可用编辑表时，右上“编辑”按钮打开表选择菜单，菜单项再导航到 `table-generic:<sheetKey>`。
 4. `table-generic:<sheetKey>` 是强制通用表列表桥。它必须跳过 special renderer，直接进入原始表的通用列表页。
-5. 编辑桥必须通过标准 route history 进入。用户在原始通用表列表点击返回时，必须回到来源小剧场美化页。
-6. 缺失或当前 rawData 中不可用的表项不得触发无效导航；UI 应隐藏或禁用该项。
+5. 首次编辑通过普通 route history push 进入。用户在原始通用表列表点击返回时，必须先回到当前小剧场美化页。
+6. 仅在 `table:<sheetKey>` 跨表浏览后再次编辑时，核心交互层可以替换 history 顶部的旧 Theater / 兼容 App / 物理表浏览锚点，再压入当前 Theater。不得清空全局 history，也不得替换审核来源。
+7. 编辑 route 渲染失败必须恢复点击前的 history；过期 render token 的失败不得回滚更新后的导航状态。
+8. 缺失或当前 rawData 中不可用的表项不得触发无效导航；UI 应隐藏或禁用该项。
 
 不要在 scene 的 `bindInteractions` 中自己手搓 `app:${sheetKey}` 跳转，也不要直接 import Table Viewer 或手写返回目标。那会重新进入普通 App 分流，未来遇到 special 表时又被拦截，还会破坏“编辑后返回美化页”的交互合同。标准做法是统一走 `table-generic:<sheetKey>`。
+
+### 2.4 物理表导航锚点
+
+所有真实 `sheet_*` 表都会进入统一物理目录，顺序只来自 `getSheetKeys(rawData)`。Theater scene 不拥有独立排序，也不得按 `tables` 声明顺序重排全局表目录。
+
+- `table:<sheetKey>` 是表级循环切换和审核 Theater 分流使用的物理锚点 route。
+- `theater:<sceneId>` 是显式 scene 入口；缺少传入锚点时优先使用 `primaryTableRole` 对应的实际 `sheetKey`，主表不可用但 scene 其他物理表仍存在时，按 `getSheetKeys(rawData)` 的全局顺序选择稳定首项。
+- 同一 scene 包含多个物理表时，`table:<sheetKey>` 必须保留用户实际进入的 `sheetKey`，不能统一改写成主表。
+- `app:<sheetKey>` 仅用于兼容既有首页入口，不应成为表级切换目标。
+- `table-generic:<sheetKey>` 仍只承担编辑桥和审核原始字段详情，不参与美化页面循环。
+
+公共标题栏由 core templates/render/interactions 提供上一表、下一表控件。scene 模块不得复制目录、路由或监听器。删除管理态和删除执行中必须禁用并阻止切换；页面生命周期失活后不得继续发布 replace。
+
+新增 scene 只要注册正确的表名与 `primaryTableRole`，可用时会自动被统一目录分类为 Theater；resolver 返回空或主表缺失时，物理表仍保留并降级到 Generic。
 
 ## 3. 数据读取与 ViewModel
 
@@ -230,6 +246,8 @@ npm run build --silent
 - 内置 scene 仍注册；新增 scene 必须加入 registry。
 - 样式 index 按 core → square → forum → live → calendar → diary 顺序引入。
 - `editableTables` role 必须属于 scene `tables`，且编辑入口统一走 `table-generic:<sheetKey>`。
+- 公共标题栏表级控件统一走 `table:<sheetKey>` 与 `replaceCurrentRoute()`，不得压入 route history。
+- 显式 scene 入口默认锚定 `primaryTableRole`，物理表入口保留传入 `sheetKey`。
 - 核心 data/templates/delete-service/render/interactions 不出现 `sceneId === 'square'` 这类分支。
 - typed delete key 没有回退。
 - 禁止用裸字符串前缀模拟 typed delete key。

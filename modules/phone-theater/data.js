@@ -1,3 +1,4 @@
+import { getSheetKeys } from '../phone-core/data-api.js';
 import {
     getTheaterSceneDefinition,
     getTheaterSceneDefinitionByTableName,
@@ -68,6 +69,24 @@ export function resolveTheaterSceneTables(rawData, sceneDefinition) {
         childSheetKeys,
         rowCount,
     };
+}
+
+export function resolveTheaterNavigationSheetKey(rawData, viewModel, requestedSheetKey) {
+    const tables = viewModel?.tables && typeof viewModel.tables === 'object'
+        ? viewModel.tables
+        : {};
+    const sceneSheetKeys = new Set(Object.values(tables)
+        .map(table => normalizeText(table?.sheetKey))
+        .filter(Boolean));
+    const requested = normalizeText(requestedSheetKey);
+    if (requested && sceneSheetKeys.has(requested)) return requested;
+
+    const primaryRole = normalizeText(viewModel?.scene?.primaryTableRole);
+    const primarySheetKey = normalizeText(tables[primaryRole]?.sheetKey);
+    if (primarySheetKey && sceneSheetKeys.has(primarySheetKey)) return primarySheetKey;
+
+    return getSheetKeys(rawData)
+        .find(sheetKey => sceneSheetKeys.has(normalizeText(sheetKey))) || '';
 }
 
 export function getAvailableTheaterScenes(rawData) {

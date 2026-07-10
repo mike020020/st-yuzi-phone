@@ -1,8 +1,12 @@
 import { getTableData } from '../phone-core/data-api.js';
 import { navigateBack } from '../phone-core/routing.js';
 import { getPhoneCoreState, phoneRuntime } from '../phone-core/state.js';
+import { buildTableNavigationControlState } from '../table-navigation/controls.js';
 import { createRuntimeScrollPreserver } from '../ui-runtime/scroll-preserver-core.js';
-import { buildTheaterSceneViewModel } from './data.js';
+import {
+    buildTheaterSceneViewModel,
+    resolveTheaterNavigationSheetKey,
+} from './data.js';
 import { buildTheaterScenePageHtml } from './templates.js';
 import { bindTheaterSceneInteractions } from './interactions.js';
 
@@ -44,6 +48,7 @@ function createTheaterLifecycleContext(container, sceneId, options = {}) {
 function createInitialState(sceneId) {
     return {
         sceneId: normalizeText(sceneId),
+        navigationSheetKey: '',
         deleteManageMode: false,
         selectedKeys: new Set(),
         deleting: false,
@@ -124,7 +129,13 @@ export function renderTheaterScene(container, sceneId, options = {}) {
     };
     const rawData = getTableData();
     const viewModel = buildTheaterSceneViewModel(rawData, state.sceneId);
+    state.navigationSheetKey = resolveTheaterNavigationSheetKey(rawData, viewModel, options.navigationSheetKey);
     const uiState = buildUiState(state, viewModel);
+    uiState.tableNavigation = state.navigationSheetKey
+        ? buildTableNavigationControlState(rawData, state.navigationSheetKey, {
+            blocked: state.deleteManageMode || state.deleting,
+        })
+        : null;
 
     if (!lifecycle.isActive({ allowDetached: true })) return;
 
@@ -143,6 +154,7 @@ export function renderTheaterScene(container, sceneId, options = {}) {
             sceneId: state.sceneId,
             state,
             viewModel,
+            tableNavigation: uiState.tableNavigation,
             render: renderCurrentScene,
             lifecycle,
         });

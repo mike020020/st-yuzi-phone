@@ -102,6 +102,18 @@ export function buildGenericListToolbarHtml(options = {}) {
     `;
 }
 
+function buildGenericTitleNavigationHtml(tableName, navigationControlState = {}, showNavigation = true) {
+    const previous = navigationControlState.previous || {};
+    const next = navigationControlState.next || {};
+    return `
+        <div class="phone-generic-title-navigation ${showNavigation ? 'phone-generic-table-navigation' : 'is-title-only'}" ${showNavigation ? 'aria-label="切换表格"' : ''}>
+            ${showNavigation ? `<button type="button" class="phone-generic-table-navigation-btn" data-action="switch-table-previous" aria-label="上一张表" aria-disabled="${previous.disabled ? 'true' : 'false'}" ${previous.disabled ? 'disabled' : ''}>‹</button>` : ''}
+            <span class="phone-nav-title">${escapeHtml(tableName)}</span>
+            ${showNavigation ? `<button type="button" class="phone-generic-table-navigation-btn" data-action="switch-table-next" aria-label="下一张表" aria-disabled="${next.disabled ? 'true' : 'false'}" ${next.disabled ? 'disabled' : ''}>›</button>` : ''}
+        </div>
+    `;
+}
+
 export function buildGenericListNavHtml(options = {}) {
     const {
         tableName = '',
@@ -110,6 +122,7 @@ export function buildGenericListNavHtml(options = {}) {
         selectedDeleteCount = 0,
         selectableDeleteCount = 0,
         allVisibleDeleteRowsSelected = false,
+        navigationControlState,
     } = options;
     const selectedCount = Math.max(0, Number(selectedDeleteCount || 0));
     const selectableCount = Math.max(0, Number(selectableDeleteCount || 0));
@@ -120,14 +133,14 @@ export function buildGenericListNavHtml(options = {}) {
     return `
         <div class="phone-nav-bar phone-generic-slot-nav ${deleteManageMode ? 'is-generic-delete-mode' : ''}" data-generic-list-region="nav">
             <button type="button" class="phone-nav-back" data-action="nav-back">${PHONE_ICONS.back}<span>返回</span></button>
-            <span class="phone-nav-title">${escapeHtml(tableName)}</span>
+            ${buildGenericTitleNavigationHtml(tableName, navigationControlState, !deleteManageMode)}
             ${deleteManageMode ? `
                 <div class="phone-generic-nav-delete-actions" aria-label="批量删除操作">
                     <button type="button" class="phone-generic-nav-delete-btn ${allVisibleDeleteRowsSelected ? 'is-active' : ''}" data-action="select-all-delete-rows" aria-pressed="${allVisibleDeleteRowsSelected ? 'true' : 'false'}" ${selectAllDisabled ? 'disabled' : ''}>全选</button>
                     <button type="button" class="phone-generic-nav-delete-btn" data-action="clear-delete-selection" ${clearDisabled ? 'disabled' : ''}>清空</button>
                     <button type="button" class="phone-generic-nav-delete-btn is-danger" data-action="delete-selected-rows" ${deleteDisabled ? 'disabled' : ''}>${deletingSelection ? '删除中...' : `删 ${selectedCount}`}</button>
                 </div>
-            ` : '<span class="phone-generic-nav-placeholder" aria-hidden="true"></span>'}
+            ` : '<div class="phone-generic-nav-placeholder" aria-hidden="true"></div>'}
         </div>
     `;
 }
@@ -351,6 +364,7 @@ export function buildGenericListPageHtml(options = {}) {
         sortDescending = false,
         onlyShowReviewUpdates = false,
         reviewUpdatedRowCount = 0,
+        navigationControlState,
     } = options;
 
     return `
@@ -363,6 +377,7 @@ export function buildGenericListPageHtml(options = {}) {
                 selectedDeleteCount,
                 selectableDeleteCount,
                 allVisibleDeleteRowsSelected,
+                navigationControlState,
             })}
             <div class="phone-app-body phone-table-body phone-generic-slot-body">
                 <div class="phone-generic-page-shell">

@@ -62,7 +62,7 @@ export function renderMessageTable(container, context, deps = {}) {
     const { createSpecialTemplateStylePayload, viewerRuntime, viewerEventManager } = deps;
     if (!(container instanceof HTMLElement) || typeof createSpecialTemplateStylePayload !== 'function') return;
 
-    const { sheetKey, tableName, rows, headers, templateMatch, type } = context;
+    const { sheetKey, navigationSheetKey, tableName, rows, headers, templateMatch, type } = context;
     const headerMap = buildHeaderIndexMap(headers);
     const readSpecialField = createSpecialFieldReader({
         templateMatch,
@@ -415,6 +415,7 @@ export function renderMessageTable(container, context, deps = {}) {
         const childSession = renderMessageConversationView({
             container,
             tableName,
+            navigationSheetKey,
             state,
             readSpecialField,
             createSpecialTemplateStylePayload,
@@ -426,6 +427,7 @@ export function renderMessageTable(container, context, deps = {}) {
             renderContactPicker,
             viewerRuntime: runtime,
             actionGuardStore,
+            isViewSessionActive: () => viewSession.isActive(),
         });
         viewSession.addCleanup(() => {
             childSession?.dispose?.();

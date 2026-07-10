@@ -51,7 +51,7 @@ const render = sources.render;
 const interactions = sources.interactions;
 
 assert(
-    routeRenderer.includes('async function loadRouteRenderer(route, renderToken)')
+    /async function loadRouteRenderer\s*\(\s*route\s*,\s*renderToken(?:\s*,[^)]*)?\)/.test(routeRenderer)
         && routeRenderer.includes('const routeRenderer = await loadRouteRenderer(route, renderToken);'),
     'route-renderer 必须把 renderToken 传入 loadRouteRenderer，不能让 theater 自己猜 route token',
 );
@@ -128,8 +128,18 @@ assert(confirmBody.includes('() => executeConfirmedDelete(container, options)'),
     assert(body.includes('requestRenderIfActive(container, options);'), `${name} 必须 active-only render`);
 });
 
+const switchTableBody = extractFunctionBody(
+    interactions,
+    'switchTheaterTable',
+    /function\s+switchTheaterTable\s*\([^)]*\)\s*{/
+);
+assert(switchTableBody.includes('if (!isTheaterInteractionActive(container, options)) return;'), 'Theater 表切换必须在读取状态前检查 active');
+assert(switchTableBody.includes('blocked: state.deleteManageMode || state.deleting'), 'Theater 表切换必须在删除管理态和删除中阻断');
+assert(switchTableBody.includes('isActive: () => isTheaterInteractionActive(container, options)'), 'Theater 表切换发布 replace 前必须再次检查 lifecycle');
+
 console.log('[theater-lifecycle-check] 检查通过');
 console.log('- OK | route token 显式传入 theater render');
 console.log('- OK | theater render 组合检查 route token、runtime、container 与 sceneId');
 console.log('- OK | 删除确认入口与 await 后 UI 回写受 lifecycle guard 保护');
 console.log('- OK | 同步删除管理交互不在 inactive 旧容器上写 state/render');
+console.log('- OK | Theater 表切换受管理态与 lifecycle 双重保护');

@@ -1,6 +1,38 @@
+import { getTableData } from '../phone-core/data-api.js';
 import { navigateBack, navigateTo } from '../phone-core/routing.js';
+import { resolveTableNavigationTarget } from '../table-navigation/catalog.js';
 import { TABLE_GENERIC_ROUTE_PREFIX } from './constants.js';
 import { setPendingTableReviewNavigationIntent } from './navigation-intent.js';
+
+export function executeTableUpdateReviewNavigation(payload = {}, deps = {}) {
+    const sheetKey = String(payload.sheetKey || '').trim();
+    const changeType = String(payload.changeType || '').trim();
+    if (changeType === 'delete') return { navigated: false, reason: 'delete', route: '' };
+    if (!sheetKey) return { navigated: false, reason: 'missing_sheet_key', route: '' };
+
+    const readTableData = deps.getTableData || getTableData;
+    const resolveTarget = deps.resolveTableNavigationTarget || resolveTableNavigationTarget;
+    const setIntent = deps.setPendingTableReviewNavigationIntent || setPendingTableReviewNavigationIntent;
+    const navigate = deps.navigateTo || navigateTo;
+    const target = resolveTarget(readTableData(), sheetKey);
+    if (target?.presentation === 'theater') {
+        navigate(target.route);
+        return { navigated: true, reason: '', route: target.route, presentation: 'theater' };
+    }
+
+    const intentAccepted = setIntent({
+        sheetKey,
+        rowId: String(payload.rowId || '').trim(),
+        rowIndex: Number(payload.rowIndex),
+        changeType,
+        createdAt: Number.isFinite(Number(payload.createdAt)) ? Number(payload.createdAt) : Date.now(),
+    });
+    if (!intentAccepted) return { navigated: false, reason: 'intent_rejected', route: '' };
+
+    const route = `${TABLE_GENERIC_ROUTE_PREFIX}${sheetKey}`;
+    navigate(route);
+    return { navigated: true, reason: '', route, presentation: target?.presentation || 'generic' };
+}
 
 export function bindTableUpdateReviewInteractions(container, options = {}) {
     if (!(container instanceof HTMLElement)) return () => {};
@@ -19,19 +51,13 @@ export function bindTableUpdateReviewInteractions(container, options = {}) {
         }
 
         if (action === 'open-review-change') {
-            const sheetKey = String(actionEl.dataset.sheetKey || '').trim();
-            const changeType = String(actionEl.dataset.changeType || '').trim();
-            if (changeType === 'delete') return;
-            if (!sheetKey) return;
-            const intentAccepted = setPendingTableReviewNavigationIntent({
-                sheetKey,
+            executeTableUpdateReviewNavigation({
+                sheetKey: String(actionEl.dataset.sheetKey || '').trim(),
                 rowId: String(actionEl.dataset.rowId || '').trim(),
                 rowIndex: Number(actionEl.dataset.rowIndex),
-                changeType,
+                changeType: String(actionEl.dataset.changeType || '').trim(),
                 createdAt: Date.now(),
             });
-            if (!intentAccepted) return;
-            navigateTo(`${TABLE_GENERIC_ROUTE_PREFIX}${sheetKey}`);
         }
     };
 

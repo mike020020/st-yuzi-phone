@@ -153,7 +153,7 @@ export function createSpecialTableViewerRuntime(container, context, deps = {}) {
         return null;
     }
 
-    const { sheetKey, tableName, rows, headers, type, templateMatch } = context;
+    const { sheetKey, navigationSheetKey, tableName, rows, headers, type, templateMatch } = context;
     const viewerRuntime = deps.viewerRuntime;
     const viewerEventManager = deps.viewerEventManager || viewerRuntime?.viewerEventManager;
     const renderMessageTable = deps.renderMessageTable || renderMessageTablePage;
@@ -173,7 +173,15 @@ export function createSpecialTableViewerRuntime(container, context, deps = {}) {
             return false;
         }
 
-        renderMessageTable(container, { sheetKey, tableName, rows, headers, templateMatch, type }, {
+        renderMessageTable(container, {
+            sheetKey,
+            navigationSheetKey,
+            tableName,
+            rows,
+            headers,
+            templateMatch,
+            type,
+        }, {
             createSpecialTemplateStylePayload: createStylePayload,
             viewerRuntime,
             viewerEventManager,

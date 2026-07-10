@@ -139,13 +139,21 @@ function main() {
         && has(contents.interactions, 'navigateBack();')
         && !has(contents.interactions, "action === 'refresh-review'")
         && !has(contents.interactions, 'onRefresh();'));
-    check(results, 'interactions', '审核页点击新增/修改项写入一次性导航 intent 并拒绝删除项', has(contents.interactions, "action === 'open-review-change'")
-        && has(contents.interactions, "if (changeType === 'delete') return;")
-        && has(contents.interactions, 'setPendingTableReviewNavigationIntent({')
+    check(results, 'interactions', '审核页绑定层将点击数据委托给可执行导航决策函数', has(contents.interactions, 'export function executeTableUpdateReviewNavigation(payload = {}, deps = {})')
+        && has(contents.interactions, "action === 'open-review-change'")
+        && has(contents.interactions, 'executeTableUpdateReviewNavigation({'));
+    check(results, 'interactions', '审核导航决策拒绝删除与空 sheetKey 后读取统一目录', has(contents.interactions, "changeType === 'delete'")
+        && has(contents.interactions, "reason: 'missing_sheet_key'")
+        && has(contents.interactions, 'const target = resolveTarget(readTableData(), sheetKey);'));
+    check(results, 'interactions', '审核导航决策 Theater 分流发生在写 intent 前并保留物理表锚点', has(contents.interactions, "target?.presentation === 'theater'")
+        && has(contents.interactions, 'navigate(target.route);')
+        && appearsBefore(contents.interactions, "target?.presentation === 'theater'", 'const intentAccepted = setIntent({'));
+    check(results, 'interactions', '审核页 Theater 分支不清理既有全局 intent', !has(contents.interactions, 'clearPendingTableReviewNavigationIntent'));
+    check(results, 'interactions', '审核导航决策非 Theater 写入一次性 intent 后进入 table-generic',
+        has(contents.interactions, 'const intentAccepted = setIntent({')
         && has(contents.interactions, 'sheetKey,')
-        && has(contents.interactions, 'rowId: String(actionEl.dataset.rowId ||')
-        && has(contents.interactions, 'rowIndex: Number(actionEl.dataset.rowIndex)'));
-    check(results, 'interactions', '审核页点击变更项导航到 table-generic 路由', has(contents.interactions, 'navigateTo(`${TABLE_GENERIC_ROUTE_PREFIX}${sheetKey}`);'));
+        && has(contents.interactions, 'const route = `${TABLE_GENERIC_ROUTE_PREFIX}${sheetKey}`;')
+        && appearsBefore(contents.interactions, 'const intentAccepted = setIntent({', 'navigate(route);'));
 
     check(results, 'service', '审核服务使用 subscribeTableUpdate 订阅表格更新', has(contents.service, "import { subscribeTableUpdate } from '../phone-core/callbacks.js';")
         && has(contents.service, 'const unsubscribe = subscribeTableUpdate((event) => {'));

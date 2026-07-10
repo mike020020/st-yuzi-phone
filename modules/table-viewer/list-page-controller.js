@@ -1,5 +1,6 @@
 import { Logger } from '../error-handler.js';
 import { showConfirmDialog } from '../settings-app/ui/confirm-dialog.js';
+import { requestTableNavigationSwitch } from '../table-navigation/controls.js';
 import { setSharedOnlyShowReviewUpdates } from './state.js';
 
 const logger = Logger.withScope({ scope: 'table-viewer/list-controller', feature: 'table-viewer' });
@@ -433,6 +434,26 @@ function confirmDeleteSelectedRows(container) {
     );
 }
 
+function switchTable(container, direction) {
+    const context = getGenericListControllerContext(container);
+    if (!context?.state) return;
+
+    const blocked = !!context.state.lockManageMode
+        || !!context.state.deleteManageMode
+        || !!context.state.deletingSelection
+        || context.state.deletingRowIndex >= 0;
+    requestTableNavigationSwitch(
+        context.navigationSheetKey || context.sheetKey,
+        direction,
+        {
+            blocked,
+            isActive: () => isGenericListContextActive(context)
+                && context.state.mode === 'list'
+                && getGenericListControllerContext(container) === context,
+        },
+    );
+}
+
 async function handleActionClick(container, actionEl) {
     const context = getGenericListControllerContext(container);
     if (!(container instanceof HTMLElement) || !context?.state) return;
@@ -446,6 +467,12 @@ async function handleActionClick(container, actionEl) {
     switch (action) {
         case 'nav-back':
             context.navigateBack();
+            return;
+        case 'switch-table-previous':
+            switchTable(container, 'previous');
+            return;
+        case 'switch-table-next':
+            switchTable(container, 'next');
             return;
         case 'add-row':
             context.showAddRowModal();
@@ -496,6 +523,7 @@ export function bindGenericListPageController(options = {}) {
         container,
         state,
         sheetKey,
+        navigationSheetKey,
         navigateBack,
         captureListScroll,
         render,
@@ -518,6 +546,7 @@ export function bindGenericListPageController(options = {}) {
     const context = setGenericListControllerContext(container, {
         state,
         sheetKey,
+        navigationSheetKey,
         navigateBack,
         captureListScroll,
         render,

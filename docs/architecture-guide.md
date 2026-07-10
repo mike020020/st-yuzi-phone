@@ -125,19 +125,22 @@ sequenceDiagram
 
 ### 3.2 路由系统
 
-路由状态由 [`routing.js`](../modules/phone-core/routing.js:52) 管理：
+路由状态由 [`routing.js`](../modules/phone-core/routing.js:39) 管理：
 
 - [`navigateTo()`](../modules/phone-core/routing.js:52)：写入当前 route，并触发 route change callbacks。
-- [`navigateBack()`](../modules/phone-core/routing.js:67)：从 routeHistory 回退。
-- [`onRouteChange()`](../modules/phone-core/routing.js:76)：注册 route change 回调。
+- [`navigateToReplacingHistoryTop()`](../modules/phone-core/routing.js:69)：仅用于保留当前页面为返回锚点、同时替换旧浏览锚点的受控 push；失败回滚必须恢复被替换的 history entry。
+- [`replaceCurrentRoute()`](../modules/phone-core/routing.js:94)：替换当前 route，不修改 routeHistory。
+- [`navigateBack()`](../modules/phone-core/routing.js:107)：从 routeHistory 回退。
+- [`onRouteChange()`](../modules/phone-core/routing.js:123)：注册 route change 回调。
 
-渲染由 [`route-runtime.js`](../modules/phone-core/route-runtime.js:74) 和 [`route-renderer.js`](../modules/phone-core/route-renderer.js:26) 执行。
+渲染由 [`route-runtime.js`](../modules/phone-core/route-runtime.js:84) 和 [`route-renderer.js`](../modules/phone-core/route-renderer.js:27) 执行。
 
 已确认路由：
 
 - home route -> [`renderHomeScreen()`](../modules/phone-home/render.js:121)
-- table app route -> [`renderTableViewer()`](../modules/table-viewer/render.js:20)
-- theater route -> [`renderTheaterScene()`](../modules/phone-theater/render.js:58)
+- `table:<sheetKey>` 物理表 route -> 通过统一目录按 Theater → Special → Generic 分类，分别进入 [`renderTheaterScene()`](../modules/phone-theater/render.js:129) 或 [`renderTableViewer()`](../modules/table-viewer/render.js:20)
+- `app:<sheetKey>` 兼容 route -> 复用同一目录分类；它不是跨表循环的目标 route
+- theater route -> [`renderTheaterScene()`](../modules/phone-theater/render.js:118)
 - table-generic route -> [`renderTableViewer()`](../modules/table-viewer/render.js:20) with force generic list mode
 - table-update-review route -> [`renderTableUpdateReview()`](../modules/table-update-review/index.js:112)
 - settings route -> [`renderSettings()`](../modules/settings-app/render.js:79)
@@ -146,18 +149,29 @@ sequenceDiagram
 
 小剧场编辑桥：
 
-- 小剧场美化页如果声明 `editableTables`，通用交互层通过 [`navigateTo()`](../modules/phone-core/routing.js:52) 进入 `table-generic:<sheetKey>`。
-- `table-generic:<sheetKey>` 由 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:26) 识别，并调用 [`renderTableViewer()`](../modules/table-viewer/render.js:20) 的强制通用列表模式，绕开小剧场子表重定向和 special 模板检测。
-- 由于编辑桥使用标准 [`navigateTo()`](../modules/phone-core/routing.js:52) 压入 route history，编辑页返回必须走 [`navigateBack()`](../modules/phone-core/routing.js:67) 回到来源小剧场美化页。这是交互合同，不是偶然副作用。
+- 小剧场美化页如果声明 `editableTables`，编辑目标统一为 `table-generic:<sheetKey>`。首次编辑以及从首页或审核来源进入后的首次编辑使用 [`navigateTo()`](../modules/phone-core/routing.js:52)，把当前 Theater 美化页保留为编辑页的返回锚点。
+- 在 `table:<sheetKey>` 跨表浏览链中再次进入编辑时，通用交互层使用 [`navigateToReplacingHistoryTop()`](../modules/phone-core/routing.js:69)：移除 history 顶部的旧 Theater / 兼容 App / 物理表浏览锚点，再压入当前 Theater。它不得用于审核来源，也不得替代 [`replaceCurrentRoute()`](../modules/phone-core/routing.js:94) 的表级切换语义。
+- `table-generic:<sheetKey>` 由 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27) 识别，并调用 [`renderTableViewer()`](../modules/table-viewer/render.js:20) 的强制通用列表模式，绕开小剧场子表重定向和 special 模板检测。
+- 编辑页返回必须先通过 [`navigateBack()`](../modules/phone-core/routing.js:107) 回到当前 Theater，再次返回才到初始 Home / Review。最新编辑 route 渲染失败时会撤销当前 Theater 的临时入栈并恢复被替换的旧锚点；过期 `routeRenderToken` 的失败不得改写新 history。
 
 审核 App 跳转桥：
 
-- [`table-update-review`](../modules/table-update-review/constants.js:2) 是系统 App route，由 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:26) 动态加载 [`renderTableUpdateReview()`](../modules/table-update-review/index.js:112)。
-- 审核项进入通用表详情时，审核交互先写入 pending navigation intent，再通过标准 [`navigateTo()`](../modules/phone-core/routing.js:52) 进入 `table-generic:<sheetKey>`；Table Viewer 消费 intent 后进入对应行详情。详情本地返回只回列表，列表路由返回继续依赖 route history 回到审核页。
+- [`table-update-review`](../modules/table-update-review/constants.js:2) 是系统 App route，由 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27) 动态加载 [`renderTableUpdateReview()`](../modules/table-update-review/index.js:112)。
+- Theater 物理表命中可用 scene 时，审核交互在写入 pending navigation intent 之前分流，直接通过标准 [`navigateTo()`](../modules/phone-core/routing.js:52) 进入 `table:<sheetKey>` 美化场景；该分支不创建或清理 Generic intent。
+- Generic 与 Special（当前为消息记录表）仍先写入 pending navigation intent，再进入 `table-generic:<sheetKey>`；Table Viewer 消费 intent 后进入对应行详情。详情本地返回只回列表，列表路由返回继续依赖 route history 回到审核页。
+
+表级循环切换：
+
+- 唯一顺序来源是 [`getSheetKeys()`](../modules/phone-core/data-api/table-repository.js:560)，统一目录位于 [`table-navigation/catalog.js`](../modules/table-navigation/catalog.js)。禁止在页面层复制 `orderNo` 排序、使用 `Object.keys(rawData)` 或按表名猜测展示类型。
+- Generic 列表、Theater 公共标题栏和消息会话列表只共享目录与 [`requestTableNavigationSwitch()`](../modules/table-navigation/controls.js:32)，各自保留现有模板与生命周期。
+- 三类页面都将“上一张、当前标题、下一张”渲染为同一标题导航组；Theater 编辑/删除和 Generic 批量删除属于独立操作区。窄屏可以让操作区换行，但不得把切表按钮移出标题组。
+- 切换成功只调用 [`replaceCurrentRoute()`](../modules/phone-core/routing.js:94)，不压入或弹出 `routeHistory`。因此 A→B→C 后执行一次返回，仍回到进入 A 前的页面。
+- 路由失败回滚同时校验目标 route 与 `routeRenderToken`，避免 A→B→C→B 的旧 B 请求回滚最新 B；back 失败还会恢复已弹出的 history entry。
+- 零表、单表、锚点缺失、非法方向、页面失活及删除/锁定管理态都会阻止切换。按钮 disabled 只是表现层，controller 与共享 controls 仍必须二次 guard。
 
 维护规则：
 
-- 新增 route 必须同步改 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:26)。
+- 新增 route 必须同步改 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27)。
 - 如果希望首开不白屏，还要同步维护 [`ROUTE_MODULES`](../modules/phone-core/preload.js:32)。
 - 异步渲染必须尊重 [`routeRenderToken`](../modules/phone-core/state.js:20)，不能绕开现有 token 防护。
 
@@ -701,7 +715,7 @@ Theater 是“把表格数据投影成场景页面”的子系统。它不是 Ta
 
 核心入口：
 
-- [`renderTheaterScene()`](../modules/phone-theater/render.js:58)：场景页面入口，负责读取当前场景状态、拉取 raw table data、构建 view model、生成页面 HTML 并绑定交互。
+- [`renderTheaterScene()`](../modules/phone-theater/render.js:118)：场景页面入口，负责读取当前场景状态、拉取 raw table data、构建 view model、生成页面 HTML 并绑定交互。
 - [`buildTheaterSceneViewModel()`](../modules/phone-theater/data.js:117)：把 raw data 和 scene definition 转成渲染用 view model。
 - [`bindTheaterSceneInteractions()`](../modules/phone-theater/interactions.js:195)：绑定通用删除管理态，并把 scene 专属交互委托给 scene definition。
 - [`deleteTheaterEntities()`](../modules/phone-theater/delete-service.js:72)：执行跨表级联删除计划，调用 [`deleteTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:529) 做行级批量删除，随后刷新投影并派发表更新事件。
@@ -864,23 +878,28 @@ sequenceDiagram
 
 #### 6.5.5 通用 shell、scene 内容与交互边界
 
-[`buildTheaterScenePageHtml()`](../modules/phone-theater/templates.js:38) 负责通用 shell：
+[`buildTheaterScenePageHtml()`](../modules/phone-theater/templates.js:91) 负责通用 shell：
 
 - 页面根节点 `.phone-app-page.phone-theater-page`。
-- [`data-theater-scene`](../modules/phone-theater/templates.js:43) 与 [`data-theater-style-scope`](../modules/phone-theater/templates.js:43)。
-- 返回按钮、标题、删除开关。
+- [`data-theater-scene`](../modules/phone-theater/templates.js:97) 与 [`data-theater-style-scope`](../modules/phone-theater/templates.js:97)。
+- 返回按钮，以及按“上一张、标题、下一张”排列的标题导航组。
+- 与标题导航组分离的编辑、删除操作区。
 - 删除管理条。
 - scene 内容区。
 
-[`bindTheaterSceneInteractions()`](../modules/phone-theater/interactions.js:195) 负责通用点击委托：
+[`bindTheaterSceneInteractions()`](../modules/phone-theater/interactions.js:408) 负责通用点击委托：
 
+- `theater-table-navigation-previous`
+- `theater-table-navigation-next`
+- `toggle-theater-edit-menu`
+- `theater-open-edit-table`
 - `toggle-theater-delete-mode`
 - `theater-select-all`
 - `theater-clear-selection`
 - `theater-toggle-select`
 - `theater-confirm-delete`
 
-scene 专属交互通过 [`bindSceneSpecificInteractions()`](../modules/phone-theater/interactions.js:178) 调用 scene definition 的 [`bindInteractions`](../modules/phone-theater/scenes/live.js:313)。当前直播 scene 使用 dataset 标记避免重复绑定弹幕暂停按钮。
+表级切换复用共享 `requestTableNavigationSwitch()`，并受删除管理态与 lifecycle active guard 约束；编辑入口统一经过 `navigateToEditableTable()` 的受控 history 策略。scene 专属交互通过 [`bindSceneSpecificInteractions()`](../modules/phone-theater/interactions.js:397) 调用 scene definition 的 [`bindInteractions`](../modules/phone-theater/scenes/live.js:313)。当前直播 scene 使用 dataset 标记避免重复绑定弹幕暂停按钮。
 
 维护规则：
 
@@ -934,7 +953,7 @@ Variable Manager 是系统 App，不依赖表格 sheet。它从 SillyTavern 当�
 - [`renderVariableManager()`](../modules/variable-manager/index.js:145)：变量管理器路由入口。
 - [`VARIABLE_MANAGER_APP`](../modules/variable-manager/index.js:246)：Home 主屏系统 App 定义，route 固定为 `variable-manager`。
 - [`buildHomeScreenViewModel()`](../modules/phone-home/view-model.js:23)：把 `VARIABLE_MANAGER_APP` 注入 Home App 列表。
-- [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:26)：识别 `variable-manager` route 并动态加载页面渲染器。
+- [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27)：识别 `variable-manager` route 并动态加载页面渲染器。
 - [`createVariableManagerPageInstance()`](../modules/variable-manager/index.js:36)：创建页面实例、runtime、页面状态和 dispose 逻辑。
 - [`getFloorVariables()`](../modules/variable-manager/variable-api.js:46)：读取楼层变量。
 - [`flattenToGroups()`](../modules/variable-manager/flat-view.js:12)：把嵌套对象转换为分组卡片模型。
@@ -1102,7 +1121,7 @@ Table Update Review 是系统 App，不绑定单张 sheet。它负责监听表�
 - [`TABLE_UPDATE_REVIEW_APP_ID`](../modules/table-update-review/constants.js:1)：Home 主屏系统 App id，当前为 `table-update-review`。
 - [`TABLE_UPDATE_REVIEW_ROUTE`](../modules/table-update-review/constants.js:2)：审核页 route，当前为 `table-update-review`。
 - [`buildHomeScreenViewModel()`](../modules/phone-home/view-model.js:23)：把审核 App 作为 `isSystemApp` 注入 Home App 列表。
-- [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:26)：识别 `table-update-review` route 并动态加载审核页渲染器。
+- [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27)：识别 `table-update-review` route 并动态加载审核页渲染器。
 - [`ROUTE_MODULES`](../modules/phone-core/preload.js:32)：包含 `../table-update-review/index.js`，确保审核页入口参与 route module preload。
 - [`renderTableUpdateReview()`](../modules/table-update-review/index.js:112)：审核页路由入口。
 - [`startTableUpdateReviewService()`](../modules/table-update-review/service.js:155)：启动表格净变化监听与审核状态更新。
@@ -1132,18 +1151,23 @@ graph TD
 - 页面渲染必须尊重 `renderToken`，过期 route 渲染不能继续 patch 当前屏幕。
 - 审核服务由 [`startTableUpdateReviewService()`](../modules/table-update-review/service.js:155) 统一启动；页面层不要绕过服务直接改 store。
 
-#### 6.7.2 审核到通用表详情的跳转合同
+#### 6.7.2 审核到物理表页面的跳转合同
 
-审核页不是 Table Viewer 的内部模式。审核项点击更新内容时，交互层写入 pending navigation intent，并调用 [`navigateTo()`](../modules/phone-core/routing.js:52) 进入 `table-generic:<sheetKey>`。Table Viewer 的 generic runtime 消费 intent 后定位目标行并进入详情页。
+审核页不是 Table Viewer 或 Theater 的内部模式。审核项点击更新内容时先按物理 `sheetKey` 查询统一表目录：
+
+- 命中可用 Theater 时，在写 intent 之前调用 [`navigateTo()`](../modules/phone-core/routing.js:52) 进入 `table:<sheetKey>`，保留物理锚点并展示 scene；该分支不定位单条记录。
+- Generic 与 Special 表写入 pending navigation intent，再进入 `table-generic:<sheetKey>`。Table Viewer 的 generic runtime 消费 intent 后定位目标行并进入详情页。
+- Theater resolver 不可用或主表缺失时，目录会把该物理表降级为 Generic，审核流程也随之进入 `table-generic:<sheetKey>`，不会让表从目录消失。
 
 返回语义分两层：
 
 - 详情页本地返回只退出详情模式，回到当前通用表列表。
-- 列表页路由返回走 [`navigateBack()`](../modules/phone-core/routing.js:67)，利用 route history 回到 `table-update-review`。
+- 列表页路由返回走 [`navigateBack()`](../modules/phone-core/routing.js:82)，利用 route history 回到 `table-update-review`。
 
 维护规则：
 
-- 不要为了审核返回链路修改 [`navigateBack()`](../modules/phone-core/routing.js:67) 的全局语义；普通 `app:<sheetKey>` 与 `table-generic:<sheetKey>` 仍依赖同一套 route history。
+- 不要为了审核返回链路修改 [`navigateBack()`](../modules/phone-core/routing.js:82) 的全局语义；普通 `app:<sheetKey>` 与 `table-generic:<sheetKey>` 仍依赖同一套 route history。
+- 不要在 Theater 分流前写 Generic intent，也不要为该分支无条件清理全局 pending intent。
 - 详情本地返回和列表路由返回必须保持不同 action 语义，不能重新让一个泛用返回选择器同时承担两种行为。
 - 审核字段摘要属于审核模板职责；不要把审核字段裁剪或展示规则塞进 Table Viewer。
 
@@ -1339,7 +1363,7 @@ graph TD
 
 ## 9. 新增功能前检查清单
 
-- 新增 route：是否更新 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:26) 和 [`ROUTE_MODULES`](../modules/phone-core/preload.js:32)。
+- 新增 route：是否更新 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27) 和 [`ROUTE_MODULES`](../modules/phone-core/preload.js:32)。
 - 新增页面：是否有 runtime、dispose、容器移除清理。
 - 新增表格写入：是否走 [`enqueueTableMutation()`](../modules/phone-core/data-api/mutation-queue.js:9)。
 - 新增字段：是否更新共享字段契约，而不是复制数组。

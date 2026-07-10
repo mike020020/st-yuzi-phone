@@ -34,10 +34,13 @@ function buildRouteRequestContext(route, renderToken, opts = {}) {
     return {
         route,
         renderToken,
+        navigationMode: String(opts.navigationMode || ''),
         isBack: !!opts.isBack,
         requestMode: String(opts.requestMode || 'explicit'),
         fromRoute: String(opts.fromRoute || ''),
         pushedHistory: !!opts.pushedHistory,
+        poppedHistoryEntry: opts.poppedHistoryEntry || null,
+        displacedHistoryEntry: opts.displacedHistoryEntry || null,
     };
 }
 
@@ -49,13 +52,23 @@ function rollbackFailedRouteRequest(nextRoute, opts = {}, state = routeRuntimeDe
     const failedRoute = String(nextRoute || '').trim();
     if (!failedRoute || state?.isDestroying) return false;
     if (String(state?.currentRoute || '').trim() !== failedRoute) return false;
+    if (!Number.isFinite(opts.renderToken) || state.routeRenderToken !== opts.renderToken) return false;
 
     const previousRoute = String(opts.fromRoute || 'home').trim() || 'home';
-    if (opts.pushedHistory === true && Array.isArray(state?.routeHistory) && state.routeHistory.length > 0) {
+    const routeHistory = Array.isArray(state?.routeHistory) ? state.routeHistory : null;
+    if (opts.pushedHistory === true && routeHistory && routeHistory.length > 0) {
         const lastEntry = state.routeHistory[state.routeHistory.length - 1];
         if (String(lastEntry?.route || '').trim() === previousRoute) {
             state.routeHistory.pop();
         }
+    }
+
+    if (opts.navigationMode === 'push-replace-history-top' && routeHistory && opts.displacedHistoryEntry) {
+        routeHistory.push(opts.displacedHistoryEntry);
+    }
+
+    if (opts.navigationMode === 'back' && routeHistory && opts.poppedHistoryEntry) {
+        routeHistory.push(opts.poppedHistoryEntry);
     }
 
     state.currentRoute = previousRoute;
@@ -66,6 +79,8 @@ function rollbackFailedRouteRequest(nextRoute, opts = {}, state = routeRuntimeDe
             failedRoute,
             previousRoute,
             pushedHistory: !!opts.pushedHistory,
+            navigationMode: String(opts.navigationMode || ''),
+            renderToken: opts.renderToken,
         },
     });
     return true;
@@ -97,11 +112,11 @@ export function requestPhoneRouteRender(route = routeRuntimeDeps.getCurrentRoute
         renderToken,
     }).then((result) => {
         if (result === false) {
-            rollbackFailedRouteRequest(nextRoute, opts, state);
+            rollbackFailedRouteRequest(nextRoute, { ...opts, renderToken }, state);
         }
         return result;
     }).catch((error) => {
-        rollbackFailedRouteRequest(nextRoute, opts, state);
+        rollbackFailedRouteRequest(nextRoute, { ...opts, renderToken }, state);
         logger.error({
             action: 'render.request',
             message: 'route 渲染请求失败',

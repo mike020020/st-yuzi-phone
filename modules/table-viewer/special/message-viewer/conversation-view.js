@@ -1,6 +1,11 @@
 import { getPhoneAiInstructionPresets, setCurrentPhoneAiInstructionPresetName } from '../../../phone-core/chat-support.js';
+import { getTableData } from '../../../phone-core/data-api.js';
 import { navigateBack } from '../../../phone-core/routing.js';
 import { PHONE_ICONS } from '../../../phone-home/icons.js';
+import {
+    buildTableNavigationControlState,
+    requestTableNavigationSwitch,
+} from '../../../table-navigation/controls.js';
 import { escapeHtml, escapeHtmlAttr } from '../../../utils/dom-escape.js';
 import { bindWheelBridge, showInlineToast } from '../../shared-ui.js';
 import {
@@ -72,6 +77,15 @@ function dispatchConversationAction(container, context, actionEl) {
             context.state.contactPickerVisible = true;
             context.renderKeepScroll();
             return true;
+        case 'navigate-table-previous':
+        case 'navigate-table-next': {
+            const direction = action === 'navigate-table-previous' ? 'previous' : 'next';
+            requestTableNavigationSwitch(context.navigationSheetKey, direction, {
+                blocked: context.state?.deleteManageMode === true || context.state?.deletingSelection === true,
+                isActive: context.isActive,
+            });
+            return true;
+        }
         default:
             return false;
     }
@@ -91,6 +105,12 @@ function bindMessageConversationViewController(container) {
         };
     const cleanups = [];
     let disposed = false;
+    const isActive = () => {
+        const currentContext = getMessageConversationViewContext(container);
+        return currentContext === context && context.active !== false
+            && context.state?.mode === 'conversation'
+            && context.isViewSessionActive?.() !== false;
+    };
     const addCleanup = (cleanup) => {
         if (typeof cleanup !== 'function') return;
         if (disposed) {
@@ -114,12 +134,12 @@ function bindMessageConversationViewController(container) {
     addCleanup(bindStableActionDelegate({
         container,
         runtime,
-        actions: ['nav-back', 'open-conversation', 'open-contact-picker'],
+        actions: [
+            'nav-back', 'open-conversation', 'open-contact-picker',
+            'navigate-table-previous', 'navigate-table-next',
+        ],
         sharedPointerGuards,
-        isActive: () => {
-            const currentContext = getMessageConversationViewContext(container);
-            return currentContext === context && context.active !== false && context.state?.mode === 'conversation';
-        },
+        isActive,
         onAction: ({ actionEl }) => {
             const currentContext = getMessageConversationViewContext(container);
             if (currentContext !== context || context.active === false) return;
@@ -155,6 +175,7 @@ export function renderMessageConversationView(options = {}) {
     const {
         container,
         tableName,
+        navigationSheetKey,
         state,
         readSpecialField,
         createSpecialTemplateStylePayload,
@@ -166,6 +187,7 @@ export function renderMessageConversationView(options = {}) {
         renderContactPicker,
         viewerRuntime,
         actionGuardStore,
+        isViewSessionActive,
     } = options;
 
     if (!(container instanceof HTMLElement) || !state || typeof readSpecialField !== 'function') return;
@@ -186,13 +208,21 @@ export function renderMessageConversationView(options = {}) {
     const showConversationSubtitle = stylePayload.structureOptions?.conversationList?.showSubtitle !== false;
     const showLastMessage = stylePayload.structureOptions?.conversationList?.showLastMessage !== false;
     const showTemplateNote = stylePayload.structureOptions?.composeBar?.showTemplateNote !== false;
+    const tableNavigation = buildTableNavigationControlState(getTableData(), navigationSheetKey, {
+        blocked: !navigationSheetKey || state.deleteManageMode === true || state.deletingSelection === true,
+    });
 
     container.innerHTML = `
         <div class="phone-app-page phone-special-app phone-special-message ${stylePayload.className}" ${stylePayload.dataAttrs} style="${stylePayload.styleAttr}">
             ${stylePayload.scopedCss ? `<style class="phone-special-template-inline-style">${stylePayload.scopedCss}</style>` : ''}
-            <div class="phone-nav-bar">
+            <div class="phone-nav-bar phone-special-conversation-nav">
                 <button type="button" class="phone-nav-back" data-action="nav-back">${PHONE_ICONS.back}<span>返回</span></button>
-                <span class="phone-nav-title">${escapeHtml(tableName)}</span>
+                <div class="phone-special-title-navigation phone-special-table-navigation" aria-label="切换表格">
+                    <button type="button" class="phone-special-table-navigation-btn" data-action="navigate-table-previous" aria-label="上一张表" aria-disabled="${tableNavigation.previous.disabled ? 'true' : 'false'}" ${tableNavigation.previous.disabled ? 'disabled' : ''}>‹</button>
+                    <span class="phone-nav-title">${escapeHtml(tableName)}</span>
+                    <button type="button" class="phone-special-table-navigation-btn" data-action="navigate-table-next" aria-label="下一张表" aria-disabled="${tableNavigation.next.disabled ? 'true' : 'false'}" ${tableNavigation.next.disabled ? 'disabled' : ''}>›</button>
+                </div>
+                <div class="phone-special-nav-placeholder" aria-hidden="true"></div>
             </div>
             <div class="phone-app-body phone-table-body phone-special-conversation-body">
                 <div class="phone-special-conversation-actions">
@@ -233,13 +263,18 @@ export function renderMessageConversationView(options = {}) {
 
     const viewContext = setMessageConversationViewContext(container, {
         state,
+        navigationSheetKey,
         readSpecialField,
         createDraftConversationId,
         render,
         renderKeepScroll,
         viewerRuntime,
         actionGuardStore,
+        isViewSessionActive,
     });
+    if (viewContext) viewContext.isActive = () => getMessageConversationViewContext(container) === viewContext
+        && viewContext.active !== false && viewContext.state?.mode === 'conversation'
+        && viewContext.isViewSessionActive?.() !== false;
     bindWheelBridge(container);
     const session = bindMessageConversationViewController(container);
 

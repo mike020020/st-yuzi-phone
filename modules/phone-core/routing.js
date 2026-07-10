@@ -59,17 +59,64 @@ export function navigateTo(route, opts = {}) {
     state.currentRoute = route;
     emitRouteChange(route, {
         ...opts,
+        navigationMode: 'push',
         fromRoute: previousRoute,
         pushedHistory,
+        isBack: false,
+    });
+}
+
+export function navigateToReplacingHistoryTop(route, opts = {}) {
+    const state = getPhoneCoreState();
+    const displacedHistoryEntry = state.routeHistory.pop() || null;
+    if (!displacedHistoryEntry) {
+        navigateTo(route, opts);
+        return false;
+    }
+
+    const previousRoute = state.currentRoute;
+    const pushedHistory = previousRoute !== PHONE_DEFAULT_ROUTE;
+    if (pushedHistory) {
+        pushRouteHistory(previousRoute);
+    }
+    state.currentRoute = route;
+    emitRouteChange(route, {
+        ...opts,
+        navigationMode: 'push-replace-history-top',
+        fromRoute: previousRoute,
+        pushedHistory,
+        displacedHistoryEntry,
+        isBack: false,
+    });
+    return true;
+}
+
+export function replaceCurrentRoute(route, opts = {}) {
+    const state = getPhoneCoreState();
+    const previousRoute = state.currentRoute;
+    state.currentRoute = route;
+    emitRouteChange(route, {
+        ...opts,
+        navigationMode: 'replace',
+        fromRoute: previousRoute,
+        pushedHistory: false,
+        isBack: false,
     });
 }
 
 export function navigateBack() {
     const state = getPhoneCoreState();
+    const fromRoute = state.currentRoute;
     const lastEntry = state.routeHistory.pop();
     const previousRoute = lastEntry?.route || PHONE_DEFAULT_ROUTE;
     state.currentRoute = previousRoute;
-    emitRouteChange(previousRoute, { isBack: true });
+    emitRouteChange(previousRoute, {
+        navigationMode: 'back',
+        fromRoute,
+        pushedHistory: false,
+        poppedHistoryEntry: lastEntry || null,
+        isBack: true,
+    });
     return previousRoute;
 }
 

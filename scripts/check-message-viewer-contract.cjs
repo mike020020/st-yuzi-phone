@@ -11,6 +11,7 @@ const FILES = {
     detailView: 'modules/table-viewer/special/message-viewer/detail-view.js',
     actionDelegate: 'modules/table-viewer/special/message-viewer/action-delegate.js',
     detailController: 'modules/table-viewer/special/message-viewer/detail-controller.js',
+    specialCss: 'styles/04-phone-special-interactions.css',
 };
 
 function read(relativePath) {
@@ -70,6 +71,54 @@ function main() {
     check(results, 'conversationView', 'conversation-view 接入统一 action delegate', has(contents.conversationView, "import { bindStableActionDelegate } from './action-delegate.js';") && has(contents.conversationView, 'bindStableActionDelegate({'));
     check(results, 'conversationView', 'conversation-view 接收并传递共享 action guard store', has(contents.conversationView, 'actionGuardStore') && has(contents.conversationView, 'sharedPointerGuards,'));
     check(results, 'conversationView', 'conversation-view 使用统一分发处理返回/进会话/联系人选择', has(contents.conversationView, 'function dispatchConversationAction(') && has(contents.conversationView, "case 'nav-back':") && has(contents.conversationView, "case 'open-conversation':") && has(contents.conversationView, "case 'open-contact-picker':"));
+    const specialTitleNavigationStart = contents.conversationView.indexOf('phone-special-title-navigation');
+    const specialTitleNavigationEnd = contents.conversationView.indexOf('phone-special-nav-placeholder', specialTitleNavigationStart);
+    const specialTitleNavigationSource = contents.conversationView.slice(specialTitleNavigationStart, specialTitleNavigationEnd);
+    check(results, 'conversationView', 'conversation-view 只在会话列表标题组按上一张、标题、下一张渲染 Special 表级控件', has(specialTitleNavigationSource, 'phone-special-table-navigation')
+        && specialTitleNavigationSource.indexOf('data-action="navigate-table-previous"') < specialTitleNavigationSource.indexOf('phone-nav-title')
+        && specialTitleNavigationSource.indexOf('phone-nav-title') < specialTitleNavigationSource.indexOf('data-action="navigate-table-next"')
+        && !has(contents.conversationView, 'phone-generic-table-navigation')
+        && !has(contents.conversationView, 'phone-theater-table-navigation'));
+    check(results, 'conversationView', 'conversation-view 使用统一 controls 并在删除管理态阻断', has(contents.conversationView, 'buildTableNavigationControlState(getTableData(), navigationSheetKey, {')
+        && has(contents.conversationView, 'state.deleteManageMode === true || state.deletingSelection === true')
+        && has(contents.conversationView, 'requestTableNavigationSwitch(context.navigationSheetKey, direction, {'));
+    check(results, 'conversationView', 'conversation-view 表级切换复用当前 view session active guard', has(contents.conversationView, 'isActive: context.isActive,')
+        && has(contents.conversationView, "'navigate-table-previous', 'navigate-table-next',")
+        && has(contents.conversationView, 'context.isViewSessionActive?.() !== false'));
+    const specialNavCssStart = contents.specialCss.indexOf('.phone-special-app.phone-special-template-scope .phone-special-conversation-nav {');
+    const specialNavCssEnd = contents.specialCss.indexOf('\n}', specialNavCssStart);
+    const specialNavCssSource = contents.specialCss.slice(specialNavCssStart, specialNavCssEnd);
+    check(results, 'specialCss', '消息记录导航使用对称侧轨与内容宽度中央列', specialNavCssStart >= 0
+        && has(specialNavCssSource, '--phone-special-nav-side-reserve: 108px;')
+        && has(specialNavCssSource, 'minmax(var(--phone-special-nav-side-reserve), 1fr)')
+        && has(specialNavCssSource, 'minmax(0, max-content)'));
+    const specialTitleGroupCssStart = contents.specialCss.indexOf('.phone-special-app.phone-special-template-scope .phone-special-title-navigation {');
+    const specialTitleGroupCssEnd = contents.specialCss.indexOf('\n}', specialTitleGroupCssStart);
+    const specialTitleGroupCssSource = contents.specialCss.slice(specialTitleGroupCssStart, specialTitleGroupCssEnd);
+    check(results, 'specialCss', '消息记录表标题组默认按内容宽度收紧并保持按钮紧贴', specialTitleGroupCssStart >= 0
+        && has(specialTitleGroupCssSource, 'grid-template-columns: 30px max-content 30px;')
+        && has(specialTitleGroupCssSource, 'align-items: center;')
+        && has(specialTitleGroupCssSource, 'gap: 4px;')
+        && has(specialTitleGroupCssSource, 'width: fit-content;')
+        && has(specialTitleGroupCssSource, 'justify-self: center;'));
+    const specialNarrowCssStart = contents.specialCss.indexOf('@media screen and (max-width: 320px)');
+    const specialNarrowCssEnd = contents.specialCss.indexOf('\n}', contents.specialCss.indexOf('.phone-special-table-navigation-btn {', specialNarrowCssStart));
+    const specialNarrowCssSource = contents.specialCss.slice(specialNarrowCssStart, specialNarrowCssEnd);
+    check(results, 'specialCss', '消息记录表 320px 仅缩小按钮轨道并继续保留完整内容宽度标题', specialNarrowCssStart >= 0
+        && has(specialNarrowCssSource, 'grid-template-columns: 26px max-content 26px;')
+        && has(specialNarrowCssSource, 'width: 26px;')
+        && has(specialNarrowCssSource, 'height: 26px;'));
+    const specialTitleCssStart = contents.specialCss.indexOf('.phone-special-app.phone-special-template-scope .phone-special-title-navigation .phone-nav-title');
+    const specialTitleCssEnd = contents.specialCss.indexOf('\n}', specialTitleCssStart);
+    const specialTitleCssSource = contents.specialCss.slice(specialTitleCssStart, specialTitleCssEnd);
+    check(results, 'specialCss', '消息记录表标题按完整文字宽度布局且不使用省略截断', specialTitleCssStart >= 0
+        && has(specialTitleCssSource, 'width: max-content;')
+        && has(specialTitleCssSource, 'min-width: max-content;')
+        && has(specialTitleCssSource, 'max-width: none;')
+        && has(specialTitleCssSource, 'overflow: visible;')
+        && has(specialTitleCssSource, 'text-overflow: clip;'));
+    check(results, 'detailView', '消息详情不渲染表级切换控件或 action', !has(contents.detailView, 'phone-special-table-navigation') && !has(contents.detailView, 'navigate-table-previous') && !has(contents.detailView, 'navigate-table-next'));
+    check(results, 'detailController', '消息详情 controller 不接入表级切换 action', !has(contents.detailController, 'navigate-table-previous') && !has(contents.detailController, 'navigate-table-next') && !has(contents.detailController, 'requestTableNavigationSwitch'));
     check(results, 'conversationView', 'conversation-view 不拦截 prompt preset select 的 change 行为', has(contents.conversationView, "target.dataset.action !== 'select-prompt-preset'"));
     check(results, 'detailView', 'detail-view 为返回按钮提供 detail-back action', has(contents.detailView, 'data-action="detail-back"') && !has(contents.detailView, 'data-action="nav-back"'));
     check(results, 'detailView', 'detail-view 为删除模式切换按钮提供稳定 data-action', has(contents.detailView, 'data-action="toggle-delete-mode"'));

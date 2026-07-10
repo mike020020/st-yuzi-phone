@@ -17,6 +17,22 @@ function renderEditMenu(editableTables = []) {
     `;
 }
 
+function renderTitleNavigation(title, navigation) {
+    const escapedTitle = escapeHtml(title || '小剧场');
+    if (!navigation?.currentSheetKey) {
+        return `<div class="phone-theater-title-navigation is-title-only"><span class="phone-nav-title">${escapedTitle}</span></div>`;
+    }
+    const previous = navigation.previous || {};
+    const next = navigation.next || {};
+    return `
+        <div class="phone-theater-title-navigation phone-theater-table-navigation" aria-label="切换表格">
+            <button type="button" class="phone-theater-table-navigation-button" data-action="theater-table-navigation-previous" aria-label="上一张表" aria-disabled="${previous.disabled ? 'true' : 'false'}" ${previous.disabled ? 'disabled' : ''}>‹</button>
+            <span class="phone-nav-title">${escapedTitle}</span>
+            <button type="button" class="phone-theater-table-navigation-button" data-action="theater-table-navigation-next" aria-label="下一张表" aria-disabled="${next.disabled ? 'true' : 'false'}" ${next.disabled ? 'disabled' : ''}>›</button>
+        </div>
+    `;
+}
+
 function renderNavActions(uiState = {}) {
     const deleteMode = !!uiState.deleteManageMode;
     const deleting = !!uiState.deleting;
@@ -45,7 +61,7 @@ function renderNav(title, uiState = {}) {
     return `
         <div class="phone-nav-bar phone-theater-nav">
             <button type="button" class="phone-nav-back">${PHONE_ICONS.back}<span>返回</span></button>
-            <span class="phone-nav-title">${escapeHtml(title || '小剧场')}</span>
+            ${renderTitleNavigation(title, uiState.tableNavigation)}
             ${renderNavActions(uiState)}
         </div>
     `;

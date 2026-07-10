@@ -1,7 +1,8 @@
 import { getTableData } from '../phone-core/data-api.js';
-import { navigateTo } from '../phone-core/routing.js';
+import { getCurrentRoute, getRouteHistory, navigateTo, navigateToReplacingHistoryTop } from '../phone-core/routing.js';
 import { showConfirmDialog } from '../settings-app/ui/confirm-dialog.js';
 import { showToast } from '../settings-app/ui/toast.js';
+import { requestTableNavigationSwitch } from '../table-navigation/controls.js';
 import { deleteTheaterEntities } from './delete-service.js';
 
 /**
@@ -184,11 +185,34 @@ function getAvailableEditableTables(options = {}) {
     return entries.filter(entry => entry?.available && normalizeText(entry.sheetKey));
 }
 
-function navigateToEditableTable(entry) {
+function isTableBrowsingRoute(route) {
+    const normalizedRoute = normalizeText(route);
+    return normalizedRoute.startsWith('table:')
+        || normalizedRoute.startsWith('theater:')
+        || normalizedRoute.startsWith('app:');
+}
+
+function navigateToEditableTable(entry, deps = {}) {
     const sheetKey = normalizeText(entry?.sheetKey);
     if (!sheetKey) return false;
-    navigateTo(`table-generic:${sheetKey}`);
+    const route = `table-generic:${sheetKey}`;
+    const readCurrentRoute = deps.getCurrentRoute || getCurrentRoute;
+    const readRouteHistory = deps.getRouteHistory || getRouteHistory;
+    const pushRoute = deps.navigateTo || navigateTo;
+    const replaceHistoryTop = deps.navigateToReplacingHistoryTop || navigateToReplacingHistoryTop;
+    const currentRoute = readCurrentRoute();
+    const history = readRouteHistory();
+    const previousBrowsingEntry = history[history.length - 1];
+    if (normalizeText(currentRoute).startsWith('table:') && isTableBrowsingRoute(previousBrowsingEntry?.route)) {
+        replaceHistoryTop(route);
+    } else {
+        pushRoute(route);
+    }
     return true;
+}
+
+export function __test__navigateToEditableTable(entry, deps = {}) {
+    return navigateToEditableTable(entry, deps);
 }
 
 function toggleEditMenu(container, options) {
@@ -222,6 +246,20 @@ function openEditableTable(actionNode, container, options) {
     const state = ensureDeleteState(options);
     state.editMenuOpen = false;
     navigateToEditableTable(entry);
+}
+
+function switchTheaterTable(direction, container, options) {
+    if (!isTheaterInteractionActive(container, options)) return;
+
+    const state = ensureDeleteState(options);
+    const navigation = options?.tableNavigation;
+    const sheetKey = normalizeText(navigation?.currentSheetKey || state.navigationSheetKey);
+    if (!sheetKey) return;
+
+    requestTableNavigationSwitch(sheetKey, direction, {
+        blocked: state.deleteManageMode || state.deleting,
+        isActive: () => isTheaterInteractionActive(container, options),
+    });
 }
 
 function openDetailDialog(actionNode, container, options) {
@@ -262,6 +300,14 @@ function handleDeleteAction(event, container, options) {
     event.preventDefault();
     event.stopPropagation();
 
+    if (action === 'theater-table-navigation-previous') {
+        switchTheaterTable('previous', container, options);
+        return true;
+    }
+    if (action === 'theater-table-navigation-next') {
+        switchTheaterTable('next', container, options);
+        return true;
+    }
     if (action === 'toggle-theater-edit-menu') {
         toggleEditMenu(container, options);
         return true;

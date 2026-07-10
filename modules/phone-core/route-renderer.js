@@ -8,6 +8,7 @@ const logger = Logger.withScope({ scope: 'phone-core/route-renderer', feature: '
 const EXIT_ANIM_MS = 220;
 const ROUTE_COMMIT_DELAY_MS = 16;
 const TABLE_GENERIC_ROUTE_PREFIX = 'table-generic:';
+const TABLE_ROUTE_PREFIX = 'table:';
 
 function isActiveRouteRender(renderToken, state = getPhoneCoreState()) {
     if (!Number.isFinite(renderToken)) {
@@ -23,7 +24,7 @@ function isRenderableScreen(screen, renderToken, state = getPhoneCoreState()) {
         && isActiveRouteRender(renderToken, state);
 }
 
-async function loadRouteRenderer(route, renderToken) {
+async function loadRouteRenderer(route, renderToken, deps = {}) {
     if (route === 'home') {
         const { renderHomeScreen } = await import('../phone-home/render.js');
         return {
@@ -45,35 +46,84 @@ async function loadRouteRenderer(route, renderToken) {
         };
     }
 
-    if (route.startsWith('app:')) {
-        const sheetKey = route.replace('app:', '').trim();
-        const [{ getTableData }, { resolveTheaterSceneBySheetKey }] = await Promise.all([
-            import('./data-api.js'),
-            import('../phone-theater/data.js'),
-        ]);
-        const theaterScene = resolveTheaterSceneBySheetKey(getTableData(), sheetKey);
-        if (theaterScene) {
-            const { renderTheaterScene } = await import('../phone-theater/render.js');
+    if (route.startsWith(TABLE_ROUTE_PREFIX)) {
+        const sheetKey = route.slice(TABLE_ROUTE_PREFIX.length).trim();
+        if (!sheetKey) return null;
+
+        const [{ getTableData }, { resolveTableNavigationTarget }] = deps.getTableData && deps.resolveTableNavigationTarget
+            ? [{ getTableData: deps.getTableData }, { resolveTableNavigationTarget: deps.resolveTableNavigationTarget }]
+            : await Promise.all([import('./data-api.js'), import('../table-navigation/catalog.js')]);
+        const target = resolveTableNavigationTarget(getTableData(), sheetKey);
+        if (!target) return null;
+
+        if (target.presentation === 'theater') {
+            const { renderTheaterScene } = deps.renderTheaterScene
+                ? { renderTheaterScene: deps.renderTheaterScene }
+                : await import('../phone-theater/render.js');
             return {
-                routeType: 'theater-app-redirect',
+                routeType: 'table-theater',
                 render(page) {
-                    renderTheaterScene(page, theaterScene.id, { renderToken });
+                    renderTheaterScene(page, target.sceneId, {
+                        renderToken,
+                        navigationSheetKey: target.sheetKey,
+                    });
                 },
             };
         }
 
-        const { renderTableViewer } = await import('../table-viewer/render.js');
+        const { renderTableViewer } = deps.renderTableViewer
+            ? { renderTableViewer: deps.renderTableViewer }
+            : await import('../table-viewer/render.js');
+        return {
+            routeType: target.presentation === 'special' ? 'table-special' : 'table-generic-auto',
+            render(page) {
+                renderTableViewer(page, target.sheetKey, {
+                    forceGenericList: target.presentation === 'generic',
+                    navigationSheetKey: target.sheetKey,
+                });
+            },
+        };
+    }
+
+    if (route.startsWith('app:')) {
+        const sheetKey = route.replace('app:', '').trim();
+        const [{ getTableData }, { resolveTableNavigationTarget }] = deps.getTableData && deps.resolveTableNavigationTarget
+            ? [{ getTableData: deps.getTableData }, { resolveTableNavigationTarget: deps.resolveTableNavigationTarget }]
+            : await Promise.all([import('./data-api.js'), import('../table-navigation/catalog.js')]);
+        const target = resolveTableNavigationTarget(getTableData(), sheetKey);
+        if (target?.presentation === 'theater') {
+            const { renderTheaterScene } = deps.renderTheaterScene
+                ? { renderTheaterScene: deps.renderTheaterScene }
+                : await import('../phone-theater/render.js');
+            return {
+                routeType: 'theater-app-redirect',
+                render(page) {
+                    renderTheaterScene(page, target.sceneId, {
+                        renderToken,
+                        navigationSheetKey: target.sheetKey,
+                    });
+                },
+            };
+        }
+
+        const { renderTableViewer } = deps.renderTableViewer
+            ? { renderTableViewer: deps.renderTableViewer }
+            : await import('../table-viewer/render.js');
         return {
             routeType: 'app',
             render(page) {
-                renderTableViewer(page, sheetKey);
+                renderTableViewer(page, sheetKey, target ? {
+                    navigationSheetKey: target.sheetKey,
+                } : {});
             },
         };
     }
 
     if (route.startsWith(TABLE_GENERIC_ROUTE_PREFIX)) {
         const sheetKey = route.slice(TABLE_GENERIC_ROUTE_PREFIX.length).trim();
-        const { renderTableViewer } = await import('../table-viewer/render.js');
+        const { renderTableViewer } = deps.renderTableViewer
+            ? { renderTableViewer: deps.renderTableViewer }
+            : await import('../table-viewer/render.js');
         return {
             routeType: 'table-generic',
             render(page) {
@@ -84,7 +134,9 @@ async function loadRouteRenderer(route, renderToken) {
 
     if (isTheaterRoute(route)) {
         const sceneId = normalizeTheaterSceneId(route);
-        const { renderTheaterScene } = await import('../phone-theater/render.js');
+        const { renderTheaterScene } = deps.renderTheaterScene
+            ? { renderTheaterScene: deps.renderTheaterScene }
+            : await import('../phone-theater/render.js');
         return {
             routeType: 'theater',
             render(page) {
@@ -124,6 +176,10 @@ async function loadRouteRenderer(route, renderToken) {
     }
 
     return null;
+}
+
+export function __test__loadRouteRenderer(route, renderToken, deps = {}) {
+    return loadRouteRenderer(route, renderToken, deps);
 }
 
 async function resolveRouteRenderer(route, renderToken) {

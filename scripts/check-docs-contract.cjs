@@ -123,6 +123,17 @@ function main() {
         'table-generic:<sheetKey>',
         'Table Viewer',
     ]));
+    check(results, FILES.architectureGuide, 'architecture guide 登记物理表 route 与 replace-only 循环语义', hasAll(architectureGuide, [
+        'table:<sheetKey>',
+        'replaceCurrentRoute',
+        'getSheetKeys',
+        'routeRenderToken',
+    ]));
+    check(results, FILES.architectureGuide, 'architecture guide 登记审核 Theater 分流且禁止脏 intent', hasAll(architectureGuide, [
+        '命中可用 Theater',
+        '写入 pending navigation intent 之前分流',
+        '不创建或清理 Generic intent',
+    ]));
     check(results, FILES.architectureGuide, 'architecture guide 登记审核返回语义边界', hasAll(architectureGuide, [
         '不要为了审核返回链路修改',
         'navigateBack',

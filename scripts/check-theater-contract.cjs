@@ -364,6 +364,9 @@ function main() {
     pushCheck(results, 'render', 'theater render 构建删除态 uiState', has(contents.render, 'buildUiState(state, viewModel)') && has(contents.render, 'selectedCount') && has(contents.render, 'totalCount'));
     pushCheck(results, 'render', 'theater render 建立生命周期上下文', has(contents.render, 'function createTheaterLifecycleContext') && has(contents.render, 'getPhoneCoreState().routeRenderToken !== renderToken') && has(contents.render, 'phoneRuntime.isDisposed()'));
     pushCheck(results, 'render', 'theater render 向 interactions 传递 lifecycle', has(contents.render, 'lifecycle,') && has(contents.interactions, 'lifecycle: options.lifecycle,'));
+    pushCheck(results, 'data', 'theater 数据层导出稳定物理锚点解析', has(contents.data, 'export function resolveTheaterNavigationSheetKey(rawData, viewModel, requestedSheetKey)') && has(contents.data, 'getSheetKeys(rawData)') && has(contents.data, 'sceneSheetKeys.has'));
+    pushCheck(results, 'render', 'theater render 使用数据层锚点解析并覆盖当前 state', has(contents.render, 'resolveTheaterNavigationSheetKey,') && has(contents.render, 'state.navigationSheetKey = resolveTheaterNavigationSheetKey(rawData, viewModel, options.navigationSheetKey)'));
+    pushCheck(results, 'render', 'theater render 在删除管理态禁用表级切换', has(contents.render, 'buildTableNavigationControlState(rawData, state.navigationSheetKey, {') && has(contents.render, 'blocked: state.deleteManageMode || state.deleting'));
 
     pushCheck(results, 'templates', 'theater templates 导出 buildTheaterScenePageHtml(viewModel, uiState)', has(contents.templates, 'export function buildTheaterScenePageHtml(viewModel, uiState = {})'));
     pushCheck(results, 'templates', 'theater templates 导入 renderKit', has(contents.templates, "from './core/render-kit.js'"));
@@ -372,15 +375,41 @@ function main() {
     pushCheck(results, 'templates', 'theater nav 不渲染场景 subtitle 小字', !has(contents.templates, 'phone-theater-subtitle') && !has(contents.templates, 'const subtitle = viewModel?.subtitle'));
     pushCheck(results, 'templates', 'theater templates 调用 scene.renderContent', has(contents.templates, 'viewModel?.scene?.renderContent') && has(contents.templates, 'renderContent(viewModel, uiState, theaterRenderKit)'));
     pushCheck(results, 'templates', 'theater templates 包含删除管理栏 action', has(contents.templates, 'toggle-theater-delete-mode') && has(contents.templates, 'theater-select-all') && has(contents.templates, 'theater-clear-selection') && has(contents.templates, 'theater-confirm-delete'));
+    const theaterTitleNavigationSource = contents.templates.slice(
+        indexOfOrInfinity(contents.templates, 'phone-theater-title-navigation phone-theater-table-navigation'),
+        indexOfOrInfinity(contents.templates, 'function renderNavActions')
+    );
+    const theaterNavActionsSource = contents.templates.slice(
+        indexOfOrInfinity(contents.templates, 'function renderNavActions'),
+        indexOfOrInfinity(contents.templates, 'function renderNav(')
+    );
+    pushCheck(results, 'templates', 'theater 公共标题组按上一张、标题、下一张顺序渲染表级控件', has(theaterTitleNavigationSource, 'phone-theater-title-navigation')
+        && has(theaterTitleNavigationSource, 'phone-theater-table-navigation')
+        && indexOfOrInfinity(theaterTitleNavigationSource, 'theater-table-navigation-previous') < indexOfOrInfinity(theaterTitleNavigationSource, 'phone-nav-title')
+        && indexOfOrInfinity(theaterTitleNavigationSource, 'phone-nav-title') < indexOfOrInfinity(theaterTitleNavigationSource, 'theater-table-navigation-next')
+        && has(theaterTitleNavigationSource, "previous.disabled ? 'disabled' : ''")
+        && has(theaterTitleNavigationSource, "next.disabled ? 'disabled' : ''"));
+    pushCheck(results, 'templates', 'theater 编辑删除操作区不包含表级切换控件', has(theaterNavActionsSource, 'phone-theater-nav-actions')
+        && !has(theaterNavActionsSource, 'phone-theater-table-navigation')
+        && !has(theaterNavActionsSource, 'theater-table-navigation-previous')
+        && !has(theaterNavActionsSource, 'theater-table-navigation-next'));
+    pushCheck(results, 'templates', 'theater 模板不混入 Generic 或 Special 表级控件', !has(contents.templates, 'phone-generic-table-navigation') && !has(contents.templates, 'phone-special-table-navigation'));
     pushCheck(results, 'templates', 'theater templates 不包含具体 scene DOM class', !hasAny(contents.templates, ['phone-theater-square-feed', 'phone-theater-forum-home', 'phone-theater-live-page']));
 
     pushCheck(results, 'interactions', 'interactions 导出 bindTheaterSceneInteractions()', has(contents.interactions, 'export function bindTheaterSceneInteractions(container, options = {})'));
     pushCheck(results, 'interactions', 'interactions 调用 scene.bindInteractions hook', has(contents.interactions, 'options?.scene?.bindInteractions') && has(contents.interactions, 'binder(container'));
     pushCheck(results, 'interactions', 'interactions 导入 deleteTheaterEntities()', has(contents.interactions, "from './delete-service.js'"));
-    pushCheck(results, 'interactions', 'interactions 导入 navigateTo()', has(contents.interactions, "from '../phone-core/routing.js'") && has(contents.interactions, 'navigateTo(`table-generic:${sheetKey}`)'));
+    pushCheck(results, 'interactions', 'interactions 编辑桥保留普通 push 与受限 history-top replacement', has(contents.interactions, "from '../phone-core/routing.js'")
+        && has(contents.interactions, 'navigateToReplacingHistoryTop')
+        && has(contents.interactions, '`table-generic:${sheetKey}`')
+        && has(contents.interactions, "startsWith('table:')")
+        && has(contents.interactions, 'isTableBrowsingRoute(previousBrowsingEntry?.route)')
+        && has(contents.interactions, 'replaceHistoryTop(route)')
+        && has(contents.interactions, 'pushRoute(route)'));
     pushCheck(results, 'interactions', 'interactions 绑定删除管理 action', has(contents.interactions, 'toggle-theater-delete-mode') && has(contents.interactions, 'theater-select-all') && has(contents.interactions, 'theater-clear-selection') && has(contents.interactions, 'theater-toggle-select') && has(contents.interactions, 'theater-confirm-delete'));
     pushCheck(results, 'interactions', 'interactions 绑定 theater 编辑入口 action', has(contents.interactions, 'toggle-theater-edit-menu') && has(contents.interactions, 'theater-open-edit-table') && has(contents.interactions, 'getAvailableEditableTables'));
     pushCheck(results, 'interactions', 'interactions action 白名单放行 theater 编辑入口', has(contents.interactions, 'function isTheaterAction') && has(contents.interactions, "normalizedAction === 'toggle-theater-edit-menu'") && has(contents.interactions, 'if (!isTheaterAction(action)) return false;'));
+    pushCheck(results, 'interactions', 'interactions 表级切换复用共享 controls 与 lifecycle guard', has(contents.interactions, 'requestTableNavigationSwitch(sheetKey, direction, {') && has(contents.interactions, 'blocked: state.deleteManageMode || state.deleting') && has(contents.interactions, 'isActive: () => isTheaterInteractionActive(container, options)'));
     pushCheck(results, 'interactions', 'interactions 使用确认弹窗与 toast', has(contents.interactions, 'showConfirmDialog') && has(contents.interactions, 'showToast'));
     pushCheck(results, 'interactions', 'interactions 删除链路使用 lifecycle active guard', has(contents.interactions, 'function isTheaterInteractionActive') && has(contents.interactions, 'requestRenderIfActive(container, options)') && has(contents.interactions, 'showToastIfActive(container, options'));
     const theaterDeleteAwaitIndex = indexOfOrInfinity(contents.interactions, 'const result = await deleteTheaterEntities');
@@ -399,6 +428,8 @@ function main() {
     pushCheck(results, 'theaterCss', '06-phone-theater.css 仅作为兼容入口 import style registry', has(contents.theaterCss, "@import url('./phone-theater/index.css')") && !has(contents.theaterCss, '[data-theater-scene="square"]'));
     pushCheck(results, 'theaterCssIndex', 'style registry 按 core → square → forum → live → calendar → diary 顺序 import', indexOfOrInfinity(contents.theaterCssIndex, "./00-core.css") < indexOfOrInfinity(contents.theaterCssIndex, "./square.css") && indexOfOrInfinity(contents.theaterCssIndex, "./square.css") < indexOfOrInfinity(contents.theaterCssIndex, "./forum.css") && indexOfOrInfinity(contents.theaterCssIndex, "./forum.css") < indexOfOrInfinity(contents.theaterCssIndex, "./live.css") && indexOfOrInfinity(contents.theaterCssIndex, "./live.css") < indexOfOrInfinity(contents.theaterCssIndex, "./calendar.css") && indexOfOrInfinity(contents.theaterCssIndex, "./calendar.css") < indexOfOrInfinity(contents.theaterCssIndex, "./diary.css"));
     pushCheck(results, 'theaterCoreCss', 'core CSS 包含 theater 删除按钮与管理条样式', has(contents.theaterCoreCss, '.phone-theater-delete-toggle') && has(contents.theaterCoreCss, '.phone-theater-manage-bar') && has(contents.theaterCoreCss, '.phone-theater-manage-btn'));
+    pushCheck(results, 'theaterCoreCss', 'core CSS 包含 scoped 表级导航与禁用态', has(contents.theaterCoreCss, '.phone-app-page.phone-theater-page .phone-theater-table-navigation') && has(contents.theaterCoreCss, '.phone-theater-table-navigation-button:disabled'));
+    pushCheck(results, 'theaterCoreCss', 'core CSS 在 420/375/320px 使用两行 grid 避免标题与操作重叠', has(contents.theaterCoreCss, '@media screen and (max-width: 420px)') && has(contents.theaterCoreCss, 'grid-template-rows: auto auto') && has(contents.theaterCoreCss, '@media screen and (max-width: 375px)') && has(contents.theaterCoreCss, '@media screen and (max-width: 320px)'));
     pushCheck(results, 'theaterCoreCss', 'core CSS 包含 theater 编辑按钮与菜单样式', has(contents.theaterCoreCss, '.phone-theater-edit-toggle') && has(contents.theaterCoreCss, '.phone-theater-edit-menu') && has(contents.theaterCoreCss, '.phone-theater-nav-actions'));
     pushCheck(results, 'theaterCoreCss', 'core CSS 包含 theater 选择按钮与选中态样式', has(contents.theaterCoreCss, '.phone-theater-select-toggle') && has(contents.theaterCoreCss, '.is-delete-selected'));
     pushCheck(results, 'theaterCoreCss', 'core CSS 删除态定位使用通用 delete-key 协议', has(contents.theaterCoreCss, '[data-theater-delete-key]:not(.phone-theater-select-toggle)'));
@@ -442,7 +473,7 @@ function main() {
     pushCheck(results, 'routeRenderer', 'route-renderer 识别 theater route', has(contents.routeRenderer, 'if (isTheaterRoute(route))'));
     pushCheck(results, 'routeRenderer', 'route-renderer 动态导入 theater render', has(contents.routeRenderer, "await import('../phone-theater/render.js')"));
     pushCheck(results, 'routeRenderer', 'route-renderer 调用 renderTheaterScene() 并传递 renderToken', has(contents.routeRenderer, 'renderTheaterScene(page, sceneId, { renderToken })'));
-    pushCheck(results, 'routeRenderer', 'route-renderer 普通 app 子表兜底进入 theater scene', has(contents.routeRenderer, "import('./data-api.js')") && has(contents.routeRenderer, "import('../phone-theater/data.js')") && has(contents.routeRenderer, 'resolveTheaterSceneBySheetKey(getTableData(), sheetKey)') && has(contents.routeRenderer, "routeType: 'theater-app-redirect'") && has(contents.routeRenderer, 'renderTheaterScene(page, theaterScene.id, { renderToken })'));
+    pushCheck(results, 'routeRenderer', 'route-renderer 普通 app 子表复用统一目录进入 theater scene', has(contents.routeRenderer, "import('./data-api.js')") && has(contents.routeRenderer, "import('../table-navigation/catalog.js')") && has(contents.routeRenderer, 'resolveTableNavigationTarget(getTableData(), sheetKey)') && has(contents.routeRenderer, "target?.presentation === 'theater'") && has(contents.routeRenderer, "routeType: 'theater-app-redirect'") && has(contents.routeRenderer, 'renderTheaterScene(page, target.sceneId, {') && has(contents.routeRenderer, 'navigationSheetKey: target.sheetKey'));
     pushCheck(results, 'routeRenderer', 'route-renderer 支持 table-generic 强制通用表 route', has(contents.routeRenderer, 'TABLE_GENERIC_ROUTE_PREFIX') && has(contents.routeRenderer, "routeType: 'table-generic'") && has(contents.routeRenderer, 'forceGenericList: true'));
 
     pushCheck(results, 'visibilitySettings', '隐藏设置导入组合数据函数', has(contents.visibilitySettings, "from '../../../phone-theater/data.js'"));
@@ -460,8 +491,8 @@ function main() {
     pushCheck(results, 'specDoc', '扩展规范文档禁止 core CSS 引用内置 scene class', has(contents.specDoc, '00-core.css') && has(contents.specDoc, '不允许引用内置 scene') && has(contents.specDoc, '[data-theater-delete-key]'));
     pushCheck(results, 'specDoc', '扩展规范文档说明验证命令', has(contents.specDoc, 'node scripts/check-theater-contract.cjs') && has(contents.specDoc, 'npm run lint --silent') && has(contents.specDoc, 'npm run build --silent'));
     pushCheck(results, 'specDoc', '扩展规范文档说明 editableTables 与 table-generic 编辑桥', has(contents.specDoc, 'editableTables') && has(contents.specDoc, 'table-generic:<sheetKey>'));
-    pushCheck(results, 'specDoc', '扩展规范文档说明编辑桥返回来源美化页', has(contents.specDoc, '编辑桥必须通过标准 route history 进入') && has(contents.specDoc, '必须回到来源小剧场美化页') && has(contents.specDoc, '不要直接 import Table Viewer'));
-    pushCheck(results, 'architectureGuide', '架构文档说明 table-generic 编辑桥返回语义', has(contents.architectureGuide, '小剧场编辑桥') && has(contents.architectureGuide, 'table-generic:<sheetKey>') && has(contents.architectureGuide, 'route history') && has(contents.architectureGuide, '回到来源小剧场美化页'));
+    pushCheck(results, 'specDoc', '扩展规范文档说明编辑桥保留当前 Theater 且受限压缩旧浏览锚点', has(contents.specDoc, '普通 route history push') && has(contents.specDoc, '先回到当前小剧场美化页') && has(contents.specDoc, '不得替换审核来源') && has(contents.specDoc, '不要直接 import Table Viewer'));
+    pushCheck(results, 'architectureGuide', '架构文档说明 table-generic 编辑桥返回与失败回滚语义', has(contents.architectureGuide, '小剧场编辑桥') && has(contents.architectureGuide, 'table-generic:<sheetKey>') && has(contents.architectureGuide, 'navigateToReplacingHistoryTop') && has(contents.architectureGuide, '回到当前 Theater') && has(contents.architectureGuide, '恢复被替换的旧锚点'));
 
     const failed = results.filter(item => !item.ok);
     if (failed.length > 0) {
