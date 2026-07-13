@@ -2,14 +2,9 @@ import {
     buildSettingsHeroHtml,
     buildSettingsPageFrame,
     buildSettingsSectionHtml,
-    buildSettingsStatGridHtml,
     buildSettingsSummaryListHtml,
 } from '../primitives.js';
 import { PHONE_ICONS } from '../../../phone-home/icons.js';
-import {
-    PHONE_BEAUTIFY_TEMPLATE_FORMAT,
-    PHONE_BEAUTIFY_TEMPLATE_SCHEMA_VERSION,
-} from '../../../phone-beautify-templates/shared.js';
 import { escapeHtml, escapeHtmlAttr } from '../../../utils/dom-escape.js';
 import { buildShellRegionHtml } from '../../../view-regions.js';
 
@@ -378,94 +373,26 @@ export function buildApiPromptConfigPageHtml({
     });
 }
 
-export function buildBeautifyTemplatePageHtml({
-    activeSpecialSummary,
-    activeGenericSummary,
-    specialListHtml,
-    genericListHtml,
-    allTemplatesCount,
-    allSpecialTemplatesCount,
-    allGenericTemplatesCount,
-}) {
-    const statsHtml = buildSettingsStatGridHtml([
-        { label: '模板总数', value: String(allTemplatesCount) },
-        { label: '专属模板', value: String(allSpecialTemplatesCount) },
-        { label: '通用模板', value: String(allGenericTemplatesCount) },
-    ]);
-
+export function buildBeautifyTemplatePageHtml() {
     const heroHtml = buildSettingsHeroHtml({
         eyebrow: '模板工坊',
-        title: '模板库与启用关系',
-        description: '集中维护专属模板与通用模板，并保留导入、导出与启用切换工作流。',
-        chips: [
-            { text: `格式 ${PHONE_BEAUTIFY_TEMPLATE_FORMAT}`, tone: 'info' },
-            { text: `协议 v${PHONE_BEAUTIFY_TEMPLATE_SCHEMA_VERSION}`, tone: 'soft' },
-            { text: '支持 annotated 导出', tone: 'neutral' },
-        ],
-        statsHtml,
+        title: '模板工坊',
+        description: '默认美化已内置于系统。这里仅用于清除历史用户模板配置并恢复内置默认。',
     });
-    const heroRegionHtml = buildShellRegionHtml({
-        region: 'beautify-hero',
-        contentHtml: heroHtml,
+    const bodyHtml = buildSettingsSectionHtml({
+        title: '恢复内置默认',
+        desc: '此操作只会在你主动确认后执行。未执行恢复时，历史用户模板与表级绑定仍按原配置运行。',
+        bodyHtml: `
+            <div class="phone-settings-note">恢复后将永久删除全部历史用户美化模板及表级模板绑定，并统一使用内置的消息记录表模板和通用表模板。此操作不可撤销。</div>
+            <div class="phone-settings-action">
+                <button type="button" class="phone-settings-btn phone-settings-btn-danger" id="phone-beautify-restore-defaults-btn">恢复默认</button>
+            </div>
+        `,
     });
-
-    const activeSummaryHtml = buildSettingsSummaryListHtml([
-        { label: '专属启用', value: activeSpecialSummary },
-        { label: '通用启用', value: activeGenericSummary },
-    ]);
-    const summarySectionHtml = buildShellRegionHtml({
-        region: 'beautify-summary',
-        contentHtml: buildSettingsSectionHtml({
-            title: '启用概览',
-            desc: '专属模板仅用于消息记录表，通用模板只会激活一个。',
-            bodyHtml: `
-                ${activeSummaryHtml}
-                <div class="phone-settings-note">支持导入、导出、启用与删除用户模板，便于离线维护模板文件。</div>
-            `,
-        }),
-    });
-    const specialSectionHtml = buildShellRegionHtml({
-        region: 'beautify-special-library',
-        contentHtml: buildSettingsSectionHtml({
-            title: '专属模板库',
-            desc: '用于“消息记录表”专属场景。该分区只保留消息记录表模板。',
-            bodyHtml: `
-                <div class="phone-settings-action phone-settings-action-wrap phone-beautify-toolbar">
-                    <button type="button" class="phone-settings-btn" id="phone-beautify-import-special-btn">导入模板</button>
-                    <button type="button" class="phone-settings-btn" id="phone-beautify-export-special-btn">导出本区</button>
-                    <button type="button" class="phone-settings-btn" id="phone-beautify-export-special-default-btn">导出默认</button>
-                </div>
-                <input type="file" id="phone-beautify-import-special-input" accept="application/json,.json" style="display:none">
-                <div class="phone-beautify-list" id="phone-beautify-list-special">${specialListHtml}</div>
-            `,
-        }),
-    });
-    const genericSectionHtml = buildShellRegionHtml({
-        region: 'beautify-generic-library',
-        contentHtml: buildSettingsSectionHtml({
-            title: '通用模板库',
-            desc: '用于通用表格展示风格，该分区始终只会启用一个模板。',
-            bodyHtml: `
-                <div class="phone-settings-action phone-settings-action-wrap phone-beautify-toolbar">
-                    <button type="button" class="phone-settings-btn" id="phone-beautify-import-generic-btn">导入模板</button>
-                    <button type="button" class="phone-settings-btn" id="phone-beautify-export-generic-btn">导出本区</button>
-                    <button type="button" class="phone-settings-btn" id="phone-beautify-export-generic-default-btn">导出默认</button>
-                </div>
-                <input type="file" id="phone-beautify-import-generic-input" accept="application/json,.json" style="display:none">
-                <div class="phone-beautify-list" id="phone-beautify-list-generic">${genericListHtml}</div>
-            `,
-        }),
-    });
-
-    const bodyHtml = `
-        ${summarySectionHtml}
-        ${specialSectionHtml}
-        ${genericSectionHtml}
-    `;
 
     return buildSettingsPageFrame({
         title: '模板工坊',
-        heroHtml: heroRegionHtml,
+        heroHtml,
         bodyClass: 'phone-app-body phone-settings-scroll phone-settings-open',
         bodyHtml,
     });

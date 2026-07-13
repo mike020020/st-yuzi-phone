@@ -2,6 +2,11 @@ export const CHRONICLE_TODAY_RELATION_ANCHOR_TABLES = Object.freeze([
     'global_state',
     'current_status',
 ]);
+export const CHRONICLE_TODAY_RELATION_REQUIRED_COLUMNS = Object.freeze([
+    'row_id',
+    'time_span',
+    'today_relation',
+]);
 export const CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS = Object.freeze(['row_id', 'cur_time']);
 
 const CHRONICLE_TODAY_RELATION_ANCHOR_TABLE_NAMES = new Set(CHRONICLE_TODAY_RELATION_ANCHOR_TABLES);
@@ -39,6 +44,63 @@ SELECT name AS anchor_table
 FROM available_anchor_tables
 ORDER BY priority
 LIMIT 1`;
+}
+
+export function buildChronicleTodayRelationSchemaGateSql() {
+    const chronicleColumnValues = CHRONICLE_TODAY_RELATION_REQUIRED_COLUMNS
+        .map((name) => `('chronicle', ${formatSqlStringLiteral(name)})`)
+        .join(', ');
+    const anchorColumnValues = CHRONICLE_TODAY_RELATION_ANCHOR_TABLES
+        .flatMap((tableName) => CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS
+            .map((name) => `(${formatSqlStringLiteral(tableName)}, ${formatSqlStringLiteral(name)})`))
+        .join(', ');
+    return `WITH
+required_columns(table_name, column_name) AS (
+    VALUES ${chronicleColumnValues}, ${anchorColumnValues}
+),
+column_capabilities AS (
+    SELECT required_columns.table_name, required_columns.column_name,
+        CASE WHEN EXISTS (
+            SELECT 1 FROM sqlite_master
+            WHERE type = 'table' AND name = required_columns.table_name
+        ) AND EXISTS (
+            SELECT 1 FROM pragma_table_info(required_columns.table_name)
+            WHERE name = required_columns.column_name
+        ) THEN 1 ELSE 0 END AS available
+    FROM required_columns
+),
+anchor_capabilities AS (
+    SELECT table_name, MIN(available) AS available
+    FROM column_capabilities
+    WHERE table_name IN ('global_state', 'current_status')
+    GROUP BY table_name
+),
+selected_anchor AS (
+    SELECT table_name
+    FROM anchor_capabilities
+    WHERE available = 1
+    ORDER BY CASE table_name WHEN 'global_state' THEN 0 ELSE 1 END
+    LIMIT 1
+),
+missing AS (
+    SELECT table_name || '.' || column_name AS requirement
+    FROM column_capabilities
+    WHERE available = 0 AND (
+        table_name = 'chronicle'
+        OR NOT EXISTS (SELECT 1 FROM selected_anchor)
+    )
+    ORDER BY table_name, column_name
+),
+fingerprint_parts AS (
+    SELECT table_name || '.' || column_name || '=' || available AS part
+    FROM column_capabilities
+    ORDER BY table_name, column_name
+)
+SELECT
+    CASE WHEN NOT EXISTS (SELECT 1 FROM missing) AND EXISTS (SELECT 1 FROM selected_anchor) THEN 1 ELSE 0 END AS schema_ok,
+    COALESCE((SELECT table_name FROM selected_anchor), '') AS anchor_table,
+    COALESCE((SELECT group_concat(requirement, ',') FROM missing), '') AS missing_requirements,
+    COALESCE((SELECT group_concat(part, '|') FROM fingerprint_parts), '') || '|anchor=' || COALESCE((SELECT table_name FROM selected_anchor), '') AS schema_fingerprint`;
 }
 
 const CHINESE_SMALL_INTEGER_LABELS = [

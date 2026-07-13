@@ -255,15 +255,27 @@ export interface PhoneBeautifyTemplateImportOptions {
 
 export interface PhoneBeautifyTemplateSourceModeResult {
     success: boolean;
+    code?: PhoneBeautifyTemplateWriteCode;
     mode?: BeautifySourceMode;
     message: string;
 }
 
 export interface PhoneBeautifyTemplateActivationResult {
     success: boolean;
+    code?: PhoneBeautifyTemplateWriteCode;
     message: string;
     templateId?: string;
     rendererKey?: PhoneBeautifyRendererKey;
+}
+
+export type PhoneBeautifyTemplateWriteCode = 'BEAUTIFY_USER_TEMPLATE_WRITE_DISABLED';
+export type PhoneBeautifyTemplateResetCode = 'BEAUTIFY_RESTORE_DEFAULTS_OK' | 'BEAUTIFY_RESTORE_DEFAULTS_WRITE_FAILED' | 'BEAUTIFY_RESTORE_DEFAULTS_VERIFY_FAILED' | 'BEAUTIFY_RESTORE_DEFAULTS_UNEXPECTED_ERROR';
+
+export interface PhoneBeautifyTemplateResetResult {
+    success: boolean;
+    code: PhoneBeautifyTemplateResetCode;
+    message: string;
+    verification?: { ok: boolean; checks: Record<string, boolean> };
 }
 
 export interface PhoneBeautifyTemplatePackMeta {
@@ -291,6 +303,7 @@ export interface PhoneBeautifyTemplateExportResult {
 
 export interface PhoneBeautifyTemplateImportResult {
     success: boolean;
+    code?: PhoneBeautifyTemplateWriteCode;
     imported: number;
     replaced: number;
     skipped: number;
@@ -301,6 +314,7 @@ export interface PhoneBeautifyTemplateImportResult {
 
 export interface PhoneBeautifyTemplateSaveResult {
     success: boolean;
+    code?: PhoneBeautifyTemplateWriteCode;
     warnings: string[];
     errors: string[];
     replaced?: boolean;
@@ -310,6 +324,7 @@ export interface PhoneBeautifyTemplateSaveResult {
 
 export interface PhoneBeautifyTemplateBindingResult {
     success: boolean;
+    code?: PhoneBeautifyTemplateWriteCode;
     message: string;
 }
 
@@ -1023,6 +1038,7 @@ export interface PhoneBeautifyTemplatesModule {
     detectGenericTemplateForTable(payload?: { sheetKey?: string; tableName?: string; headers?: string[] }): PhoneBeautifyTemplateMatchResult | null;
     bindSheetToBeautifyTemplate(sheetKey: string, templateId: string): PhoneBeautifyTemplateBindingResult;
     clearSheetBeautifyBinding(sheetKey: string): PhoneBeautifyTemplateBindingResult;
+    restorePhoneBeautifyTemplatesToBuiltinDefaults(): PhoneBeautifyTemplateResetResult;
 }
 
 /**

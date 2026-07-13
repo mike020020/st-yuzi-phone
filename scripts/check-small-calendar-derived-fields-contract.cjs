@@ -66,11 +66,11 @@ async function main() {
     assert.ok(!/;\s*\S/.test(signatureSql), 'signature SQL 禁止分号串多语句');
     assert.ok(!/;\s*\S/.test(updateSql), 'update SQL 禁止分号串多语句');
 
-    ['querySqlViaApi', 'executeSqlMutationViaApi', 'subscribeTableUpdate', 'runtime.applying', 'runtime.pending', 'runtime.running', 'startSmallCalendarDerivedFieldsInjection', 'stopSmallCalendarDerivedFieldsInjection'].forEach((needle) => {
+    ['querySqlViaApi', 'probeSqliteCapabilityViaApi', 'executeSqlMutationViaApi', 'subscribeTableUpdate', 'notificationVersion', 'DEBOUNCE_MS = 600', 'runtime.running', 'startSmallCalendarDerivedFieldsInjection', 'stopSmallCalendarDerivedFieldsInjection'].forEach((needle) => {
         assertIncludes(runtimeSource, needle, `小日历运行时必须包含监听/写入/防递归合同：${needle}`);
     });
-    assertIncludes(runtimeSource, 'postSignaturePayload.sourceSignature === preSignaturePayload.sourceSignature', '小日历运行时必须用日期源签名确认写入期间源稳定');
-    assertIncludes(runtimeSource, 'preSignaturePayload.inputSignature === runtime.lastInputSignature', '小日历运行时必须用完整签名避免重复写入');
+    assertIncludes(runtimeSource, 'post.sourceSignature === pre.sourceSignature', '小日历运行时必须用日期源签名确认写入期间源稳定');
+    assertIncludes(runtimeSource, 'pre.inputSignature === runtime.lastInputSignature', '小日历运行时必须用完整签名避免重复写入');
 
     ['startSmallCalendarDerivedFieldsInjection', 'stopSmallCalendarDerivedFieldsInjection', './derived-fields/small-calendar-derived-fields.js'].forEach((needle) => {
         assertIncludes(lifecycleSource, needle, `lifecycle 必须接入小日历派生字段启动/停止：${needle}`);

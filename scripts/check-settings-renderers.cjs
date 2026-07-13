@@ -133,8 +133,8 @@ function main() {
 
     pushCheck(results, 'beautifyPage', 'beautify 页面导出显式页面工厂', has(contents.beautifyPage, 'export function createBeautifyTemplatePage(ctx) {'));
     pushCheck(results, 'beautifyPage', 'beautify 页面不再导入 createManagedPageRuntime()', !has(contents.beautifyPage, 'createManagedPageRuntime'));
-    pushCheck(results, 'beautifyPage', 'beautify 页面改为消费外层 `pageRuntime`', has(contents.beautifyPage, 'const { container, registerCleanup, pageRuntime, state } = ctx;'));
-    pushCheck(results, 'beautifyPage', 'beautify 页面通过 runtime 统一驱动行为层', has(contents.beautifyPage, 'runtime,'));
+    pushCheck(results, 'beautifyPage', 'beautify 页面消费外层 `pageRuntime`', has(contents.beautifyPage, 'const { container, pageRuntime, registerCleanup } = ctx;'));
+    pushCheck(results, 'beautifyPage', 'beautify 页面将 pageRuntime 注入行为层', has(contents.beautifyPage, 'runtime: pageRuntime,'));
 
     pushCheck(results, 'databaseController', 'database controller 接收 `pageRuntime`', has(contents.databaseController, 'pageRuntime,'));
     pushCheck(results, 'databaseController', 'database controller 通过 runtime.addEventListener() 绑定事件', has(contents.databaseController, 'if (runtime?.addEventListener) {'));

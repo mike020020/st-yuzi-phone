@@ -233,9 +233,6 @@ function buildPromptEditorPageContextFromServices(services) {
 function buildBeautifyTemplatePageContextFromServices(services) {
     return {
         ...services.common,
-        captureScroll: services.scroll.captureScroll,
-        restoreScroll: services.scroll.restoreScroll,
-        rerenderBeautifyKeepScroll: services.scroll.rerenderBeautifyKeepScroll,
     };
 }
 

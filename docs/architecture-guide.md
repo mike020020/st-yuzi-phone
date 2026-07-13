@@ -607,94 +607,66 @@ Appearance 页面服务统一由 [`appearance-settings.js`](../modules/settings-
 
 ### 6.4 Beautify 模板系统
 
-Beautify 模板系统负责把“某张表该用什么视觉模板、字段绑定、布局 token、导入导出协议”统一封装，避免 Table Viewer 在渲染阶段直接硬编码每张表的样式规则。
+Beautify 模板系统负责把“某张表使用什么视觉模板、字段绑定和布局 token”统一封装，避免 Table Viewer 在渲染阶段直接硬编码每张表的样式规则。产品端的“模板工坊”已经退役模板管理能力，现在只提供用户主动确认的“恢复内置默认”操作。
 
-#### 6.4.1 模板类型与包协议
+#### 6.4.1 内置默认与历史兼容
 
 核心常量在 [`constants.js`](../modules/phone-beautify-templates/constants.js:1)：
 
 - 专属模板类型：[`PHONE_TEMPLATE_TYPE_SPECIAL`](../modules/phone-beautify-templates/constants.js:1)，值为 `special_app_template`。
 - 通用模板类型：[`PHONE_TEMPLATE_TYPE_GENERIC`](../modules/phone-beautify-templates/constants.js:2)，值为 `generic_table_template`。
-- 导入导出包格式：[`PHONE_BEAUTIFY_TEMPLATE_FORMAT`](../modules/phone-beautify-templates/constants.js:4)，值为 `yuzi-phone-style-pack`。
-- 当前 schema：[`PHONE_BEAUTIFY_TEMPLATE_SCHEMA_VERSION`](../modules/phone-beautify-templates/constants.js:5)。
-- 最小兼容 schema：[`PHONE_BEAUTIFY_TEMPLATE_MIN_COMPAT_SCHEMA_VERSION`](../modules/phone-beautify-templates/constants.js:6)。
-- 导出模式：[`PHONE_BEAUTIFY_TEMPLATE_EXPORT_MODE_RUNTIME`](../modules/phone-beautify-templates/constants.js:10) 与 [`PHONE_BEAUTIFY_TEMPLATE_EXPORT_MODE_ANNOTATED`](../modules/phone-beautify-templates/constants.js:11)。
-
-[`exportPhoneBeautifyPack()`](../modules/phone-beautify-templates/import-export.js:33) 输出统一包结构：`format`、`schemaVersion`、`packMeta`、`templates`。导入入口是 [`importPhoneBeautifyPackFromData()`](../modules/phone-beautify-templates/import-export.js:78)，它会解析输入、校验模板、处理内置 ID 冲突、按 overwrite 规则导入用户模板，然后调用 [`saveTemplateStore()`](../modules/phone-beautify-templates/store.js:86) 持久化。
-
-#### 6.4.2 默认模板与 store
-
-默认模板由 [`defaults.js`](../modules/phone-beautify-templates/defaults.js:18) 聚合：
-
-- 专属字段绑定与默认 style options：[`special-field-bindings.js`](../modules/phone-beautify-templates/defaults/special-field-bindings.js:1)。
-- 通用布局与摘要字段绑定：[`generic-field-bindings.js`](../modules/phone-beautify-templates/defaults/generic-field-bindings.js:1)。
-- 内置模板清单：[`BUILTIN_TEMPLATES`](../modules/phone-beautify-templates/defaults/builtin-templates.js:19)。
+- 内置消息记录表模板：`builtin.special.message.v1`。
+- 内置通用表模板：`builtin.generic.table.v1`。
 
 用户模板 store 使用设置字段 [`PHONE_BEAUTIFY_STORE_KEY`](../modules/phone-beautify-templates/constants.js:8)。[`readTemplateStore()`](../modules/phone-beautify-templates/store.js:93) 从 settings 读取并归一化；[`saveTemplateStore()`](../modules/phone-beautify-templates/store.js:86) 会重新 normalize、写入 [`schemaVersion`](../modules/phone-beautify-templates/store.js:79)、更新时间戳，并保存到 settings。
 
-store 中的 [`bindings`](../modules/phone-beautify-templates/store.js:82) 是“单表绑定”映射：key 是 sheetKey，value 是 templateId。这个绑定优先级高于全局 active 模板。
+旧用户的 `templates`、`bindings`、`user` source mode 和用户 active template 仍会被读取。这条链路只用于方案 A 的历史兼容：用户没有主动恢复时，升级、启动、打开设置或打开表格都不得自动清理旧配置。`bindings` 是 sheetKey → templateId 的表级绑定，优先级高于 active 模板；它和内置模板中的 `render.fieldBindings` 完全不同，恢复操作不得删除后者。
 
-#### 6.4.3 normalize 入口与模板字段契约
+#### 6.4.2 读取与匹配优先级
 
-模板归一化入口是 [`normalizeTemplate()`](../modules/phone-beautify-templates/normalize.js:1)。该模块负责：
+缓存由 [`cache.js`](../modules/phone-beautify-templates/cache.js:1) 管理 store、内置模板和派生读取结果。匹配入口在 [`matcher.js`](../modules/phone-beautify-templates/matcher.js:37)：
 
-- templateType 校验：[`normalizeTemplateType()`](../modules/phone-beautify-templates/normalize.js:117)。
-- rendererKey 默认推断：[`defaultRendererKeyByType()`](../modules/phone-beautify-templates/normalize.js:122)。
-- 通用布局枚举：[`GENERIC_LAYOUT_ALLOWED_VALUES`](../modules/phone-beautify-templates/normalize.js:70)。
-- 专属字段绑定允许键：[`SPECIAL_FIELD_BINDING_ALLOWED_KEYS`](../modules/phone-beautify-templates/normalize.js:31)。
-- 通用摘要字段绑定允许键：[`GENERIC_FIELD_BINDING_ALLOWED_KEYS`](../modules/phone-beautify-templates/normalize.js:87)。
-- 旧 style token alias 到新 token 的映射：[`GENERIC_STYLE_TOKEN_ALIAS_MAP`](../modules/phone-beautify-templates/normalize.js:95)、[`SPECIAL_STYLE_TOKEN_ALIAS_MAP`](../modules/phone-beautify-templates/normalize.js:105)。
+1. 历史表级 binding 命中后返回 `manual_binding`。
+2. active template 次之。
+3. matcher score 最后，并按 score、sourcePriority、updatedAt 排序。
 
-模板字段绑定的值统一经过 [`normalizeFieldBindingCandidates()`](../modules/phone-beautify-templates/core.js:142) 处理：候选字段会去空、去重，并过滤明显危险字符串。
+[`getBeautifyTemplateSourceModeRuntime()`](../modules/phone-beautify-templates/repository.js:329) 继续支持历史 `user` source mode：有用户模板时读取用户模板，没有时回退内置模板。不要把“产品端禁写”误实现成 matcher 或 repository 禁读，否则旧用户会在没有确认的情况下丢失外观。
 
-#### 6.4.4 缓存与读取模型
+#### 6.4.3 用户写入退役策略
 
-[`cache.js`](../modules/phone-beautify-templates/cache.js:9) 有三类缓存：
+稳定错误码由 [`policy.js`](../modules/phone-beautify-templates/policy.js:1) 定义为 `BEAUTIFY_USER_TEMPLATE_WRITE_DISABLED`。以下兼容 API 保留函数签名，但只返回统一拒绝结果，不再写 settings 或失效缓存：
 
-- storeCache：缓存 settings 中的用户模板 store。
-- builtinCache：缓存内置模板深拷贝。
-- derivedCache：缓存 all templates、by type、by id、source runtime。
+- `savePhoneBeautifyUserTemplate()`
+- `deletePhoneBeautifyUserTemplate()`
+- `importPhoneBeautifyPackFromData()`
+- `setBeautifyTemplateSourceMode()`
+- `setActiveBeautifyTemplateIdByType()`
+- `bindSheetToBeautifyTemplate()`
+- `clearSheetBeautifyBinding()`
 
-缓存版本由 [`getStoreVersion()`](../modules/phone-beautify-templates/cache.js:32) 基于 updatedAt、模板数量和绑定数量生成。任何写入模板 store 或绑定后，都必须调用 [`invalidatePhoneBeautifyTemplateCache()`](../modules/phone-beautify-templates/cache.js:119)。
+底层 [`saveTemplateStore()`](../modules/phone-beautify-templates/store.js:86) 没有删除，因为历史读取归一化和受控系统维护仍依赖 store 模型；它不是产品端重新开放用户模板管理的许可。只读导出函数也不再出现在模板工坊页面。
 
-#### 6.4.5 active 模板与匹配优先级
+#### 6.4.4 恢复内置默认用例
 
-全局 active 模板设置字段：
+唯一允许的产品清理写路径是 [`restorePhoneBeautifyTemplatesToBuiltinDefaults()`](../modules/phone-beautify-templates/reset.js:76)。它只调用一次 `savePhoneSettingsPatch()`，把五类设置同时收敛为：
 
-- 专属模板 map：[`BEAUTIFY_ACTIVE_TEMPLATE_IDS_SETTING_KEY_SPECIAL`](../modules/phone-beautify-templates/constants.js:22)。
-- 通用模板 id：[`BEAUTIFY_ACTIVE_TEMPLATE_ID_SETTING_KEY_GENERIC`](../modules/phone-beautify-templates/constants.js:23)。
+- store：`templates=[]`、`bindings={}`；
+- special/generic source mode：`builtin`；
+- special active map：精确等于 `{ special_message: 'builtin.special.message.v1' }`；
+- generic active：`builtin.generic.table.v1`。
 
-读取 active 模板的入口：
+写入成功后用例统一调用 [`invalidatePhoneBeautifyTemplateCache()`](../modules/phone-beautify-templates/cache.js:121)，并回读原始 settings、规范化 store、source runtime 和两个 matcher。任一验证失败都返回失败结果，页面不得显示成功；固定目标允许用户幂等重试。这里的 settings patch 只表示内存设置已更新并已调度宿主保存，不得声称获得磁盘事务 durability ack。
 
-- [`getActiveBeautifyTemplateIdsForSpecial()`](../modules/phone-beautify-templates/repository.js:282)。
-- [`getActiveBeautifyTemplateIdByType()`](../modules/phone-beautify-templates/repository.js:264)。
-- [`setActiveBeautifyTemplateIdByType()`](../modules/phone-beautify-templates/repository.js:306)。
+#### 6.4.5 模板工坊页面
 
-匹配入口在 [`matcher.js`](../modules/phone-beautify-templates/matcher.js:37)：
-
-1. 单表绑定优先：[`store.bindings`](../modules/phone-beautify-templates/matcher.js:55) / [`store.bindings`](../modules/phone-beautify-templates/matcher.js:163) 命中后直接返回 `manual_binding`。
-2. active 模板次之：专属表按表名推断 rendererKey 后读取 active map；通用表读取 active generic id。
-3. matcher score 最后：通过 [`scoreTemplateMatcher()`](../modules/phone-beautify-templates/matcher-helpers.js:1) 根据表名和表头计算分数，并按 score、sourcePriority、updatedAt 排序。
-
-新增模板能力时，必须维护这个优先级，不要在 Table Viewer 内部额外绕一套“临时模板选择”。
-
-#### 6.4.6 source mode
-
-模板 source mode 设置字段：
-
-- 专属模板 source mode：[`BEAUTIFY_SOURCE_MODE_SETTING_KEY_SPECIAL`](../modules/phone-beautify-templates/constants.js:13)。
-- 通用模板 source mode：[`BEAUTIFY_SOURCE_MODE_SETTING_KEY_GENERIC`](../modules/phone-beautify-templates/constants.js:14)。
-- 允许值：[`BEAUTIFY_SOURCE_MODE_BUILTIN`](../modules/phone-beautify-templates/constants.js:15)、[`BEAUTIFY_SOURCE_MODE_USER`](../modules/phone-beautify-templates/constants.js:16)。
-
-[`getEffectiveTemplatesBySourceMode()`](../modules/phone-beautify-templates/repository.js:210) 的规则是：builtin 模式只使用内置模板；user 模式优先用户模板，如果没有用户模板则 fallback 到内置模板。运行时读取通过 [`getBeautifyTemplateSourceModeRuntime()`](../modules/phone-beautify-templates/repository.js:359) 形成 sourceRuntime，Table Viewer matcher 会把 `sourceMode`、`sourceModePreferred`、`sourceModeFallbackApplied` 写入检测结果。
+[`beautify.js`](../modules/settings-app/pages/beautify.js:1) 不再查询模板全集或 active 状态，不再依赖 FileReader、下载、模板列表 ViewModel 或导入导出模块。页面只保留标题、返回、说明和 `#phone-beautify-restore-defaults-btn`。点击后由 [`beautify-behavior.js`](../modules/settings-app/pages/beautify-behavior.js:1) 显示不可逆二次确认，执行期间使用锁阻止并发恢复，失败后释放按钮允许重试。
 
 维护规则：
 
-- 模板系统是 Table Viewer 样式与字段绑定的事实源；不要在渲染器里复制模板字段候选列表。
-- 新增模板字段必须同步 normalize、内置模板、CSS token 或 data attribute 消费端。
-- 新增模板导入导出字段必须保持 runtime export 与 annotated export 两种模式可读。
-- 单表绑定优先级高于 active 模板，高于 matcher score。
-- 模板写入后必须使缓存失效。
+- 启动阶段只允许 [`repairActiveBeautifyTemplateSettings()`](../modules/phone-beautify-templates/repository.js:290) 修复无效 active 引用，禁止调用恢复用例或强制清理有效历史用户配置。
+- 恢复只清 store 的表级 `bindings`，绝不能删除内置模板的 `render.fieldBindings`。
+- 不在 Table Viewer 内复制第二套模板选择或默认渲染架构。
+- 本次边界不包含 Theater、`tables/sources/**`、`tables/generated/**` 或 Fusion；消息记录表是 `special_message` Table Viewer 路径，不得笼统称为“小剧场模板”。
 
 ### 6.5 Fusion 模板缝合
 

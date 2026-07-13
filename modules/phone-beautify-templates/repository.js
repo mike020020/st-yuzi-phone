@@ -11,23 +11,18 @@ import {
     SPECIAL_RENDERER_KEYS,
 } from './constants.js';
 import {
-    deepClone,
-    nowTs,
     normalizeString,
     sanitizeId,
 } from './core.js';
 import {
     normalizeTemplate,
-    normalizeTemplateMeta,
     normalizeTemplateType,
 } from './normalize.js';
-import { saveTemplateStore } from './store.js';
-import { ensureUniqueTemplateId } from './template-id.js';
+import { createBeautifyUserTemplateWriteDisabledResult } from './policy.js';
 import {
     getCachedAllPhoneBeautifyTemplates,
     getCachedBeautifyTemplateSourceRuntime,
     getCachedBuiltinPhoneBeautifyTemplates,
-    getCachedPhoneBeautifyTemplateById,
     getCachedPhoneBeautifyTemplatesByType,
     getCachedPhoneBeautifyTemplateStore,
     getPhoneBeautifyTemplateCacheVersion,
@@ -43,13 +38,6 @@ const ALLOWED_RENDERER_KEYS = new Set([
     ...SPECIAL_RENDERER_KEYS,
     'generic_table',
 ]);
-
-function getTemplateById(templateId) {
-    const id = sanitizeId(templateId, '');
-    if (!id) return null;
-
-    return getCachedPhoneBeautifyTemplateById(id, { includeDisabled: true });
-}
 
 function buildSourceRuntimeCacheKey(templateType, options = {}) {
     const safeType = normalizeTemplateType(templateType, '');
@@ -147,12 +135,6 @@ function getGenericActiveTemplateIdRaw() {
     return normalizeGenericActiveTemplateId(raw);
 }
 
-function resolveActiveCleanupValue(deletedTemplateId, fallbackTemplateId) {
-    const safeDeletedId = sanitizeId(deletedTemplateId, '');
-    const safeFallbackId = sanitizeId(fallbackTemplateId, '');
-    return safeFallbackId && safeFallbackId !== safeDeletedId ? safeFallbackId : '';
-}
-
 function areSpecialActiveTemplateIdsEqual(leftMap, rightMap) {
     const left = normalizeSpecialActiveTemplateIds(leftMap);
     const right = normalizeSpecialActiveTemplateIds(rightMap);
@@ -163,78 +145,6 @@ function areSpecialActiveTemplateIdsEqual(leftMap, rightMap) {
     return leftKeys.every((key, index) => key === rightKeys[index] && left[key] === right[key]);
 }
 
-function cleanupActiveSettingsForDeletedTemplate(template) {
-    const safeDeletedId = sanitizeId(template?.id, '');
-    const safeType = normalizeTemplateType(template?.templateType, '');
-    if (!safeDeletedId || !safeType) {
-        return {
-            activeSettingsUpdated: false,
-            genericActiveTemplateId: '',
-            specialActiveTemplateIds: null,
-        };
-    }
-
-    if (safeType === PHONE_TEMPLATE_TYPE_GENERIC) {
-        const currentActiveId = getGenericActiveTemplateIdRaw();
-        if (currentActiveId !== safeDeletedId) {
-            return {
-                activeSettingsUpdated: false,
-                genericActiveTemplateId: currentActiveId,
-                specialActiveTemplateIds: null,
-            };
-        }
-
-        const nextActiveId = resolveActiveCleanupValue(safeDeletedId, getDefaultGenericTemplateId());
-        saveBeautifyTemplateSettingAndInvalidate(BEAUTIFY_ACTIVE_TEMPLATE_ID_SETTING_KEY_GENERIC, nextActiveId);
-        return {
-            activeSettingsUpdated: true,
-            genericActiveTemplateId: nextActiveId,
-            specialActiveTemplateIds: null,
-        };
-    }
-
-    if (safeType === PHONE_TEMPLATE_TYPE_SPECIAL) {
-        const currentMap = getSpecialActiveTemplateIdsRaw();
-        let changed = false;
-        const nextMap = { ...currentMap };
-
-        Object.entries(currentMap).forEach(([rendererKey, activeTemplateId]) => {
-            if (activeTemplateId !== safeDeletedId) return;
-
-            const fallbackId = resolveActiveCleanupValue(
-                safeDeletedId,
-                getDefaultSpecialTemplateIdByRenderer(rendererKey),
-            );
-            if (fallbackId) {
-                nextMap[rendererKey] = fallbackId;
-            } else {
-                delete nextMap[rendererKey];
-            }
-            changed = true;
-        });
-
-        if (!changed) {
-            return {
-                activeSettingsUpdated: false,
-                genericActiveTemplateId: '',
-                specialActiveTemplateIds: currentMap,
-            };
-        }
-
-        saveBeautifyTemplateSettingAndInvalidate(BEAUTIFY_ACTIVE_TEMPLATE_IDS_SETTING_KEY_SPECIAL, nextMap);
-        return {
-            activeSettingsUpdated: true,
-            genericActiveTemplateId: '',
-            specialActiveTemplateIds: nextMap,
-        };
-    }
-
-    return {
-        activeSettingsUpdated: false,
-        genericActiveTemplateId: '',
-        specialActiveTemplateIds: null,
-    };
-}
 
 function getSpecialTemplatesByRendererKey(rendererKey, options = {}) {
     const safeRendererKey = normalizeString(rendererKey, 48);
@@ -340,18 +250,9 @@ export function getBeautifyTemplateSourceMode(templateType) {
 }
 
 export function setBeautifyTemplateSourceMode(templateType, sourceMode) {
-    const settingKey = getSourceModeSettingKey(templateType);
-    if (!settingKey) {
-        return { success: false, message: '模板类型无效' };
-    }
-
-    const normalized = normalizeSourceModeForTemplateType(templateType, sourceMode);
-    saveBeautifyTemplateSettingAndInvalidate(settingKey, normalized);
-    return {
-        success: true,
-        mode: normalized,
-        message: normalized === BEAUTIFY_SOURCE_MODE_USER ? '已切换到自定义导入模板' : '已切换到默认模板',
-    };
+    void templateType;
+    void sourceMode;
+    return createBeautifyUserTemplateWriteDisabledResult();
 }
 
 export function getActiveBeautifyTemplateIdByType(templateType, options = {}) {
@@ -420,56 +321,9 @@ export function repairActiveBeautifyTemplateSettings() {
 }
 
 export function setActiveBeautifyTemplateIdByType(templateType, templateId) {
-    const safeType = normalizeTemplateType(templateType, '');
-    const safeTemplateId = sanitizeId(templateId, '');
-    if (!safeType || !safeTemplateId) {
-        return { success: false, message: '模板类型或模板 ID 无效' };
-    }
-
-    const template = getTemplateById(safeTemplateId);
-    if (!template || template.enabled === false) {
-        return { success: false, message: '模板不存在或未启用' };
-    }
-
-    if (template.templateType !== safeType) {
-        return { success: false, message: '模板类型不匹配' };
-    }
-
-    if (safeType === PHONE_TEMPLATE_TYPE_GENERIC) {
-        if (template?.render?.rendererKey !== 'generic_table') {
-            return { success: false, message: '通用模板渲染器无效' };
-        }
-
-        saveBeautifyTemplateSettingAndInvalidate(BEAUTIFY_ACTIVE_TEMPLATE_ID_SETTING_KEY_GENERIC, safeTemplateId);
-        return {
-            success: true,
-            templateId: safeTemplateId,
-            message: '通用模板已启用',
-        };
-    }
-
-    if (safeType === PHONE_TEMPLATE_TYPE_SPECIAL) {
-        const rendererKey = normalizeString(template?.render?.rendererKey, 48);
-        if (!SPECIAL_RENDERER_KEYS.has(rendererKey)) {
-            return { success: false, message: '专属模板渲染器无效' };
-        }
-
-        const currentMap = getActiveBeautifyTemplateIdsForSpecial({ withFallback: false, persist: false });
-        const nextMap = {
-            ...currentMap,
-            [rendererKey]: safeTemplateId,
-        };
-
-        saveBeautifyTemplateSettingAndInvalidate(BEAUTIFY_ACTIVE_TEMPLATE_IDS_SETTING_KEY_SPECIAL, nextMap);
-        return {
-            success: true,
-            rendererKey,
-            templateId: safeTemplateId,
-            message: '专属模板已启用',
-        };
-    }
-
-    return { success: false, message: '模板类型无效' };
+    void templateType;
+    void templateId;
+    return createBeautifyUserTemplateWriteDisabledResult();
 }
 
 export function getBeautifyTemplateSourceModeRuntime(templateType, options = {}) {
@@ -607,123 +461,12 @@ export function validatePhoneBeautifyTemplate(rawTemplate) {
 }
 
 export function savePhoneBeautifyUserTemplate(rawTemplate, options = {}) {
-    const overwrite = options.overwrite !== false;
-
-    const validated = validatePhoneBeautifyTemplate(rawTemplate);
-    if (!validated.ok || !validated.template) {
-        return {
-            success: false,
-            warnings: validated.warnings || [],
-            errors: validated.errors?.length > 0 ? validated.errors : ['模板校验失败'],
-            message: validated.errors?.[0] || '模板校验失败',
-            template: null,
-        };
-    }
-
-    const template = deepClone(validated.template);
-    template.source = 'user';
-    template.readOnly = false;
-    template.exportable = true;
-    template.enabled = template.enabled !== false;
-    template.meta = normalizeTemplateMeta(template.meta);
-    template.meta.updatedAt = nowTs();
-
-    const store = getCachedPhoneBeautifyTemplateStore();
-    const userTemplates = deepClone(store.templates || []);
-    const userMap = new Map(userTemplates.map((t, idx) => [t.id, idx]));
-    const builtinIds = new Set(getBuiltinPhoneBeautifyTemplates().map(t => t.id));
-    const usedIds = new Set([
-        ...builtinIds,
-        ...userTemplates.map(t => t.id),
-    ]);
-
-    const warnings = [];
-
-    if (builtinIds.has(template.id)) {
-        const nextId = ensureUniqueTemplateId(`user.edited.${template.id}`, usedIds);
-        warnings.push(`内置模板 ID 不可直接覆盖，已自动转存为 ${nextId}`);
-        template.id = nextId;
-    }
-
-    let replaced = false;
-
-    if (userMap.has(template.id)) {
-        if (overwrite) {
-            const idx = Number(userMap.get(template.id));
-            if (Number.isInteger(idx) && idx >= 0) {
-                userTemplates[idx] = template;
-                replaced = true;
-            } else {
-                userTemplates.push(template);
-            }
-        } else {
-            const nextId = ensureUniqueTemplateId(template.id, usedIds);
-            warnings.push(`模板 ID 冲突，已自动改为 ${nextId}`);
-            template.id = nextId;
-            userTemplates.push(template);
-        }
-    } else {
-        if (usedIds.has(template.id)) {
-            template.id = ensureUniqueTemplateId(template.id, usedIds);
-        } else {
-            usedIds.add(template.id);
-        }
-        userTemplates.push(template);
-    }
-
-    saveTemplateStore({
-        ...store,
-        templates: userTemplates,
-    });
-    invalidatePhoneBeautifyTemplateCache();
-
-    return {
-        success: true,
-        warnings,
-        errors: [],
-        replaced,
-        template: deepClone(template),
-        message: replaced ? '模板已覆盖保存' : '模板已保存为用户模板',
-    };
+    void rawTemplate;
+    void options;
+    return createBeautifyUserTemplateWriteDisabledResult({ warnings: [], errors: [], template: null });
 }
 
 export function deletePhoneBeautifyUserTemplate(templateId) {
-    const safeId = sanitizeId(templateId, '');
-    if (!safeId) {
-        return { success: false, message: '模板 ID 无效' };
-    }
-
-    const store = getCachedPhoneBeautifyTemplateStore();
-    const removedTemplate = store.templates.find((template) => template.id === safeId) || null;
-    if (!removedTemplate) {
-        return { success: false, message: '未找到可删除的用户模板' };
-    }
-
-    const nextTemplates = store.templates.filter((template) => template.id !== safeId);
-    const nextBindings = { ...store.bindings };
-    Object.entries(nextBindings).forEach(([sheetKey, bindTemplateId]) => {
-        if (bindTemplateId === safeId) {
-            delete nextBindings[sheetKey];
-        }
-    });
-
-    saveTemplateStore({
-        ...store,
-        templates: nextTemplates,
-        bindings: nextBindings,
-    });
-    invalidatePhoneBeautifyTemplateCache();
-
-    const activeCleanup = cleanupActiveSettingsForDeletedTemplate(removedTemplate);
-
-    return {
-        success: true,
-        message: '模板已删除',
-        templateId: safeId,
-        templateType: normalizeTemplateType(removedTemplate?.templateType, ''),
-        rendererKey: normalizeString(removedTemplate?.render?.rendererKey, 48),
-        activeSettingsUpdated: activeCleanup.activeSettingsUpdated,
-        genericActiveTemplateId: activeCleanup.genericActiveTemplateId,
-        specialActiveTemplateIds: activeCleanup.specialActiveTemplateIds,
-    };
+    void templateId;
+    return createBeautifyUserTemplateWriteDisabledResult();
 }

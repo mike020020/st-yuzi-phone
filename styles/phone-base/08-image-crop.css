@@ -247,19 +247,6 @@
         grid-template-columns: 1fr;
     }
 
-    .phone-beautify-source-summary-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .phone-beautify-item {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .phone-beautify-item-actions {
-        justify-content: flex-end;
-    }
-
     .phone-image-crop-overlay {
         align-items: flex-start;
         padding:

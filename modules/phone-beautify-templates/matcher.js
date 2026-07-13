@@ -16,17 +16,16 @@ import {
     normalizeHeadersSet,
     scoreTemplateMatcher,
 } from './matcher-helpers.js';
-import { saveTemplateStore } from './store.js';
 import {
     getCachedPhoneBeautifyTemplateById,
     getCachedPhoneBeautifyTemplateStore,
-    invalidatePhoneBeautifyTemplateCache,
 } from './cache.js';
 import {
     getActiveBeautifyTemplateIdsForSpecial,
     getActiveBeautifyTemplateIdByType,
     getBeautifyTemplateSourceModeRuntime,
 } from './repository.js';
+import { createBeautifyUserTemplateWriteDisabledResult } from './policy.js';
 
 function getTemplateById(templateId) {
     const safeId = sanitizeId(templateId, '');
@@ -243,51 +242,12 @@ export function detectGenericTemplateForTable({ sheetKey, tableName, headers = [
 }
 
 export function bindSheetToBeautifyTemplate(sheetKey, templateId) {
-    const safeSheetKey = normalizeString(sheetKey, 80);
-    const safeTemplateId = sanitizeId(templateId, '');
-    if (!safeSheetKey || !safeTemplateId) {
-        return { success: false, message: '绑定参数无效' };
-    }
-
-    const template = getTemplateById(safeTemplateId);
-    if (!template) {
-        return { success: false, message: '模板不存在' };
-    }
-
-    const store = getCachedPhoneBeautifyTemplateStore();
-    const nextBindings = {
-        ...store.bindings,
-        [safeSheetKey]: safeTemplateId,
-    };
-
-    saveTemplateStore({
-        ...store,
-        bindings: nextBindings,
-    });
-    invalidatePhoneBeautifyTemplateCache();
-
-    return { success: true, message: '绑定已保存' };
+    void sheetKey;
+    void templateId;
+    return createBeautifyUserTemplateWriteDisabledResult();
 }
 
 export function clearSheetBeautifyBinding(sheetKey) {
-    const safeSheetKey = normalizeString(sheetKey, 80);
-    if (!safeSheetKey) {
-        return { success: false, message: '表格标识无效' };
-    }
-
-    const store = getCachedPhoneBeautifyTemplateStore();
-    if (!store.bindings[safeSheetKey]) {
-        return { success: true, message: '当前无绑定' };
-    }
-
-    const nextBindings = { ...store.bindings };
-    delete nextBindings[safeSheetKey];
-
-    saveTemplateStore({
-        ...store,
-        bindings: nextBindings,
-    });
-    invalidatePhoneBeautifyTemplateCache();
-
-    return { success: true, message: '绑定已清除' };
+    void sheetKey;
+    return createBeautifyUserTemplateWriteDisabledResult();
 }

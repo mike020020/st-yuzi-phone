@@ -31,6 +31,7 @@ async function main() {
     assertIncludes(source, 'executeSqlMutationViaApi', '派生器必须通过 data-api 执行 SQL mutation');
     assertIncludes(source, 'buildChronicleTodayRelationSignatureSql', '派生器必须使用 signature SQL builder');
     assertIncludes(source, 'buildChronicleTodayRelationUpdateSql', '派生器必须使用 UPDATE SQL builder');
+    assertIncludes(source, 'buildChronicleTodayRelationSchemaGateSql', '派生器必须在 signature/update 前执行完整 schema gate');
     assertIncludes(source, 'MAX_SIGNATURE_RETRY = 1', '派生器必须使用一次有界 signature 重试');
     assertIncludes(source, 'runtime.lastInputSignature', '派生器必须保留输入签名缓存');
     assertIncludes(source, 'runtime.lastInvalidWarningSignature', '派生器必须对 invalid time_span warning 去重');
@@ -39,7 +40,8 @@ async function main() {
     assertIncludes(dataApi, 'querySqlViaApi', 'data-api facade 必须导出 querySqlViaApi');
     assertIncludes(dataApi, 'executeSqlMutationViaApi', 'data-api facade 必须导出 executeSqlMutationViaApi');
 
-    assertIncludes(source, 'export const ANCHOR_TABLE_SQL = buildChronicleTodayRelationAnchorTableSql()', '派生器必须导出由集中配置生成的 today anchor SQL，供执行级合同复用单一 SQL 来源');
+    assertIncludes(dataApi, 'probeSqliteCapabilityViaApi', 'data-api facade 必须导出窄 SELECT 1 probe');
+    assertIncludes(source, 'export const ANCHOR_TABLE_SQL = buildChronicleTodayRelationSchemaGateSql()', '派生器必须导出完整 schema gate SQL');
     assertIncludes(source, 'CHRONICLE_TODAY_RELATION_ANCHOR_TABLES', '派生器必须复用集中 today anchor 表配置');
     assertIncludes(builder, 'export const CHRONICLE_TODAY_RELATION_ANCHOR_TABLES', 'SQL builder 必须导出集中 today anchor 表白名单配置');
     assertIncludes(builder, 'buildChronicleTodayRelationAnchorTableSql', 'SQL builder 必须提供 today anchor SQL 生成器');
@@ -49,7 +51,7 @@ async function main() {
     assertIncludes(builder, 'CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS', 'SQL builder 必须集中声明 today anchor 统一所需列');
     assertIncludes(builder, "formatSqlStringLiteral(columnName)", 'SQL builder 必须用统一 required columns 生成列名 SQL 字面量');
     assertIncludes(builder, 'ORDER BY priority', 'SQL builder 必须按配置顺序优先使用 global_state，缺失或 schema 不完整时再使用 current_status');
-    assertIncludes(source, 'anchor-missing', '派生器必须在缺少 today anchor 表时明确告警');
+    assertIncludes(source, 'schema-blocked', '派生器必须在 schema 不完整时安全阻断');
     assertIncludes(builder, 'normalizeChronicleTodayRelationAnchorTable', 'SQL builder 必须校验 today anchor 表名');
     assertNotIncludes(source, "VALUES ('global_state', 0), ('current_status', 1)", '派生器不得散落硬编码 today anchor VALUES，必须由集中配置生成');
     assert.deepStrictEqual(
@@ -62,8 +64,8 @@ async function main() {
         ['row_id', 'cur_time'],
         'today anchor 统一 schema 要求必须集中声明 row_id/cur_time',
     );
-    assert.strictEqual(sourceModule.ANCHOR_TABLE_SQL, builderModule.buildChronicleTodayRelationAnchorTableSql(), '派生器导出的 ANCHOR_TABLE_SQL 必须等于 builder 由集中配置生成的 SQL');
-    assertIncludes(sourceModule.ANCHOR_TABLE_SQL, "VALUES ('global_state', 0), ('current_status', 1)", '生成后的 anchor SQL 必须按优先级兼容 global_state/current_status');
+    assert.strictEqual(sourceModule.ANCHOR_TABLE_SQL, builderModule.buildChronicleTodayRelationSchemaGateSql(), '派生器导出的 ANCHOR_TABLE_SQL 必须等于完整 gate SQL');
+    assertIncludes(sourceModule.ANCHOR_TABLE_SQL, "WHEN 'global_state' THEN 0 ELSE 1 END", '生成后的 schema gate SQL 必须按优先级兼容 global_state/current_status');
     assertIncludes(builder, 'cur_time', 'SQL builder 必须读取 today anchor 表 cur_time');
     assertIncludes(builder, 'FROM chronicle', 'SQL builder 必须读取 chronicle');
     assertIncludes(builder, 'time_span', 'SQL builder 必须读取 chronicle.time_span');

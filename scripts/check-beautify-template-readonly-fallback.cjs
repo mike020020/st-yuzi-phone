@@ -1,130 +1,86 @@
+const assert = require('assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const ROOT = process.cwd();
+const url = file => pathToFileURL(path.join(ROOT, file)).href;
+const clone = value => structuredClone(value);
 
-const FILES = {
-    repository: 'modules/phone-beautify-templates/repository.js',
-    matcher: 'modules/phone-beautify-templates/matcher.js',
-    beautifyPage: 'modules/settings-app/pages/beautify.js',
-    index: 'index.js',
-};
+async function main() {
+    const timers = new Map();
+    let timerId = 0;
+    let saveCalls = 0;
+    const ctx = {
+        extensionSettings: {},
+        saveSettingsDebounced() { saveCalls += 1; },
+    };
+    global.window = {
+        getContext: () => ctx,
+        setTimeout(callback) { const id = ++timerId; timers.set(id, callback); return id; },
+        clearTimeout(id) { timers.delete(id); },
+    };
 
-function read(relativePath) {
-    return fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
-}
+    const settings = await import(url('modules/settings.js'));
+    const repository = await import(url('modules/phone-beautify-templates/repository.js'));
+    const matcher = await import(url('modules/phone-beautify-templates/matcher.js'));
+    const cache = await import(url('modules/phone-beautify-templates/cache.js'));
+    const store = await import(url('modules/phone-beautify-templates/store.js'));
 
-function normalizeLineEndings(value) {
-    return String(value).replace(/\r\n?/g, '\n');
-}
+    const builtins = repository.getBuiltinPhoneBeautifyTemplates();
+    const specialUser = clone(builtins.find(item => item.id === 'builtin.special.message.v1'));
+    Object.assign(specialUser, { id: 'user.legacy.special', source: 'user', readOnly: false });
+    const genericUser = clone(builtins.find(item => item.id === 'builtin.generic.table.v1'));
+    Object.assign(genericUser, { id: 'user.legacy.generic', source: 'user', readOnly: false });
 
-function has(content, snippet) {
-    return normalizeLineEndings(content).includes(normalizeLineEndings(snippet));
-}
+    ctx.extensionSettings[settings.extensionName] = {
+        ...clone(settings.defaultSettings),
+        yuziPhoneBeautifyTemplates: {
+            schemaVersion: '1.0.0',
+            updatedAt: 7,
+            templates: [specialUser, genericUser],
+            bindings: { legacy_special: specialUser.id, legacy_generic: genericUser.id },
+        },
+        beautifyTemplateSourceModeSpecial: 'user',
+        beautifyTemplateSourceModeGeneric: 'user',
+        beautifyActiveTemplateIdsSpecial: { special_message: specialUser.id },
+        beautifyActiveTemplateIdGeneric: genericUser.id,
+    };
+    const beforeSettings = clone(ctx.extensionSettings[settings.extensionName]);
+    cache.invalidatePhoneBeautifyTemplateCache();
 
-function count(content, snippet) {
-    return normalizeLineEndings(content).split(normalizeLineEndings(snippet)).length - 1;
-}
+    const normalizedStore = store.readTemplateStore();
+    assert.deepEqual(normalizedStore.templates.map(item => item.id).sort(), [genericUser.id, specialUser.id].sort());
+    assert.deepEqual(normalizedStore.bindings, { legacy_special: specialUser.id, legacy_generic: genericUser.id });
+    assert.equal(repository.getBeautifyTemplateSourceModeRuntime('special_app_template').preferredMode, 'user');
+    assert.equal(repository.getBeautifyTemplateSourceModeRuntime('generic_table_template').preferredMode, 'user');
+    assert.deepEqual(repository.getActiveBeautifyTemplateIdsForSpecial({ withFallback: false }), { special_message: specialUser.id });
+    assert.equal(repository.getActiveBeautifyTemplateIdByType('generic_table_template', { withFallback: false }), genericUser.id);
 
-function check(results, fileKey, description, ok) {
-    results.push({ file: FILES[fileKey], description, ok });
-}
+    const specialMatch = matcher.detectSpecialTemplateForTable({
+        sheetKey: 'legacy_special', tableName: '消息记录表', headers: ['会话ID', '发送者', '消息内容'],
+    });
+    const genericMatch = matcher.detectGenericTemplateForTable({
+        sheetKey: 'legacy_generic', tableName: '历史通用表', headers: [],
+    });
+    assert.equal(specialMatch.template.id, specialUser.id);
+    assert.equal(specialMatch.reason, 'manual_binding');
+    assert.equal(genericMatch.template.id, genericUser.id);
+    assert.equal(genericMatch.reason, 'manual_binding');
 
-function escapeRegExp(value) {
-    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+    const repair = repository.repairActiveBeautifyTemplateSettings();
+    assert.equal(repair.specialUpdated, false, '有效历史 special active 不得被 repair 覆盖');
+    assert.equal(repair.genericUpdated, false, '有效历史 generic active 不得被 repair 覆盖');
+    assert.deepEqual(ctx.extensionSettings[settings.extensionName], beforeSettings, '兼容读取与 repair 不得改写有效历史设置');
+    assert.equal(timers.size, 0, '纯读取与无变更 repair 不得调度保存');
+    assert.equal(saveCalls, 0);
 
-function findMatchingParen(content, openParenIndex) {
-    let depth = 0;
-    for (let i = openParenIndex; i < content.length; i += 1) {
-        const ch = content[i];
-        if (ch === '(') depth += 1;
-        if (ch === ')') {
-            depth -= 1;
-            if (depth === 0) return i;
-        }
-    }
-    return -1;
-}
-
-function extractNamedFunction(content, functionName) {
-    const declarationPattern = new RegExp(`(?:export\\s+)?function\\s+${escapeRegExp(functionName)}\\s*\\(`);
-    const match = declarationPattern.exec(content);
-    if (!match) return '';
-
-    const declarationStart = match.index;
-    const openParenIndex = declarationStart + match[0].length - 1;
-    const closeParenIndex = findMatchingParen(content, openParenIndex);
-    if (closeParenIndex < 0) return '';
-
-    const bodyStart = content.indexOf('{', closeParenIndex + 1);
-    if (bodyStart < 0) return '';
-
-    let depth = 0;
-    for (let i = bodyStart; i < content.length; i += 1) {
-        const ch = content[i];
-        if (ch === '{') depth += 1;
-        if (ch === '}') {
-            depth -= 1;
-            if (depth === 0) {
-                return content.slice(declarationStart, i + 1);
-            }
-        }
-    }
-
-    return '';
-}
-
-function main() {
-    const contents = Object.fromEntries(
-        Object.entries(FILES).map(([key, relativePath]) => [key, read(relativePath)])
-    );
-
-    const results = [];
-    const detectSpecial = extractNamedFunction(contents.matcher, 'detectSpecialTemplateForTable');
-    const detectGeneric = extractNamedFunction(contents.matcher, 'detectGenericTemplateForTable');
-    const renderBeautify = extractNamedFunction(contents.beautifyPage, 'renderBeautifyTemplatePage');
-    const sourceRuntime = extractNamedFunction(contents.repository, 'getBeautifyTemplateSourceModeRuntime');
-    const getGenericActive = extractNamedFunction(contents.repository, 'getActiveBeautifyTemplateIdByType');
-    const getSpecialActive = extractNamedFunction(contents.repository, 'getActiveBeautifyTemplateIdsForSpecial');
-    const repairActive = extractNamedFunction(contents.repository, 'repairActiveBeautifyTemplateSettings');
-    const doInitialize = extractNamedFunction(contents.index, 'doInitialize');
-
-    check(results, 'repository', 'repository 暴露显式 active repair 函数', has(contents.repository, 'export function repairActiveBeautifyTemplateSettings()'));
-    check(results, 'repository', 'generic active getter 不再写入设置', !has(getGenericActive, 'saveBeautifyTemplateSettingAndInvalidate('));
-    check(results, 'repository', 'special active getter 不再写入设置', !has(getSpecialActive, 'saveBeautifyTemplateSettingAndInvalidate('));
-    check(results, 'repository', '显式 repair 处理 generic active 设置写入', has(repairActive, 'saveBeautifyTemplateSettingAndInvalidate(BEAUTIFY_ACTIVE_TEMPLATE_ID_SETTING_KEY_GENERIC, nextGenericId);'));
-    check(results, 'repository', '显式 repair 处理 special active 设置写入', has(repairActive, 'saveBeautifyTemplateSettingAndInvalidate(BEAUTIFY_ACTIVE_TEMPLATE_IDS_SETTING_KEY_SPECIAL, nextSpecialMap);'));
-    check(results, 'repository', 'source runtime 读 special active fallback 时不持久化', has(sourceRuntime, 'const activeMap = getActiveBeautifyTemplateIdsForSpecial({\n                    withFallback: true,\n                    persist: false,\n                });'));
-    check(results, 'repository', 'source runtime 读 generic active fallback 时不持久化', has(sourceRuntime, "const activeTemplateId = getActiveBeautifyTemplateIdByType(PHONE_TEMPLATE_TYPE_GENERIC, {\n                    withFallback: true,\n                    persist: false,\n                });"));
-    check(results, 'repository', 'source runtime 内不再出现 persist: true', !has(sourceRuntime, 'persist: true'));
-
-    check(results, 'matcher', 'special matcher 读取 active fallback 时不持久化', has(contents.matcher, 'const activeMap = getActiveBeautifyTemplateIdsForSpecial({\n        withFallback: true,\n        persist: false,\n    });'));
-    check(results, 'matcher', 'generic matcher 读取 active fallback 时不持久化', has(contents.matcher, "const activeTemplateId = getActiveBeautifyTemplateIdByType(PHONE_TEMPLATE_TYPE_GENERIC, {\n        withFallback: true,\n        persist: false,\n    });"));
-    check(results, 'matcher', 'matcher 读路径不再出现 persist: true', !has(contents.matcher, 'persist: true'));
-
-    check(results, 'beautifyPage', 'beautify 页面渲染读取 special fallback 时不持久化', has(renderBeautify, 'const activeSpecialMap = getActiveBeautifyTemplateIdsForSpecial({\n        withFallback: true,\n        persist: false,\n    });'));
-    check(results, 'beautifyPage', 'beautify 页面渲染读取 generic fallback 时不持久化', has(renderBeautify, "const activeGenericTemplateId = getActiveBeautifyTemplateIdByType(PHONE_TEMPLATE_TYPE_GENERIC, {\n        withFallback: true,\n        persist: false,\n    });"));
-    check(results, 'beautifyPage', 'beautify 页面渲染读路径不再出现 persist: true', !has(renderBeautify, 'persist: true'));
-
-    check(results, 'index', '入口导入显式 active repair', has(contents.index, "import { repairActiveBeautifyTemplateSettings } from './modules/phone-beautify-templates/repository.js';"));
-    check(results, 'index', '初始化流程调用显式 active repair', has(doInitialize, 'repairActiveBeautifyTemplateSettings();'));
-    check(results, 'index', '初始化流程只调用一次 active repair', count(doInitialize, 'repairActiveBeautifyTemplateSettings();') === 1);
-
-    const failed = results.filter(item => !item.ok);
-    if (failed.length > 0) {
-        console.error('[beautify-template-readonly-fallback-check] 检查失败：');
-        for (const item of failed) {
-            console.error(`- ${item.file}: ${item.description}`);
-        }
-        process.exitCode = 1;
-        return;
-    }
-
+    const pageSource = fs.readFileSync('modules/settings-app/pages/beautify.js', 'utf8');
+    const indexSource = fs.readFileSync('index.js', 'utf8');
+    assert.ok(!pageSource.includes('getPhoneBeautifyTemplatesByType'));
+    assert.ok(indexSource.includes('repairActiveBeautifyTemplateSettings();'));
+    assert.ok(!indexSource.includes('restorePhoneBeautifyTemplatesToBuiltinDefaults'));
     console.log('[beautify-template-readonly-fallback-check] 检查通过');
-    for (const item of results) {
-        console.log(`- OK | ${item.file} | ${item.description}`);
-    }
 }
 
-main();
+main().catch(error => { console.error(error); process.exitCode = 1; });

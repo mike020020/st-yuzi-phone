@@ -686,140 +686,6 @@
     word-break: break-word;
 }
 
-.phone-beautify-toolbar {
-    margin-top: 2px;
-}
-
-.phone-beautify-source-summary-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.phone-beautify-source-summary-item {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid var(--yuzi-settings-border, rgba(58, 55, 49, 0.08));
-    background: var(--yuzi-settings-surface-soft, rgba(245, 243, 239, 0.6));
-}
-
-.phone-beautify-source-summary-title {
-    font-size: 10px;
-    color: var(--yuzi-settings-text-faint, #9A9790);
-}
-
-.phone-beautify-source-summary-value {
-    font-size: 12px;
-    color: var(--yuzi-settings-text-primary, #3A3731);
-}
-
-.phone-beautify-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 320px;
-    overflow-y: auto;
-    padding-right: 2px;
-}
-
-.phone-beautify-item {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--yuzi-settings-border, rgba(58, 55, 49, 0.08));
-}
-
-.phone-beautify-item:last-child {
-    border-bottom: none;
-}
-
-.phone-beautify-item-main {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.phone-beautify-item-title-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.phone-beautify-item-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--yuzi-settings-text-primary, #3A3731);
-}
-
-.phone-beautify-item-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 3px;
-    padding: 2px 8px;
-    font-size: 10px;
-    line-height: 1.4;
-    border: 1px solid transparent;
-}
-
-.phone-beautify-item-badge.is-builtin {
-    color: var(--yuzi-settings-success, #5B7A6A);
-    background: color-mix(in srgb, var(--yuzi-settings-success, #5B7A6A) 12%, transparent);
-    border-color: color-mix(in srgb, var(--yuzi-settings-success, #5B7A6A) 35%, transparent);
-}
-
-.phone-beautify-item-badge.is-user {
-    color: var(--yuzi-settings-accent, #5B7A6A);
-    background: color-mix(in srgb, var(--yuzi-settings-accent, #5B7A6A) 12%, transparent);
-    border-color: color-mix(in srgb, var(--yuzi-settings-accent, #5B7A6A) 34%, transparent);
-}
-
-.phone-beautify-item-meta {
-    font-size: 10px;
-    color: var(--yuzi-settings-text-faint, #9A9790);
-    line-height: 1.5;
-    word-break: break-all;
-}
-
-.phone-beautify-item-matcher {
-    font-size: 11px;
-    color: var(--yuzi-settings-text-secondary, #7A7772);
-    line-height: 1.5;
-    word-break: break-word;
-}
-
-.phone-beautify-item-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.phone-beautify-pick-radio {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    color: var(--yuzi-settings-text-secondary, #7A7772);
-    user-select: none;
-}
-
-.phone-beautify-pick-radio input {
-    width: 14px;
-    height: 14px;
-    accent-color: var(--yuzi-settings-accent, #5B7A6A);
-}
-
 /* ========== Settings App Wabi-Sabi Redesign ========== */
 .phone-settings-page .phone-nav-bar,
 .phone-fusion-page .phone-nav-bar {
@@ -1608,8 +1474,7 @@
     box-shadow: 0 1px 4px rgba(58, 55, 49, 0.12);
 }
 
-.phone-settings-page .phone-settings-switch,
-.phone-settings-page .phone-beautify-pick-radio input {
+.phone-settings-page .phone-settings-switch {
     accent-color: var(--yuzi-settings-accent, #5B7A6A);
 }
 
@@ -1742,7 +1607,6 @@
 .phone-settings-page .phone-db-table-checklist,
 .phone-settings-page .phone-toggle-shape-list,
 .phone-settings-page .phone-icon-upload-list,
-.phone-settings-page .phone-beautify-list,
 .phone-settings-page .phone-worldbook-entries {
     display: flex;
     flex-direction: column;
@@ -1759,7 +1623,6 @@
 .phone-settings-page .phone-db-table-checklist,
 .phone-settings-page .phone-toggle-shape-list,
 .phone-settings-page .phone-icon-upload-list,
-.phone-settings-page .phone-beautify-list,
 .phone-settings-page .phone-worldbook-entries {
     margin: 0;
 }
@@ -1769,7 +1632,6 @@
 .phone-settings-page .phone-db-table-item,
 .phone-settings-page .phone-toggle-shape-item,
 .phone-settings-page .phone-icon-upload-row,
-.phone-settings-page .phone-beautify-item,
 .phone-settings-page .phone-worldbook-entry {
     display: flex;
     align-items: center;
@@ -1787,12 +1649,10 @@
 .phone-settings-page .phone-db-table-item:last-child,
 .phone-settings-page .phone-toggle-shape-item:last-child,
 .phone-settings-page .phone-icon-upload-row:last-child,
-.phone-settings-page .phone-beautify-item:last-child,
 .phone-settings-page .phone-worldbook-entry:last-child {
     border-bottom: none;
 }
 
-.phone-settings-page .phone-beautify-item,
 .phone-settings-page .phone-worldbook-entry {
     align-items: flex-start;
 }
@@ -1810,8 +1670,6 @@
 .phone-settings-page .phone-icon-default,
 .phone-settings-page .phone-worldbook-entry-meta,
 .phone-settings-page .phone-prompt-preview-label,
-.phone-settings-page .phone-beautify-item-meta,
-.phone-settings-page .phone-beautify-item-matcher,
 .phone-settings-page .phone-worldbook-status,
 .phone-settings-page .phone-worldbook-loading,
 .phone-settings-page .phone-worldbook-empty {
@@ -1867,43 +1725,6 @@
     max-height: 112px;
 }
 
-.phone-settings-page .phone-beautify-item-main {
-    gap: 6px;
-}
-
-.phone-settings-page .phone-beautify-item-title {
-    font-size: 14px;
-    color: var(--yuzi-settings-text-primary, #3A3731);
-}
-
-.phone-settings-page .phone-beautify-item-badge.is-builtin {
-    color: var(--yuzi-settings-success, #5B7A6A);
-    background: color-mix(in srgb, var(--yuzi-settings-success, #5B7A6A) 8%, transparent);
-    border-color: color-mix(in srgb, var(--yuzi-settings-success, #5B7A6A) 18%, transparent);
-}
-
-.phone-settings-page .phone-beautify-item-badge.is-user {
-    color: var(--yuzi-settings-warning, #A68B5B);
-    background: color-mix(in srgb, var(--yuzi-settings-warning, #A68B5B) 8%, transparent);
-    border-color: color-mix(in srgb, var(--yuzi-settings-warning, #A68B5B) 18%, transparent);
-}
-
-.phone-settings-page .phone-beautify-item-actions {
-    flex-direction: column;
-    align-items: stretch;
-    min-width: 88px;
-}
-
-.phone-settings-page .phone-beautify-pick-radio {
-    justify-content: center;
-    min-height: 32px;
-    padding: 0 8px;
-    border-radius: 4px;
-    background: transparent;
-    border: 1px solid var(--yuzi-settings-border, rgba(58, 55, 49, 0.08));
-    color: var(--yuzi-settings-text-secondary, #7A7772);
-}
-
 .phone-settings-page .phone-worldbook-entry-label {
     width: 100%;
     display: flex;
@@ -1952,15 +1773,6 @@
         flex-basis: auto;
     }
 
-    .phone-settings-page .phone-beautify-item {
-        flex-direction: column;
-    }
-
-    .phone-settings-page .phone-beautify-item-actions {
-        width: 100%;
-        flex-direction: row;
-        justify-content: flex-start;
-    }
 }
 
 /* 深色主题兼容：强制设置页表单控件保持侘寂米白底炭灰字 */

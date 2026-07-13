@@ -23,6 +23,7 @@ async function main() {
     const currentStatusSignatureSql = mod.buildChronicleTodayRelationSignatureSql('current_status');
     const currentStatusUpdateSql = mod.buildChronicleTodayRelationUpdateSql('current_status');
     const anchorSql = mod.buildChronicleTodayRelationAnchorTableSql();
+    const schemaGateSql = mod.buildChronicleTodayRelationSchemaGateSql();
     const allSql = `${signatureSql}\n${updateSql}\n${debugSql}\n${currentStatusSignatureSql}\n${currentStatusUpdateSql}`;
 
     assert.ok(Array.isArray(mod.CHRONICLE_TODAY_RELATION_ANCHOR_TABLES), 'SQL builder 必须导出集中 today anchor 表白名单数组');
@@ -36,6 +37,15 @@ async function main() {
         ['row_id', 'cur_time'],
         'today anchor 统一 schema 要求必须集中声明 row_id/cur_time',
     );
+    assert.deepStrictEqual(mod.CHRONICLE_TODAY_RELATION_REQUIRED_COLUMNS, ['row_id', 'time_span', 'today_relation'], 'chronicle 完整 gate 必需列必须集中声明');
+    ['schema_ok', 'anchor_table', 'missing_requirements', 'schema_fingerprint', 'sqlite_master', 'pragma_table_info', 'chronicle', 'global_state', 'current_status'].forEach((needle) => {
+        assertIncludes(schemaGateSql, needle, `schema gate 必须包含 ${needle}`);
+    });
+    assert.ok(!/;\s*\S/.test(schemaGateSql), 'schema gate SQL 禁止分号串多语句');
+    assertNotIncludes(schemaGateSql.toUpperCase(), 'ALTER TABLE', 'schema gate 禁止 ALTER TABLE');
+    assertNotIncludes(schemaGateSql.toUpperCase(), 'UPDATE ', 'schema gate 必须只读');
+    assertNotIncludes(schemaGateSql.toUpperCase(), 'INSERT ', 'schema gate 必须只读');
+    assertNotIncludes(schemaGateSql.toUpperCase(), 'DELETE ', 'schema gate 必须只读');
     assertIncludes(anchorSql, "VALUES ('global_state', 0), ('current_status', 1)", 'anchor SQL 必须由集中配置生成 global_state/current_status 候选 VALUES');
     assertIncludes(anchorSql, 'candidate_anchor_tables', 'anchor SQL 必须只从候选白名单选表，不得扫描全部 cur_time 表');
     assertIncludes(anchorSql, 'sqlite_master', 'anchor SQL 必须检查候选表存在');

@@ -13,6 +13,7 @@ export {
 
 export {
     querySqlViaApi,
+    probeSqliteCapabilityViaApi,
     executeSqlMutationViaApi,
 } from './data-api/sql-repository.js';
 

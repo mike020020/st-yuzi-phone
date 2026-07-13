@@ -15,7 +15,6 @@ const FILES = {
     backgroundService: 'modules/settings-app/services/appearance-settings/background-service.js',
     iconUploadService: 'modules/settings-app/services/appearance-settings/icon-upload-service.js',
     buttonStyle: 'modules/settings-app/pages/button-style.js',
-    beautify: 'modules/settings-app/pages/beautify.js',
     constants: 'modules/settings-app/constants.js',
 };
 
@@ -95,7 +94,6 @@ function main() {
     check(results, 'buttonStyle', 'button-style 上传错误回调先检查页面生命周期', has(contents.buttonStyle, "onError: (msg) => {\n                if (!isPageActive()) return;\n                showToast(container, msg || '按钮封面上传失败', true);\n            },"));
     check(results, 'appearancePage', 'appearance 页面向背景上传服务传入 runtime', has(contents.appearancePage, 'setupBgUpload(container, { runtime })'));
     check(results, 'appearancePage', 'appearance 页面向图标上传服务传入 runtime', has(contents.appearancePage, "renderIconUploadList(container.querySelector('#phone-icon-upload-list'), { runtime })"));
-    check(results, 'beautify', '继续从 media-upload façade 导入下载能力', has(contents.beautify, "from '../services/media-upload.js';"));
 
     const failed = results.filter(item => !item.ok);
     if (failed.length > 0) {

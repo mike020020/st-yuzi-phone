@@ -19,7 +19,7 @@
 | [`reference/syntax-reference.md`](./reference/syntax-reference.md) | 模板变量与条件表达式语法参考 | 编写或调试数据库模板变量、条件表达式和 `<if>` 标签时查阅 |
 | [`reference/自定义表建表指南.md`](./reference/自定义表建表指南.md) | 自定义表结构参考 | 设计或解释用户自定义表结构时查阅 |
 | [`reference/theater-scene-extension-spec.md`](./reference/theater-scene-extension-spec.md) | 小剧场 scene 扩展规范 | 新增 theater scene 时查阅 scene contract、删除规则和样式入口 |
-| [`reference/merged-template-sample.json`](./reference/merged-template-sample.json) | 美化模板合并样本 | 阅读 [`modules/phone-beautify-templates/`](../modules/phone-beautify-templates) 时对照参考 |
+| [`reference/merged-template-sample.json`](./reference/merged-template-sample.json) | 历史美化模板样本 | 维护 [`modules/phone-beautify-templates/`](../modules/phone-beautify-templates) 的旧数据读取兼容时对照参考；产品端不再提供模板导入入口 |
 | [`reference/table-source-format.md`](./reference/table-source-format.md) | 表格 Markdown 事实源格式 | 维护 `tables/sources/**` 并合成 `tables/generated/**.json` 时查阅 |
 
 ## 与 plans/ 的关系

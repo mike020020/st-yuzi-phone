@@ -101,6 +101,33 @@ export async function querySqlViaApi(sqlOrOptions, params = [], options = {}) {
     }
 }
 
+function readProbeScalar(result) {
+    const row = Array.isArray(result?.rows) ? result.rows[0] : null;
+    if (row && typeof row === 'object' && !Array.isArray(row)) return row.ok;
+    if (Array.isArray(row)) return row[0];
+    const valuesRow = Array.isArray(result?.values) ? result.values[0] : null;
+    return Array.isArray(valuesRow) ? valuesRow[0] : undefined;
+}
+
+/**
+ * Narrow SQLite capability probe. This deliberately does not expose a global
+ * readiness cache: callers own retry timing and must treat every result as a
+ * point-in-time capability observation.
+ */
+export async function probeSqliteCapabilityViaApi() {
+    const result = await querySqlViaApi('SELECT 1 AS ok');
+    if (!result?.ok) {
+        return {
+            ok: false,
+            code: result?.code || 'probe_unconfirmed',
+            message: result?.message || 'SQLite capability result was not confirmed',
+        };
+    }
+    return readProbeScalar(result) === 1
+        ? { ok: true, code: 'ok' }
+        : { ok: false, code: 'probe_unconfirmed', message: 'SQLite capability result did not contain scalar 1' };
+}
+
 function normalizeMutationResult(result) {
     if (result === null) return buildFailure('sqlite_unavailable', 'SQLite SQL 写入不可用或数据库 API 返回 null');
     if (result === undefined) return buildFailure('mutation_failed', 'SQL 写入返回 undefined');
