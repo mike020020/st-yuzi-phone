@@ -9,6 +9,7 @@
  * 5. generic  : 通用表模板层
  * 6. theater  : 小剧场三场景（广场 / 论坛 / 直播）美化层
  * 7. variable : 变量管理层
+ * 8. presets  : 玉子美化运行 shell 与模板工坊补层
  * @version 1.4.2
  */
 
@@ -33,3 +34,6 @@
 
 /* 7) variable manager layer */
 @import url('./styles/12-variable-manager.css');
+
+/* 8) content preset shell / workshop */
+@import url('./styles/13-content-presets.css');

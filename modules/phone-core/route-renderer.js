@@ -1,5 +1,8 @@
 import { Logger } from '../error-handler.js';
+import { tryRenderContentPreset } from '../content-presets/renderer.js';
+import { resolveContentPresetRouteTarget } from '../content-presets/route-target.js';
 import { isTheaterRoute, normalizeTheaterSceneId } from '../phone-theater/config.js';
+import { removeRoutePage } from './route-page-lifecycle.js';
 import { clearRouteHistory } from './routing.js';
 import { bindPhoneScrollGuards, hardenPhoneInteractionDefaults, logRouteScrollDebugSnapshot } from './scroll-guards.js';
 import { getPhoneCoreState, phoneRuntime } from './state.js';
@@ -60,13 +63,16 @@ async function loadRouteRenderer(route, renderToken, deps = {}) {
             const { renderTheaterScene } = deps.renderTheaterScene
                 ? { renderTheaterScene: deps.renderTheaterScene }
                 : await import('../phone-theater/render.js');
+            const originalRenderer = (page) => renderTheaterScene(page, target.sceneId, {
+                renderToken,
+                navigationSheetKey: target.sheetKey,
+            });
             return {
                 routeType: 'table-theater',
-                render(page) {
-                    renderTheaterScene(page, target.sceneId, {
-                        renderToken,
-                        navigationSheetKey: target.sheetKey,
-                    });
+                async render(page) {
+                    const presetTarget = resolveContentPresetRouteTarget(route, getTableData());
+                    const renderPreset = deps.tryRenderContentPreset || tryRenderContentPreset;
+                    if (!await renderPreset(page, presetTarget, { renderToken, originalRenderer })) originalRenderer(page);
                 },
             };
         }
@@ -74,13 +80,16 @@ async function loadRouteRenderer(route, renderToken, deps = {}) {
         const { renderTableViewer } = deps.renderTableViewer
             ? { renderTableViewer: deps.renderTableViewer }
             : await import('../table-viewer/render.js');
+        const originalRenderer = (page) => renderTableViewer(page, target.sheetKey, {
+            forceGenericList: target.presentation === 'generic',
+            navigationSheetKey: target.sheetKey,
+        });
         return {
             routeType: target.presentation === 'special' ? 'table-special' : 'table-generic-auto',
-            render(page) {
-                renderTableViewer(page, target.sheetKey, {
-                    forceGenericList: target.presentation === 'generic',
-                    navigationSheetKey: target.sheetKey,
-                });
+            async render(page) {
+                const presetTarget = resolveContentPresetRouteTarget(route, getTableData());
+                const renderPreset = deps.tryRenderContentPreset || tryRenderContentPreset;
+                if (!await renderPreset(page, presetTarget, { renderToken, originalRenderer })) originalRenderer(page);
             },
         };
     }
@@ -95,13 +104,16 @@ async function loadRouteRenderer(route, renderToken, deps = {}) {
             const { renderTheaterScene } = deps.renderTheaterScene
                 ? { renderTheaterScene: deps.renderTheaterScene }
                 : await import('../phone-theater/render.js');
+            const originalRenderer = (page) => renderTheaterScene(page, target.sceneId, {
+                renderToken,
+                navigationSheetKey: target.sheetKey,
+            });
             return {
                 routeType: 'theater-app-redirect',
-                render(page) {
-                    renderTheaterScene(page, target.sceneId, {
-                        renderToken,
-                        navigationSheetKey: target.sheetKey,
-                    });
+                async render(page) {
+                    const presetTarget = resolveContentPresetRouteTarget(route, getTableData());
+                    const renderPreset = deps.tryRenderContentPreset || tryRenderContentPreset;
+                    if (!await renderPreset(page, presetTarget, { renderToken, originalRenderer })) originalRenderer(page);
                 },
             };
         }
@@ -109,12 +121,15 @@ async function loadRouteRenderer(route, renderToken, deps = {}) {
         const { renderTableViewer } = deps.renderTableViewer
             ? { renderTableViewer: deps.renderTableViewer }
             : await import('../table-viewer/render.js');
+        const originalRenderer = (page) => renderTableViewer(page, sheetKey, target ? {
+            navigationSheetKey: target.sheetKey,
+        } : {});
         return {
             routeType: 'app',
-            render(page) {
-                renderTableViewer(page, sheetKey, target ? {
-                    navigationSheetKey: target.sheetKey,
-                } : {});
+            async render(page) {
+                const presetTarget = resolveContentPresetRouteTarget(route, getTableData());
+                const renderPreset = deps.tryRenderContentPreset || tryRenderContentPreset;
+                if (!await renderPreset(page, presetTarget, { renderToken, originalRenderer })) originalRenderer(page);
             },
         };
     }
@@ -137,10 +152,14 @@ async function loadRouteRenderer(route, renderToken, deps = {}) {
         const { renderTheaterScene } = deps.renderTheaterScene
             ? { renderTheaterScene: deps.renderTheaterScene }
             : await import('../phone-theater/render.js');
+        const { getTableData } = deps.getTableData ? { getTableData: deps.getTableData } : await import('./data-api.js');
+        const originalRenderer = (page) => renderTheaterScene(page, sceneId, { renderToken });
         return {
             routeType: 'theater',
-            render(page) {
-                renderTheaterScene(page, sceneId, { renderToken });
+            async render(page) {
+                const presetTarget = resolveContentPresetRouteTarget(route, getTableData());
+                const renderPreset = deps.tryRenderContentPreset || tryRenderContentPreset;
+                if (!await renderPreset(page, presetTarget, { renderToken, originalRenderer })) originalRenderer(page);
             },
         };
     }
@@ -232,7 +251,7 @@ function removeStaleRoutePages(screen, retainedPages = []) {
     for (const routePage of getRoutePages(screen)) {
         if (retainedPageSet.has(routePage)) continue;
         routePage.setAttribute('aria-hidden', 'true');
-        routePage.remove();
+        removeRoutePage(routePage);
     }
 }
 
@@ -281,9 +300,12 @@ function schedulePreviousPageRemoval(oldContent, exitClass) {
     oldContent.style.pointerEvents = 'none';
 
     phoneRuntime.setTimeout(() => {
-        if (!oldContent.isConnected) return;
+        if (!oldContent.isConnected) {
+            removeRoutePage(oldContent);
+            return;
+        }
         oldContent.setAttribute('aria-hidden', 'true');
-        oldContent.remove();
+        removeRoutePage(oldContent);
     }, EXIT_ANIM_MS);
 
     return true;
@@ -298,9 +320,9 @@ function activateCommittedRoutePage(page, route, renderToken) {
     });
 }
 
-function renderResolvedRoutePage(routeRenderer, context) {
+async function renderResolvedRoutePage(routeRenderer, context) {
     try {
-        routeRenderer.render(context.page);
+        await routeRenderer.render(context.page);
         return true;
     } catch (error) {
         logger.error({
@@ -327,6 +349,7 @@ function commitRoutePage({ screen, page, oldContent, route, renderToken, isBack 
                 screenConnected: screen?.isConnected === true,
             },
         });
+        removeRoutePage(page);
         return false;
     }
 
@@ -355,6 +378,7 @@ function scheduleRouteCommit({ screen, page, oldContent, route, renderToken, isB
                     screenConnected: screen?.isConnected === true,
                 },
             });
+            removeRoutePage(page);
             return;
         }
         commitRoutePage({ screen, page, oldContent, route, renderToken, isBack });
@@ -379,6 +403,7 @@ export async function renderPhoneRoute(route, opts = {}) {
 
     const routeRenderer = await resolveRouteRenderer(context.route, context.renderToken);
     if (!routeRenderer) {
+        removeRoutePage(context.page);
         logger.warn({
             action: 'render.skip',
             message: 'route 渲染失败：未找到 route renderer',
@@ -391,6 +416,7 @@ export async function renderPhoneRoute(route, opts = {}) {
     }
 
     if (!isRenderableScreen(context.screen, context.renderToken, context.state)) {
+        removeRoutePage(context.page);
         logger.warn({
             action: 'render.skip',
             message: 'route 渲染失败：screen 不可渲染或 render token 已过期',
@@ -405,7 +431,8 @@ export async function renderPhoneRoute(route, opts = {}) {
         return false;
     }
 
-    if (!renderResolvedRoutePage(routeRenderer, context)) {
+    if (!await renderResolvedRoutePage(routeRenderer, context)) {
+        removeRoutePage(context.page);
         return false;
     }
 

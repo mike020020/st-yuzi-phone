@@ -1,0 +1,13 @@
+{
+  "name": "yuzi-beautify-workshop",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "check": "node tools/check-preset.mjs examples/basic-preset.json examples/tables.json",
+    "test": "node tests/run-tests.mjs",
+    "inspect": "node tools/inspect-tables.mjs examples/tables.json",
+    "pack": "node tools/pack-preset.mjs examples/project.json output/basic-preset.json",
+    "readback": "node tools/readback-preset.mjs examples/project.json output/basic-preset.json"
+  }
+}

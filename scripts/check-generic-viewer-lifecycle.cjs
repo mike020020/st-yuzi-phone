@@ -17,6 +17,33 @@ function assertIncludes(source, snippet, message, failures) {
     }
 }
 
+function extractBlock(source, label, pattern, failures) {
+    const match = pattern.exec(source);
+    if (!match) {
+        failures.push(`${label} 未找到`);
+        return '';
+    }
+
+    let index = match.index + match[0].length;
+    let depth = 1;
+    while (index < source.length && depth > 0) {
+        const char = source[index];
+        if (char === '{') depth += 1;
+        if (char === '}') depth -= 1;
+        index += 1;
+    }
+    if (depth !== 0) {
+        failures.push(`${label} 函数体括号不平衡`);
+        return '';
+    }
+    return source.slice(match.index, index);
+}
+
+function countOccurrences(source, snippet) {
+    if (!snippet) return 0;
+    return String(source || '').split(snippet).length - 1;
+}
+
 function main() {
     const failures = [];
     const addRowModal = read('modules/table-viewer/add-row-modal.js');
@@ -25,13 +52,31 @@ function main() {
     const rowDelete = read('modules/table-viewer/row-delete-controller.js');
     const listController = read('modules/table-viewer/list-page-controller.js');
     const detailEdit = read('modules/table-viewer/detail-edit-controller.js');
+    const reconcileBody = extractBlock(
+        addRowModal,
+        'reconcileInsertedRow',
+        /async\s+function\s+reconcileInsertedRow\s*\([^)]*\)\s*{/,
+        failures,
+    );
+    const reconcileRetryLoop = extractBlock(
+        reconcileBody,
+        'reconcileInsertedRow retry loop',
+        /for\s*\(const\s+waitMs\s+of\s+retryWaits\)\s*{/,
+        failures,
+    );
 
     assertIncludes(addRowModal, 'function isRuntimeDisposed(runtime) {\n    return !!(runtime && typeof runtime.isDisposed === \'function\' && runtime.isDisposed());\n}', 'add-row-modal 暴露 runtime disposed helper', failures);
     assertIncludes(addRowModal, 'viewerRuntime: providedViewerRuntime,', 'add-row-modal 接收显式 viewerRuntime', failures);
     assertIncludes(addRowModal, 'const viewerRuntime = providedViewerRuntime && typeof providedViewerRuntime === \'object\'\n        ? providedViewerRuntime\n        : resolveViewerRuntime(container);', 'add-row-modal 优先使用显式 viewerRuntime，保留 DOM 反查 fallback', failures);
     assertIncludes(addRowModal, 'const result = await insertTableRow(tableName, newData);\n            if (!isViewerActive()) return;', 'add-row-modal insert await 后阻断旧 UI 回写', failures);
-    assertIncludes(addRowModal, 'if (!isRuntimeActive(viewerRuntime)) {\n            return {\n                reachedExpected,\n                latestSummary,\n                aborted: true,\n            };\n        }', 'add-row-modal reconcile sleep 后检查 viewer lifecycle', failures);
-    assertIncludes(addRowModal, 'await refreshPhoneTableProjection();\n            if (!isRuntimeActive(viewerRuntime)) {', 'add-row-modal reconcile projection await 后检查 viewer lifecycle', failures);
+    assertIncludes(reconcileBody, 'if (!isRuntimeActive(viewerRuntime)) {\n            return {\n                reachedExpected,\n                latestSummary,\n                aborted: true,\n                recoveryRefreshed,\n            };\n        }', 'add-row-modal reconcile sleep 后检查 viewer lifecycle', failures);
+    if (reconcileRetryLoop.includes('refreshPhoneTableProjection')) {
+        failures.push('add-row-modal 默认三轮只读对账不得主动刷新投影');
+    }
+    assertIncludes(reconcileBody, 'if (!reachedExpected && isRuntimeActive(viewerRuntime)) {\n        recoveryRefreshed = await refreshPhoneTableProjection();\n        if (!isRuntimeActive(viewerRuntime)) {', 'add-row-modal 仅在最终未收敛时 recovery refresh，且 await 后检查 viewer lifecycle', failures);
+    if (countOccurrences(reconcileBody, 'refreshPhoneTableProjection()') !== 1) {
+        failures.push('add-row-modal reconcile 必须恰好保留一次 recovery refresh');
+    }
     assertIncludes(addRowModal, 'viewerRuntime,\n                })).catch((reconcileError) => {', 'add-row-modal 将 viewerRuntime 传入 reconcile', failures);
     assertIncludes(addRowModal, 'if (!isViewerActive()) return;\n            showInlineToast(container, `新增异常: ${err?.message || \'未知错误\'}`);', 'add-row-modal catch 分支 disposed 后不 toast/恢复旧按钮', failures);
 

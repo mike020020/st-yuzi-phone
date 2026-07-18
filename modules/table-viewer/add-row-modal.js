@@ -160,34 +160,21 @@ async function reconcileInsertedRow(options = {}) {
         viewerRuntime,
     } = options;
 
-    const retrySteps = [
-        { waitMs: 120, refreshProjection: true },
-        { waitMs: 260, refreshProjection: false },
-        { waitMs: 480, refreshProjection: true },
-    ];
+    const retryWaits = [120, 260, 480];
     let latestSummary = summarizeSheetSnapshot(getTableData(), sheetKey);
     let reachedExpected = Number.isInteger(latestSummary.rowCount) && latestSummary.rowCount >= expectedMinRowCount;
+    let recoveryRefreshed = false;
 
-    for (let attemptIndex = 0; attemptIndex < retrySteps.length && !reachedExpected; attemptIndex++) {
-        const step = retrySteps[attemptIndex];
-        await sleep(step.waitMs);
+    for (const waitMs of retryWaits) {
+        if (reachedExpected) break;
+        await sleep(waitMs);
         if (!isRuntimeActive(viewerRuntime)) {
             return {
                 reachedExpected,
                 latestSummary,
                 aborted: true,
+                recoveryRefreshed,
             };
-        }
-
-        if (step.refreshProjection) {
-            await refreshPhoneTableProjection();
-            if (!isRuntimeActive(viewerRuntime)) {
-                return {
-                    reachedExpected,
-                    latestSummary,
-                    aborted: true,
-                };
-            }
         }
 
         const latestData = getTableData();
@@ -201,6 +188,27 @@ async function reconcileInsertedRow(options = {}) {
         }
     }
 
+    if (!reachedExpected && isRuntimeActive(viewerRuntime)) {
+        recoveryRefreshed = await refreshPhoneTableProjection();
+        if (!isRuntimeActive(viewerRuntime)) {
+            return {
+                reachedExpected,
+                latestSummary,
+                aborted: true,
+                recoveryRefreshed,
+            };
+        }
+
+        const latestData = getTableData();
+        latestSummary = summarizeSheetSnapshot(latestData, sheetKey);
+        const syncResult = syncRowsFromSheetSnapshot(rows, latestData, sheetKey);
+        reachedExpected = syncResult.rowCount >= expectedMinRowCount;
+        if (syncResult.synced && state) {
+            state.syncLockState(getTableLockState(sheetKey));
+            renderKeepScroll();
+        }
+    }
+
     if (isRuntimeActive(viewerRuntime)) {
         dispatchPhoneTableUpdated(sheetKey);
     }
@@ -208,6 +216,7 @@ async function reconcileInsertedRow(options = {}) {
     return {
         reachedExpected,
         latestSummary,
+        recoveryRefreshed,
     };
 }
 

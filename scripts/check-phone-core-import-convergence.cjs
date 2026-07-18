@@ -114,7 +114,8 @@ function main() {
     check(results, 'genericRuntime', 'generic-runtime 改为直接从 chat-support 导入 sheet 运行时能力', has(contents.genericRuntime, "from '../phone-core/chat-support.js';"));
     check(results, 'genericRuntime', 'generic-runtime 不再从 phone-core façade 导入', !has(contents.genericRuntime, "from '../phone-core.js';"));
 
-    check(results, 'viewerRuntime', 'viewer-runtime 改为直接从 callbacks 导入 setCurrentViewingSheet()', has(contents.viewerRuntime, "from '../phone-core/callbacks.js';"));
+    check(results, 'viewerRuntime', 'viewer-runtime 改为直接从 callbacks 导入 currentViewingSheet lease', has(contents.viewerRuntime, "from '../phone-core/callbacks.js';")
+        && has(contents.viewerRuntime, 'acquireCurrentViewingSheet,') && has(contents.viewerRuntime, 'releaseCurrentViewingSheet,'));
     check(results, 'viewerRuntime', 'viewer-runtime 不再从 phone-core façade 导入', !has(contents.viewerRuntime, "from '../phone-core.js';"));
 
     check(results, 'specialMessageViewer', 'special message-viewer 改为直接从 chat-support 导入聊天运行时能力', has(contents.specialMessageViewer, "from '../../phone-core/chat-support.js';"));

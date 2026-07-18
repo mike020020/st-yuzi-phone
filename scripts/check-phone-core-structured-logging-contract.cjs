@@ -53,7 +53,8 @@ function main() {
 
     check(results, 'panelActions', 'panel-actions 使用 scoped logger', has(contents.panelActions, "const logger = Logger.withScope({ scope: 'phone-core/data-api/panel-actions', feature: 'db-api' });"));
     check(results, 'panelActions', 'panel-actions manualUpdate API 失败使用结构化日志', has(contents.panelActions, "action: 'manual-update.api'"));
-    check(results, 'panelActions', 'panel-actions fallback 失败使用结构化日志', has(contents.panelActions, "action: 'manual-update.fallback'"));
+    check(results, 'panelActions', 'panel-actions manualUpdate API 缺失使用结构化日志', has(contents.panelActions, "action: 'manual-update.method-unavailable'"));
+    check(results, 'panelActions', 'panel-actions 不再保留无法等待 settlement 的 DOM fallback 日志', !has(contents.panelActions, "action: 'manual-update.fallback'"));
 
     check(results, 'presetRepository', 'preset-repository 使用 scoped logger', has(contents.presetRepository, "const logger = Logger.withScope({ scope: 'phone-core/data-api/preset-repository', feature: 'db-api' });"));
     check(results, 'presetRepository', 'preset-repository 使用结构化 preset 日志', has(contents.presetRepository, "action: 'api-presets.get'"));

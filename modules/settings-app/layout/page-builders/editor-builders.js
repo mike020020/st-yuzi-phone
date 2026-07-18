@@ -373,22 +373,87 @@ export function buildApiPromptConfigPageHtml({
     });
 }
 
-export function buildBeautifyTemplatePageHtml() {
+export function buildBeautifyTemplatePageHtml(viewModel = {}) {
+    const presets = Array.isArray(viewModel.presets) ? viewModel.presets : [];
+    const tables = Array.isArray(viewModel.tables) ? viewModel.tables : [];
+    const status = String(viewModel.status || 'loading');
     const heroHtml = buildSettingsHeroHtml({
         eyebrow: '模板工坊',
         title: '模板工坊',
-        description: '默认美化已内置于系统。这里仅用于清除历史用户模板配置并恢复内置默认。',
+        description: '导入多单表完整预设，并按真实表精确选择当前美化。未绑定或运行失败时保留原展示。',
     });
-    const bodyHtml = buildSettingsSectionHtml({
-        title: '恢复内置默认',
-        desc: '此操作只会在你主动确认后执行。未执行恢复时，历史用户模板与表级绑定仍按原配置运行。',
+
+    const statusHtml = status === 'loading'
+        ? '<div class="phone-settings-note">正在读取独立模板仓库…</div>'
+        : status === 'unavailable' || status === 'error'
+            ? `<div class="phone-settings-note">模板仓库不可用：${escapeHtml(viewModel.error?.message || '未知错误')}。现有页面仍使用原展示。</div>`
+            : '';
+
+    const presetCardsHtml = presets.length > 0
+        ? presets.map((preset) => {
+            const issues = Array.isArray(preset.issues) ? preset.issues : [];
+            const issueHtml = issues.length > 0
+                ? `<ul class="phone-settings-list">${issues.map(issue => `<li><strong>${escapeHtml(issue.code || 'issue')}</strong>：${escapeHtml(issue.message || '')}</li>`).join('')}</ul>`
+                : '<div class="phone-settings-note">未记录导入问题。</div>';
+            return `
+                <article class="phone-settings-card">
+                    <div class="phone-settings-card-title">${escapeHtml(preset.name || preset.id)}</div>
+                    <div class="phone-settings-card-desc">ID：${escapeHtml(preset.id)} · 版本：${escapeHtml(preset.version || '未声明')} · 作者：${escapeHtml(preset.author || '未声明')} · ${Number(preset.items?.length || 0)} 个单表项</div>
+                    ${issueHtml}
+                    <div class="phone-settings-action">
+                        <button type="button" class="phone-settings-btn" data-action="export" data-preset-id="${escapeHtmlAttr(preset.id)}">导出</button>
+                        <button type="button" class="phone-settings-btn phone-settings-btn-danger" data-action="delete" data-preset-id="${escapeHtmlAttr(preset.id)}">删除</button>
+                    </div>
+                </article>`;
+        }).join('')
+        : '<div class="phone-settings-note">尚未导入玉子美化预设。</div>';
+
+    const tableCardsHtml = tables.length > 0
+        ? tables.map((table) => {
+            const candidates = Array.isArray(table.candidates) ? table.candidates : [];
+            const active = table.active;
+            const candidateHtml = candidates.length > 0
+                ? candidates.map((candidate) => {
+                    const selected = active?.presetId === candidate.presetId && active?.itemId === candidate.itemId;
+                    return `
+                        <div class="phone-settings-row">
+                            <div class="phone-settings-row-main">
+                                <div class="phone-settings-row-title">${escapeHtml(candidate.preset?.name || candidate.presetId)} / ${escapeHtml(candidate.item?.name || candidate.itemId)}</div>
+                                <div class="phone-settings-row-desc">${selected ? '当前已启用' : '表名与声明字段精确匹配'}</div>
+                            </div>
+                            <button type="button" class="phone-settings-btn" data-action="activate" data-sheet-key="${escapeHtmlAttr(table.sheetKey)}" data-preset-id="${escapeHtmlAttr(candidate.presetId)}" data-item-id="${escapeHtmlAttr(candidate.itemId)}" ${selected ? 'disabled' : ''}>${selected ? '当前' : '设为当前'}</button>
+                        </div>`;
+                }).join('')
+                : '<div class="phone-settings-note">没有匹配此表名与字段的可运行预设项。</div>';
+            return `
+                <article class="phone-settings-card">
+                    <div class="phone-settings-card-title">${escapeHtml(table.tableName || table.sheetKey)}</div>
+                    <div class="phone-settings-card-desc">sheetKey：${escapeHtml(table.sheetKey)} · 字段：${escapeHtml((table.headers || []).join('、') || '无')}</div>
+                    ${candidateHtml}
+                    <div class="phone-settings-action">
+                        <button type="button" class="phone-settings-btn" data-action="clear" data-sheet-key="${escapeHtmlAttr(table.sheetKey)}" ${active ? '' : 'disabled'}>恢复默认</button>
+                    </div>
+                </article>`;
+        }).join('')
+        : '<div class="phone-settings-note">没有可配置的真实表。消息记录表不会出现在这里。</div>';
+
+    const bodyHtml = `
+        ${statusHtml}
+        ${buildSettingsSectionHtml({
+        title: '完整预设',
+        desc: '同 ID 导入会要求确认；覆盖成功后清除该预设的全部表绑定，但不会自动启用或迁移同 itemId。',
         bodyHtml: `
-            <div class="phone-settings-note">恢复后将永久删除全部历史用户美化模板及表级模板绑定，并统一使用内置的消息记录表模板和通用表模板。此操作不可撤销。</div>
             <div class="phone-settings-action">
-                <button type="button" class="phone-settings-btn phone-settings-btn-danger" id="phone-beautify-restore-defaults-btn">恢复默认</button>
+                <button type="button" class="phone-settings-btn phone-settings-btn-primary" data-action="import">导入预设</button>
             </div>
+            ${presetCardsHtml}
         `,
-    });
+    })}
+        ${buildSettingsSectionHtml({
+        title: '真实表绑定',
+        desc: '仅列出非消息记录表。候选匹配采用 Unicode NFKC、表名精确相等和声明字段包含规则。',
+        bodyHtml: `${tableCardsHtml}<div class="phone-settings-action"><button type="button" class="phone-settings-btn phone-settings-btn-danger" data-action="clear-all">全部恢复默认</button></div>`,
+    })}`;
 
     return buildSettingsPageFrame({
         title: '模板工坊',

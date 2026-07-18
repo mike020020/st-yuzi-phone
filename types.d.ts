@@ -926,6 +926,62 @@ export interface SettingsPromptEditorService {
     savePhoneAiInstructionPreset: (...args: any[]) => any;
 }
 
+export type ContentPresetScriptMode = 'classic' | 'module';
+
+export interface ContentPresetIssue {
+    code: string;
+    message: string;
+    itemId?: string;
+}
+
+export interface ContentPresetBinding {
+    sheetKey: string;
+    presetId: string;
+    itemId: string;
+}
+
+export interface ContentPresetItem {
+    id: string;
+    name: string;
+    target: { tableName: string; fields: readonly string[] };
+    entry: { html?: string; css?: string; js?: string; scriptMode: ContentPresetScriptMode };
+    assets: readonly string[];
+    issues: readonly ContentPresetIssue[];
+    activatable: boolean;
+}
+
+export interface ContentPresetRecord {
+    id: string;
+    name: string;
+    version: string;
+    author: string;
+    items: readonly ContentPresetItem[];
+    issues: readonly ContentPresetIssue[];
+    files: Readonly<Record<string, { path: string; mimeType: string; encoding: 'text' | 'base64'; content: string }>>;
+    importedAt: string;
+}
+
+export interface ContentPresetWorkshopViewModel {
+    status: 'loading' | 'ready' | 'unavailable' | 'error';
+    error: unknown;
+    revision: number;
+    presets: readonly ContentPresetRecord[];
+    tables: readonly any[];
+}
+
+export interface SettingsContentPresetWorkshopService {
+    getSnapshot: () => any;
+    subscribe: (listener: (snapshot: any) => void) => () => void;
+    getViewModel: () => Promise<ContentPresetWorkshopViewModel>;
+    prepareImport: (input: string | object) => Promise<{ record: ContentPresetRecord; replacesExisting: boolean }>;
+    importPrepared: (prepared: { record: ContentPresetRecord; replacesExisting: boolean }, allowReplace?: boolean) => Promise<any>;
+    exportPreset: (presetId: string) => Promise<{ filename: string; text: string; mimeType: string }>;
+    deletePreset: (presetId: string) => Promise<any>;
+    setActive: (sheetKey: string, presetId: string, itemId: string) => Promise<any>;
+    clearActive: (sheetKey: string) => Promise<any>;
+    clearAllActive: () => Promise<any>;
+}
+
 export interface SettingsApiPromptPageRendererDeps extends SettingsApiPromptService, SettingsAiInstructionPresetService {}
 
 export interface SettingsPromptEditorPageRendererDeps extends SettingsPromptEditorService {}
@@ -941,6 +997,7 @@ export interface SettingsPageRendererGroupedDeps {
     buttonStyle?: SettingsButtonStylePageRendererDeps;
     apiPrompt?: SettingsApiPromptPageRendererDeps;
     promptEditor?: SettingsPromptEditorPageRendererDeps;
+    contentPresetWorkshop?: SettingsContentPresetWorkshopService;
 }
 
 export interface SettingsPageInstance {

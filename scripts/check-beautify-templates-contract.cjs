@@ -9,7 +9,9 @@ const files = {
     policy: read('modules/phone-beautify-templates/policy.js'),
     reset: read('modules/phone-beautify-templates/reset.js'),
     page: read('modules/settings-app/pages/beautify.js'),
+    behavior: read('modules/settings-app/pages/beautify-behavior.js'),
     builder: read('modules/settings-app/layout/page-builders/editor-builders.js'),
+    workshop: read('modules/content-presets/workshop-service.js'),
     types: read('types.d.ts'),
 };
 
@@ -19,10 +21,17 @@ assert.ok(files.matcher.includes("reason: 'manual_binding'"), '历史 binding �
 assert.ok(files.matcher.includes('store.bindings?.[safeSheetKey]'));
 assert.ok(files.policy.includes('BEAUTIFY_USER_TEMPLATE_WRITE_DISABLED'));
 assert.ok(files.reset.includes('restorePhoneBeautifyTemplatesToBuiltinDefaults'));
-assert.ok(files.page.includes('restorePhoneBeautifyTemplatesToBuiltinDefaults'));
-assert.ok(!files.page.includes('getPhoneBeautifyTemplatesByType'));
-assert.ok(!files.page.includes('FileReader'));
-assert.ok(files.builder.includes('phone-beautify-restore-defaults-btn'));
-for (const old of ['phone-beautify-import-', 'phone-beautify-export-', 'phone-beautify-list-']) assert.ok(!files.builder.includes(old));
+assert.ok(!files.page.includes('phone-beautify-templates/'), '新模板工坊不得重新耦合旧 Beautify store');
+assert.ok(files.page.includes('contentPresetWorkshopService.getViewModel()'));
+assert.ok(files.page.includes('contentPresetWorkshopService.subscribe('));
+assert.ok(files.behavior.includes('service.prepareImport(await file.text())'));
+for (const method of ['importPrepared', 'exportPreset', 'deletePreset', 'setActive', 'clearActive', 'clearAllActive']) {
+    assert.ok(files.workshop.includes(`async ${method}(`), `工坊 service 必须提供 ${method}()`);
+}
+for (const action of ['import', 'export', 'delete', 'activate', 'clear', 'clear-all']) {
+    assert.ok(files.builder.includes(`data-action="${action}"`), `页面必须提供 ${action} action`);
+}
+assert.ok(!files.builder.includes('phone-beautify-restore-defaults-btn'));
 assert.ok(files.types.includes('PhoneBeautifyTemplateResetResult'));
-console.log('[beautify-templates-contract-check] 检查通过');
+assert.ok(files.types.includes('SettingsContentPresetWorkshopService'));
+console.log('[beautify-templates-contract-check] 新工坊与旧兼容合同检查通过');

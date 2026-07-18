@@ -58,10 +58,13 @@ const deleteBody = extractFunctionBody(
 );
 assertOrdered(deleteBody, [
     'const execution = await executeTheaterDeletionPlans(scene, deletionPlans);',
-    'const refreshed = await refreshPhoneTableProjection();',
+    'const refreshed = execution.results.length > 0',
+    '&& execution.results.every((result) => result.refreshed !== false);',
+    'notifiedSheetKeys.forEach(sheetKey => dispatchPhoneTableUpdated(sheetKey));',
     'message: refreshed ? `已删除 ${execution.deletedCount} 条相关数据` : `已删除 ${execution.deletedCount} 条相关数据，但刷新投影失败`,',
     'refreshed,',
-], 'deleteTheaterEntities 必须返回投影刷新状态和失败文案');
+], 'deleteTheaterEntities 必须汇总底层 mutation 刷新状态并返回失败文案');
+assert(!deleteBody.includes('refreshPhoneTableProjection'), 'deleteTheaterEntities 不得在批次末重复刷新投影');
 assert(deleteBody.includes('expectedDeletedCount: removedCount'), 'deleteTheaterEntities 必须返回预期删除数量用于部分失败反馈');
 assert(deleteBody.includes('notDeletedPlans: execution.notDeletedPlans || [],'), 'deleteTheaterEntities 失败时必须返回按计划归集的未删除行');
 assert(deleteBody.includes('notDeletedRowsBySheetKey: execution.notDeletedRowsBySheetKey || {},'), 'deleteTheaterEntities 失败时必须返回按 sheetKey 索引的未删除行');
@@ -74,7 +77,7 @@ const executionPlansBody = extractFunctionBody(
 assertOrdered(executionPlansBody, [
     'for (let planIndex = 0; planIndex < orderedPlans.length; planIndex += 1) {',
     'const plan = orderedPlans[planIndex];',
-    'const result = await deleteTableRowsBatch(plan.tableName, plan.rowIndexes, {',
+    'const result = await deleteTableRowsBatch(plan.tableName, plan.rowIndexes);',
     'results.push({',
     '...result,',
     'if (!result.ok) {',
@@ -84,6 +87,7 @@ assertOrdered(executionPlansBody, [
     'notDeletedPlans,',
     'notDeletedRowsBySheetKey: buildTheaterNotDeletedRowsBySheetKey(notDeletedPlans),',
 ], 'executeTheaterDeletionPlans 必须透传并归集每个删除计划和后续未执行计划的未删除行');
+assert(!executionPlansBody.includes('refreshProjection'), 'executeTheaterDeletionPlans 不得向仓库传递旧 refreshProjection 选项');
 assert(deleteService.includes('attempted: false,') && deleteService.includes("reason: 'unattempted_after_previous_failure'"), 'delete-service 必须标记后续未执行计划');
 
 assert(
@@ -114,5 +118,5 @@ assertOrdered(executeBody, [
 ], 'executeConfirmedDelete 删除失败仍必须使用错误样式');
 
 console.log('[theater-delete-feedback-check] 检查通过');
-console.log('- OK | 小剧场删除服务返回 refreshed 和刷新失败文案');
+console.log('- OK | 小剧场删除服务汇总 mutation refreshed 且不重复刷新投影');
 console.log('- OK | 小剧场删除交互根据 result.refreshed === false 选择异常样式');

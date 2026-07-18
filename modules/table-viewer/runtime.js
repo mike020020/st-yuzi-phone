@@ -1,5 +1,9 @@
 import { Logger } from '../error-handler.js';
-import { resetDataVersion, setCurrentViewingSheet } from '../phone-core/callbacks.js';
+import {
+    acquireCurrentViewingSheet,
+    releaseCurrentViewingSheet,
+    resetDataVersion,
+} from '../phone-core/callbacks.js';
 import { createRuntimeScope } from '../runtime-manager.js';
 import { bindTemplateDraftPreviewForViewer } from './template-runtime.js';
 
@@ -87,7 +91,8 @@ export function createViewerRuntime(options = {}) {
 
     const resolvedRuntimeDeps = {
         getModalById: (id) => document.getElementById(id),
-        setCurrentViewingSheet,
+        acquireCurrentViewingSheet,
+        releaseCurrentViewingSheet,
         resetDataVersion,
         bindTemplateDraftPreviewForViewer,
         getObserverRoot: () => document.body,
@@ -107,6 +112,7 @@ export function createViewerRuntime(options = {}) {
     let viewerDisposed = false;
     let suppressExternalTableUpdateDepth = 0;
     let runtimeApi = null;
+    let viewingSheetOwner = null;
 
     const dispose = () => {
         if (viewerDisposed) return;
@@ -128,8 +134,9 @@ export function createViewerRuntime(options = {}) {
             delete host[VIEWER_RUNTIME_INSTANCE_KEY];
         }
 
-        if (typeof resolvedRuntimeDeps.setCurrentViewingSheet === 'function') {
-            resolvedRuntimeDeps.setCurrentViewingSheet(null);
+        if (viewingSheetOwner && typeof resolvedRuntimeDeps.releaseCurrentViewingSheet === 'function') {
+            resolvedRuntimeDeps.releaseCurrentViewingSheet(viewingSheetOwner);
+            viewingSheetOwner = null;
         }
     };
 
@@ -209,8 +216,8 @@ export function createViewerRuntime(options = {}) {
             observeRemoval = true,
         } = options;
 
-        if (setViewingSheet && typeof resolvedRuntimeDeps.setCurrentViewingSheet === 'function') {
-            resolvedRuntimeDeps.setCurrentViewingSheet(sheetKey);
+        if (setViewingSheet && typeof resolvedRuntimeDeps.acquireCurrentViewingSheet === 'function') {
+            viewingSheetOwner = resolvedRuntimeDeps.acquireCurrentViewingSheet(sheetKey);
         }
         if (resetVersion && typeof resolvedRuntimeDeps.resetDataVersion === 'function') {
             resolvedRuntimeDeps.resetDataVersion();

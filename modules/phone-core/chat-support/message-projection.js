@@ -1,11 +1,10 @@
 import { Logger } from '../../error-handler.js';
 import { findAutoManagedRowIdColumnIndex } from '../../utils/table-column-metadata.js';
-import { callApiWithTimeout, getDB } from '../db-bridge.js';
+import { callMutationApiToSettlement, getDB } from '../db-bridge.js';
 import { deleteTableRowsBatch, getTableData, insertTableRow, insertTableRowsBatch, updateTableRow } from '../data-api.js';
+import { enqueueTableMutation } from '../data-api/mutation-queue.js';
 
 const logger = Logger.withScope({ scope: 'phone-core/chat-support/message-projection', feature: 'chat-support' });
-const PHONE_MESSAGE_ARCHIVE_INSERT_TIMEOUT_MS = 30000;
-
 const PHONE_MESSAGE_HEADER_CANDIDATES = Object.freeze({
     threadId: ['threadId', '会话ID', '会话Id', '会话编号', '对话ID'],
     threadTitle: ['threadTitle', '会话标题', '会话名称', '群聊标题', '标题'],
@@ -200,10 +199,7 @@ export async function appendPhoneMessageRecordsBatch(sheetKey, messages = [], op
     const headers = snapshot.headers;
     const payloads = normalizedMessages.map((message) => buildPhoneMessagePayloadFromHeaders(headers, message));
     const rows = payloads.map((payload, index) => materializeMessageRowFromPayload(headers, snapshot.rows, payload, index));
-    const insertResult = await insertTableRowsBatch(snapshot.tableName, payloads, {
-        refreshProjection: options.refreshProjection,
-        insertTimeoutMs: PHONE_MESSAGE_ARCHIVE_INSERT_TIMEOUT_MS,
-    });
+    const insertResult = await insertTableRowsBatch(snapshot.tableName, payloads);
 
     if (!insertResult.ok) {
         return {
@@ -221,42 +217,49 @@ export async function appendPhoneMessageRecordsBatch(sheetKey, messages = [], op
         };
     }
 
-    const refreshed = insertResult.refreshed !== false;
     dispatchPhoneTableUpdated(safeSheetKey);
 
     return {
         ok: true,
-        code: refreshed ? 'ok' : 'ok_refresh_failed',
-        message: refreshed ? '批量归档成功' : '批量归档成功，但投影刷新失败',
+        code: 'ok',
+        message: '批量归档成功',
         tableName: String(options.tableName || snapshot.tableName || safeSheetKey).trim(),
         payloads,
         rows,
         rowIndexes: insertResult.rowIndexes || [],
-        refreshed,
+        refreshed: true,
     };
 }
 
 export async function refreshPhoneTableProjection() {
-    const api = getDB();
-    if (!api || typeof api.refreshDataAndWorldbook !== 'function') {
-        return false;
-    }
+    return enqueueTableMutation('refreshPhoneTableProjection', async () => {
+        const api = getDB();
+        if (!api || typeof api.refreshDataAndWorldbook !== 'function') {
+            return false;
+        }
 
-    try {
-        const result = await callApiWithTimeout(
-            () => api.refreshDataAndWorldbook(),
-            12000,
-            'refreshPhoneTableProjection',
-        );
-        return !!result;
-    } catch (error) {
-        logger.warn({
-            action: 'projection.refresh',
-            message: 'refreshDataAndWorldbook 调用失败',
-            error,
-        });
-        return false;
-    }
+        try {
+            const result = await callMutationApiToSettlement(
+                () => api.refreshDataAndWorldbook(),
+                'refreshPhoneTableProjection',
+            );
+            if (result !== true) {
+                logger.warn({
+                    action: 'projection.refresh-unconfirmed',
+                    message: 'refreshDataAndWorldbook 未确认成功',
+                    context: { resultType: result === null ? 'null' : typeof result },
+                });
+            }
+            return result === true;
+        } catch (error) {
+            logger.warn({
+                action: 'projection.refresh',
+                message: 'refreshDataAndWorldbook 调用失败',
+                error,
+            });
+            return false;
+        }
+    });
 }
 
 export async function refreshPhoneMessageProjection() {
@@ -354,9 +357,7 @@ export async function deletePhoneSheetRows(sheetKey, rowIndexes = [], options = 
         };
     }
 
-    const result = await deleteTableRowsBatch(tableName, normalizedRowIndexes, {
-        refreshProjection: options.refreshProjection,
-    });
+    const result = await deleteTableRowsBatch(tableName, normalizedRowIndexes);
     const resultDeletedRowIndexes = Array.isArray(result.deletedRowIndexes) ? result.deletedRowIndexes : [];
     const resultFailedRowIndexes = Array.isArray(result.failedRowIndexes) ? result.failedRowIndexes : [];
     const resultAttemptedRowIndexes = Array.isArray(result.attemptedRowIndexes)

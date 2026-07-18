@@ -2,10 +2,12 @@ import { Logger } from '../../error-handler.js';
 import {
     DEFAULT_API_TIMEOUT,
     callApiWithTimeout,
+    callMutationApiToSettlement,
     getDB,
     isDbBooleanSuccess,
     normalizeDbInsertedRowIndex,
 } from '../db-bridge.js';
+import { normalizeSqlMutationSettlement } from './mutation-settlement.js';
 import { enqueueTableMutation } from './mutation-queue.js';
 
 const logger = Logger.withScope({ scope: 'phone-core/data-api/table-repository', feature: 'db-api' });
@@ -116,22 +118,6 @@ function readTableSnapshotSummaryFromApi(api, tableName, action = 'table-data.sn
     }
 }
 
-async function refreshTableProjection(api, actionName, options = {}) {
-    if (options.refreshProjection === false) {
-        return true;
-    }
-    if (!api || typeof api.refreshDataAndWorldbook !== 'function') {
-        return false;
-    }
-
-    const result = await callApiWithTimeout(
-        () => api.refreshDataAndWorldbook(),
-        12000,
-        actionName,
-    );
-    return !!result;
-}
-
 function buildDeleteBatchDiagnostics({ tableName = '', deleteStrategy = 'none', fallbackReason = '', requestedRowIndexes = [] } = {}) {
     return {
         tableName,
@@ -147,6 +133,52 @@ function buildApiUnavailableResult(message = '数据库API不可用') {
         code: 'api_unavailable',
         message,
         refreshed: false,
+    };
+}
+
+function buildMethodMissingResult(methodName, message = '') {
+    const safeMethodName = String(methodName || '').trim() || 'unknown';
+    return {
+        ok: false,
+        code: 'method_missing',
+        message: message || `数据库 API 缺少方法：${safeMethodName}`,
+        refreshed: false,
+    };
+}
+
+function normalizeBooleanMutationResult(result, operationName) {
+    if (isDbBooleanSuccess(result)) {
+        return { ok: true, code: 'ok', message: '' };
+    }
+    if (result === null) {
+        return { ok: false, code: 'mutation_result_null', message: `${operationName} 返回 null` };
+    }
+    if (result === false) {
+        return { ok: false, code: 'mutation_failed', message: `${operationName} 明确返回失败` };
+    }
+    return {
+        ok: false,
+        code: 'mutation_result_invalid',
+        message: `${operationName} 返回值无效`,
+    };
+}
+
+function normalizeInsertMutationResult(rawRowIndex) {
+    const rowIndex = normalizeDbInsertedRowIndex(rawRowIndex);
+    if (rowIndex >= 1) {
+        return { ok: true, code: 'ok', message: '', rowIndex };
+    }
+    if (rawRowIndex === null) {
+        return { ok: false, code: 'mutation_result_null', message: 'insertRow 返回 null', rowIndex };
+    }
+    if (rawRowIndex === false) {
+        return { ok: false, code: 'mutation_failed', message: 'insertRow 明确返回失败', rowIndex };
+    }
+    return {
+        ok: false,
+        code: 'mutation_result_invalid',
+        message: 'insertRow 未返回有效数据行索引',
+        rowIndex,
     };
 }
 
@@ -195,12 +227,14 @@ function buildBatchDeleteRowIndexResult({
 }
 
 async function callDeleteRowApi(api, tableName, dbRowIndex) {
-    const result = await callApiWithTimeout(
+    const result = await callMutationApiToSettlement(
         () => api.deleteRow(tableName, dbRowIndex),
-        DEFAULT_API_TIMEOUT,
         'deleteTableRows.deleteRow',
     );
-    return isDbBooleanSuccess(result);
+    return {
+        ...normalizeBooleanMutationResult(result, 'deleteRow'),
+        result,
+    };
 }
 
 function isSafeSqlIdentifier(value) {
@@ -281,54 +315,58 @@ function buildSelectExistingRowIdsSql(physicalTableName, rowCount) {
     return `SELECT row_id FROM ${physicalTableName} WHERE row_id IN (${placeholders})`;
 }
 
-function normalizeSqlDeleteMutationResult(result) {
-    if (result === null) {
-        return { ok: false, code: 'sqlite_unavailable', message: 'SQLite SQL 写入不可用或数据库 API 返回 null', changes: null };
-    }
-    if (result === undefined) {
-        return { ok: false, code: 'mutation_failed', message: 'SQL 写入返回 undefined', changes: null };
-    }
-    if (!result || typeof result !== 'object' || Array.isArray(result)) {
-        return { ok: false, code: 'mutation_failed', message: 'SQL 写入返回值不是对象', changes: null, rawResult: result };
-    }
-
-    const errors = Array.isArray(result.errors) ? result.errors : [];
-    if (errors.length > 0) {
-        return { ok: false, code: 'mutation_failed', message: 'SQL 写入返回错误', changes: null, result, errors };
-    }
-    if (result.saved === false) {
-        return { ok: false, code: 'save_failed', message: 'SQL 写入未确认保存成功', changes: null, result };
-    }
-    if ('ok' in result && result.ok === false) {
-        return { ok: false, code: result.code || 'mutation_failed', message: result.message || 'SQL 写入未确认成功', changes: null, result };
-    }
-    if ('success' in result && result.success === false) {
-        return { ok: false, code: 'mutation_failed', message: 'SQL 写入未确认成功', changes: null, result };
-    }
-
-    return {
-        ok: true,
-        code: 'ok',
-        message: 'SQL 写入成功',
-        changes: Number.isFinite(Number(result.changes)) ? Number(result.changes) : null,
-        result,
-    };
-}
-
 function normalizeExistingRowIdQueryResult(result) {
     if (!result || typeof result !== 'object' || Array.isArray(result)) {
         return { ok: false, rowIds: [] };
     }
+    if ('errors' in result && !Array.isArray(result.errors)) {
+        return { ok: false, rowIds: [] };
+    }
+
     const errors = Array.isArray(result.errors) ? result.errors : [];
     if (errors.length > 0 || result.saved === false || result.ok === false || result.success === false) {
         return { ok: false, rowIds: [] };
     }
 
-    const rows = Array.isArray(result.rows) ? result.rows : [];
-    const values = Array.isArray(result.values) ? result.values : [];
-    const rowIds = rows.length > 0
-        ? rows.map((row) => normalizeRowId(row?.row_id ?? row?.ROW_ID ?? row?.[0])).filter(Boolean)
-        : values.map((row) => normalizeRowId(Array.isArray(row) ? row[0] : row)).filter(Boolean);
+    const columns = Array.isArray(result.columns)
+        ? result.columns.map((column) => String(column || '').trim().toLowerCase())
+        : null;
+    const rows = Array.isArray(result.rows) ? result.rows : null;
+    const values = Array.isArray(result.values) ? result.values : null;
+    const rowCount = result.rowCount;
+    const rowIdColumnIndex = columns?.indexOf('row_id') ?? -1;
+    if (
+        !columns
+        || !rows
+        || !values
+        || !Number.isInteger(rowCount)
+        || rowCount < 0
+        || rowIdColumnIndex < 0
+        || rows.length !== rowCount
+        || values.length !== rowCount
+    ) {
+        return { ok: false, rowIds: [] };
+    }
+
+    const rowIds = [];
+    for (let index = 0; index < rowCount; index++) {
+        const row = rows[index];
+        const valueRow = values[index];
+        const rowValue = row && typeof row === 'object' && !Array.isArray(row)
+            ? (row.row_id ?? row.ROW_ID)
+            : undefined;
+        const valueRowValue = Array.isArray(valueRow) ? valueRow[rowIdColumnIndex] : undefined;
+        const rowId = normalizeRowId(rowValue ?? valueRowValue);
+        if (!rowId) {
+            return { ok: false, rowIds: [] };
+        }
+        rowIds.push(rowId);
+    }
+
+    if (new Set(rowIds).size !== rowIds.length) {
+        return { ok: false, rowIds: [] };
+    }
+
     return { ok: true, rowIds: Array.from(new Set(rowIds)) };
 }
 
@@ -346,10 +384,19 @@ async function queryExistingRowIdsAfterSqlDelete(api, physicalTableName, rowIds)
         DEFAULT_API_TIMEOUT,
         `deleteTableRowsBatch.${methodName}`,
     );
-    return normalizeExistingRowIdQueryResult(result);
+    const queryResult = normalizeExistingRowIdQueryResult(result);
+    if (!queryResult.ok) {
+        return queryResult;
+    }
+
+    const requestedRowIds = new Set(rowIds);
+    if (queryResult.rowIds.some((rowId) => !requestedRowIds.has(rowId))) {
+        return { ok: false, rowIds: [] };
+    }
+    return queryResult;
 }
 
-async function tryDeleteRowsViaSqlMutation(api, safeTableName, normalizedRowIndexes, options = {}) {
+async function tryDeleteRowsViaSqlMutation(api, safeTableName, normalizedRowIndexes) {
     if (!api || typeof api.executeSqlMutation !== 'function') {
         return { shouldFallback: true, fallbackReason: 'executeSqlMutation_missing' };
     }
@@ -382,12 +429,11 @@ async function tryDeleteRowsViaSqlMutation(api, safeTableName, normalizedRowInde
     const sql = buildDeleteRowsSql(mappingResult.physicalTableName, rowIds.length);
     let mutationResult = null;
     try {
-        const rawResult = await callApiWithTimeout(
+        const rawResult = await callMutationApiToSettlement(
             () => api.executeSqlMutation(sql, rowIds),
-            DEFAULT_API_TIMEOUT,
             'deleteTableRowsBatch.executeSqlMutation',
         );
-        mutationResult = normalizeSqlDeleteMutationResult(rawResult);
+        mutationResult = normalizeSqlMutationSettlement(rawResult);
     } catch (error) {
         logger.warn({
             action: 'delete-rows-batch.sql-error',
@@ -395,7 +441,7 @@ async function tryDeleteRowsViaSqlMutation(api, safeTableName, normalizedRowInde
             context: { tableName: safeTableName, physicalTableName: mappingResult.physicalTableName, rowIds },
             error,
         });
-        mutationResult = { ok: false, code: 'mutation_failed', message: error?.message || 'SQL 批量删除调用异常', changes: null, errors: [error] };
+        mutationResult = { ok: false, code: 'mutation_rejected', message: error?.message || 'SQL 批量删除调用异常', changes: null, errors: [error] };
     }
 
     const attemptedRowIndexes = normalizedRowIndexes;
@@ -403,10 +449,11 @@ async function tryDeleteRowsViaSqlMutation(api, safeTableName, normalizedRowInde
     let failedRowIndexes = [];
     let queryResult = null;
     const changesMatchesRequest = mutationResult.ok && mutationResult.changes === rowIds.length;
+    const requiresReconciliation = !changesMatchesRequest;
 
     if (changesMatchesRequest) {
         deletedRowIndexes = normalizedRowIndexes;
-    } else if (mutationResult.ok || mutationResult.changes !== null) {
+    } else if (requiresReconciliation) {
         try {
             queryResult = await queryExistingRowIdsAfterSqlDelete(api, mappingResult.physicalTableName, rowIds);
             if (queryResult.ok) {
@@ -436,24 +483,28 @@ async function tryDeleteRowsViaSqlMutation(api, safeTableName, normalizedRowInde
         failedRowIndexes,
     });
     const allDeleted = batchRowIndexes.notDeletedRowIndexes.length === 0 && failedRowIndexes.length === 0;
-    const partialUnknown = !allDeleted && (!queryResult || queryResult.ok !== true) && !changesMatchesRequest;
-    const refreshed = deletedRowIndexes.length > 0
-        ? await refreshTableProjection(api, 'deleteTableRowsBatch.refreshProjection', options)
-        : false;
+    const partialUnknown = requiresReconciliation && queryResult?.ok !== true;
+    const refreshed = mutationResult.ok && deletedRowIndexes.length > 0;
+    const confirmedFailureCode = mutationResult.ok ? 'mutation_failed' : (mutationResult.code || 'mutation_failed');
+    const confirmedFailureMessage = mutationResult.ok
+        ? '删除失败：数据库已确认未删除目标行'
+        : (mutationResult.message || '删除失败：数据库未确认删除目标行');
 
     return {
         shouldFallback: false,
         ok: allDeleted,
         code: allDeleted
-            ? (refreshed ? 'ok' : 'ok_refresh_failed')
-            : (partialUnknown ? 'partial_unknown' : (deletedRowIndexes.length > 0 ? 'partial_failed' : 'failed')),
+            ? 'ok'
+            : (partialUnknown
+                ? 'partial_unknown'
+                : (deletedRowIndexes.length > 0 ? 'partial_failed' : confirmedFailureCode)),
         message: allDeleted
-            ? (refreshed ? '删除成功' : '删除成功，但刷新投影失败')
+            ? '删除成功'
             : (partialUnknown
                 ? 'SQL 批量删除结果无法完整确认，已可能写入，不执行逐行回退'
                 : (deletedRowIndexes.length > 0
                     ? `部分删除失败：已删除 ${deletedRowIndexes.length} 行，仍有 ${batchRowIndexes.notDeletedRowIndexes.length} 行未删除`
-                    : '删除失败：数据库未确认删除目标行')),
+                    : confirmedFailureMessage)),
         tableName: safeTableName,
         ...batchRowIndexes,
         deletedCount: deletedRowIndexes.length,
@@ -467,6 +518,8 @@ async function tryDeleteRowsViaSqlMutation(api, safeTableName, normalizedRowInde
             rowIds,
             sqlChanges: mutationResult.changes,
             mutationCode: mutationResult.code,
+            mutationSettled: true,
+            reconciliationRequired: requiresReconciliation,
             queryChecked: !!queryResult,
             queryConfirmed: queryResult?.ok === true,
         },
@@ -478,21 +531,27 @@ async function deleteRowsViaLegacyDeleteRowLoop(api, safeTableName, normalizedRo
     const attemptedRowIndexes = [];
     const deletedRowIndexes = [];
     const failedRowIndexes = [];
+    let failureCode = '';
+    let failureMessage = '';
 
     for (let index = 0; index < dbRowIndexes.length; index++) {
         const dbRowIndex = dbRowIndexes[index];
         const uiRowIndex = normalizedRowIndexes[index];
         try {
             attemptedRowIndexes.push(uiRowIndex);
-            const ok = await callDeleteRowApi(api, safeTableName, dbRowIndex);
-            if (ok) {
+            const deletion = await callDeleteRowApi(api, safeTableName, dbRowIndex);
+            if (deletion.ok) {
                 deletedRowIndexes.push(uiRowIndex);
             } else {
                 failedRowIndexes.push(uiRowIndex);
+                failureCode = deletion.code;
+                failureMessage = deletion.message;
                 break;
             }
         } catch (error) {
             failedRowIndexes.push(uiRowIndex);
+            failureCode = 'mutation_rejected';
+            failureMessage = error?.message || 'deleteRow 调用异常';
             logger.warn({
                 action: 'delete-rows-batch.error',
                 message: '批量 deleteRow 调用异常',
@@ -510,20 +569,18 @@ async function deleteRowsViaLegacyDeleteRowLoop(api, safeTableName, normalizedRo
         failedRowIndexes,
     });
     const allDeleted = batchRowIndexes.notDeletedRowIndexes.length === 0 && failedRowIndexes.length === 0;
-    const refreshed = deletedRowIndexes.length > 0
-        ? await refreshTableProjection(api, 'deleteTableRowsBatch.refreshProjection', options)
-        : false;
+    const refreshed = deletedRowIndexes.length > 0;
 
     return {
         ok: allDeleted,
         code: allDeleted
-            ? (refreshed ? 'ok' : 'ok_refresh_failed')
-            : (deletedRowIndexes.length > 0 ? 'partial_failed' : 'failed'),
+            ? 'ok'
+            : (deletedRowIndexes.length > 0 ? 'partial_failed' : (failureCode || 'mutation_failed')),
         message: allDeleted
-            ? (refreshed ? '删除成功' : '删除成功，但刷新投影失败')
+            ? '删除成功'
             : (deletedRowIndexes.length > 0
                 ? `部分删除失败：已删除 ${deletedRowIndexes.length} 行，仍有 ${batchRowIndexes.notDeletedRowIndexes.length} 行未删除`
-                : '删除失败：数据库未确认删除目标行'),
+                : (failureMessage || '删除失败：数据库未确认删除目标行')),
         tableName: safeTableName,
         ...batchRowIndexes,
         deletedCount: deletedRowIndexes.length,
@@ -535,6 +592,7 @@ async function deleteRowsViaLegacyDeleteRowLoop(api, safeTableName, normalizedRo
             fallbackReason: options.fallbackReason || '',
             attemptedDbRowIndexes: dbRowIndexes.slice(0, attemptedRowIndexes.length),
             requestedRowIndexes: normalizedRowIndexes,
+            failureCode,
         },
     };
 }
@@ -599,28 +657,24 @@ export function getSheetKeys(rawData) {
 
 export async function updateTableCell(tableName, rowIndex, colIdentifier, value, options = {}) {
     return enqueueTableMutation('updateTableCell', async () => {
+        void options;
         const api = getDB();
         const safeTableName = normalizeTableName(tableName);
         if (!safeTableName) return buildTableNameMissingResult('单元格更新');
-        if (!api || typeof api.updateCell !== 'function') {
-            return buildApiUnavailableResult();
-        }
+        if (!api) return buildApiUnavailableResult();
+        if (typeof api.updateCell !== 'function') return buildMethodMissingResult('updateCell');
 
         try {
-            const result = await callApiWithTimeout(
+            const result = await callMutationApiToSettlement(
                 () => api.updateCell(safeTableName, rowIndex, colIdentifier, value),
-                DEFAULT_API_TIMEOUT,
                 'updateTableCell.updateCell',
             );
-            const ok = isDbBooleanSuccess(result);
-            const refreshed = ok ? await refreshTableProjection(api, 'updateTableCell.refreshProjection', options) : false;
+            const mutation = normalizeBooleanMutationResult(result, 'updateCell');
             return {
-                ok,
-                code: ok ? (refreshed ? 'ok' : 'ok_refresh_failed') : 'failed',
-                refreshed,
-                message: ok
-                    ? (refreshed ? undefined : '单元格已更新，但刷新投影失败')
-                    : 'updateCell 未确认更新成功',
+                ok: mutation.ok,
+                code: mutation.code,
+                refreshed: mutation.ok,
+                message: mutation.message || undefined,
             };
         } catch (error) {
             logger.warn({
@@ -629,13 +683,14 @@ export async function updateTableCell(tableName, rowIndex, colIdentifier, value,
                 context: { tableName: safeTableName, rowIndex, colIdentifier },
                 error,
             });
-            return { ok: false, code: 'error', message: error?.message || '未知错误', refreshed: false };
+            return { ok: false, code: 'mutation_rejected', message: error?.message || '未知错误', refreshed: false };
         }
     });
 }
 
 export async function updateTableRow(tableName, rowIndex, data, options = {}) {
     return enqueueTableMutation('updateTableRow', async () => {
+        void options;
         const api = getDB();
         const safeTableName = normalizeTableName(tableName);
         const payload = normalizePayload(data);
@@ -644,28 +699,25 @@ export async function updateTableRow(tableName, rowIndex, data, options = {}) {
         if (!Number.isInteger(Number(rowIndex)) || Number(rowIndex) < 1) {
             return { ok: false, code: 'row_index_invalid', message: '行更新失败：行索引无效', refreshed: false };
         }
-        if (!api || typeof api.updateRow !== 'function') {
-            return buildApiUnavailableResult();
-        }
+        if (!api) return buildApiUnavailableResult();
+        if (typeof api.updateRow !== 'function') return buildMethodMissingResult('updateRow');
 
         try {
-            const apiResult = await callApiWithTimeout(
+            const apiResult = await callMutationApiToSettlement(
                 () => api.updateRow(safeTableName, Number(rowIndex), payload),
-                DEFAULT_API_TIMEOUT,
                 'updateTableRow.updateRow',
             );
-            const ok = isDbBooleanSuccess(apiResult);
-            const refreshed = ok ? await refreshTableProjection(api, 'updateTableRow.refreshProjection', options) : false;
+            const mutation = normalizeBooleanMutationResult(apiResult, 'updateRow');
             const diagnostics = {
                 tableName: safeTableName,
                 rowIndex: Number(rowIndex),
                 payloadKeys,
                 payloadPreview: summarizeTablePayload(payload),
                 apiResult: summarizeApiResult(apiResult),
-                refreshed,
+                refreshed: mutation.ok,
             };
 
-            if (!ok) {
+            if (!mutation.ok) {
                 logger.warn({
                     action: 'update-row.unconfirmed',
                     message: 'updateRow 未确认更新成功',
@@ -674,14 +726,12 @@ export async function updateTableRow(tableName, rowIndex, data, options = {}) {
             }
 
             return {
-                ok,
-                code: ok ? (refreshed ? 'ok' : 'ok_refresh_failed') : 'failed',
-                persisted: ok,
-                refreshed,
+                ok: mutation.ok,
+                code: mutation.code,
+                persisted: mutation.ok,
+                refreshed: mutation.ok,
                 fallbackUsed: false,
-                message: ok
-                    ? (refreshed ? undefined : '行已更新，但刷新投影失败')
-                    : 'updateRow 未确认更新成功',
+                message: mutation.message || undefined,
                 diagnostics,
             };
         } catch (error) {
@@ -696,22 +746,23 @@ export async function updateTableRow(tableName, rowIndex, data, options = {}) {
                 },
                 error,
             });
-            return { ok: false, code: 'error', message: error?.message || '未知错误', refreshed: false };
+            return { ok: false, code: 'mutation_rejected', message: error?.message || '未知错误', persisted: false, refreshed: false };
         }
     });
 }
 
 export async function insertTableRow(tableName, data, options = {}) {
     return enqueueTableMutation('insertTableRow', async () => {
+        void options;
         const api = getDB();
         const safeTableName = normalizeTableName(tableName);
         const payload = normalizePayload(data);
         const payloadKeys = getPayloadKeys(payload);
         if (!safeTableName) return buildTableNameMissingResult('新增行');
-        if (!api || typeof api.insertRow !== 'function') {
+        if (!api) {
             logger.warn({
                 action: 'insert-row.api-unavailable',
-                message: 'insertRow 不可用',
+                message: '数据库 API 不可用',
                 context: {
                     tableName: safeTableName,
                     payloadKeys,
@@ -719,18 +770,17 @@ export async function insertTableRow(tableName, data, options = {}) {
             });
             return buildApiUnavailableResult();
         }
+        if (typeof api.insertRow !== 'function') return buildMethodMissingResult('insertRow');
 
         const beforeSnapshotSummary = readTableSnapshotSummaryFromApi(api, safeTableName, 'insert-row.snapshot-before-error');
 
         try {
-            const rawRowIndex = await callApiWithTimeout(
+            const rawRowIndex = await callMutationApiToSettlement(
                 () => api.insertRow(safeTableName, payload),
-                DEFAULT_API_TIMEOUT,
                 'insertTableRow.insertRow',
             );
-            const rowIndex = normalizeDbInsertedRowIndex(rawRowIndex);
-            const ok = rowIndex >= 1;
-            const refreshed = ok ? await refreshTableProjection(api, 'insertTableRow.refreshProjection', options) : false;
+            const mutation = normalizeInsertMutationResult(rawRowIndex);
+            const rowIndex = mutation.rowIndex;
             const afterSnapshotSummary = readTableSnapshotSummaryFromApi(api, safeTableName, 'insert-row.snapshot-after-error');
             const diagnostics = {
                 tableName: safeTableName,
@@ -741,10 +791,10 @@ export async function insertTableRow(tableName, data, options = {}) {
                 normalizedRowIndex: rowIndex,
                 beforeSnapshot: beforeSnapshotSummary,
                 afterSnapshot: afterSnapshotSummary,
-                refreshed,
+                refreshed: mutation.ok,
             };
 
-            if (!ok) {
+            if (!mutation.ok) {
                 logger.warn({
                     action: 'insert-row.unconfirmed',
                     message: 'insertRow 未返回有效数据行索引，未执行全量快照兜底',
@@ -753,16 +803,14 @@ export async function insertTableRow(tableName, data, options = {}) {
             }
 
             return {
-                ok,
-                code: ok ? (refreshed ? 'ok' : 'ok_refresh_failed') : 'insert_unconfirmed',
-                rowIndex: ok ? rowIndex : undefined,
+                ok: mutation.ok,
+                code: mutation.code,
+                rowIndex: mutation.ok ? rowIndex : undefined,
                 rawRowIndex,
-                persisted: ok,
-                refreshed,
+                persisted: mutation.ok,
+                refreshed: mutation.ok,
                 fallbackUsed: false,
-                message: ok
-                    ? (refreshed ? undefined : '新增已完成，但刷新投影失败')
-                    : 'insertRow 未返回有效数据行索引，未执行全量快照兜底',
+                message: mutation.message || undefined,
                 diagnostics,
             };
         } catch (error) {
@@ -776,27 +824,27 @@ export async function insertTableRow(tableName, data, options = {}) {
                 },
                 error,
             });
-            return { ok: false, code: 'error', message: error?.message || '未知错误', refreshed: false };
+            return { ok: false, code: 'mutation_rejected', message: error?.message || '未知错误', persisted: false, refreshed: false };
         }
     });
 }
 
 export async function insertTableRowsBatch(tableName, rows = [], options = {}) {
     return enqueueTableMutation('insertTableRowsBatch', async () => {
+        void options;
         const api = getDB();
         const safeTableName = normalizeTableName(tableName);
         const sourceRows = Array.isArray(rows) ? rows : [];
         const payloads = sourceRows.filter((row) => row && typeof row === 'object' && !Array.isArray(row)).map(normalizePayload);
-        const insertTimeoutRaw = Number(options?.insertTimeoutMs);
-        const insertTimeoutMs = Number.isFinite(insertTimeoutRaw) && insertTimeoutRaw > 0
-            ? Math.round(insertTimeoutRaw)
-            : DEFAULT_API_TIMEOUT;
         if (!safeTableName) return { ...buildTableNameMissingResult('批量新增行'), payloads: [], rowIndexes: [], rollback: null };
         if (payloads.length === 0) {
             return { ok: false, code: 'empty_rows', message: '批量新增失败：没有可新增的行', payloads: [], rowIndexes: [], refreshed: false, rollback: null };
         }
-        if (!api || typeof api.insertRow !== 'function') {
+        if (!api) {
             return { ...buildApiUnavailableResult(), payloads, rowIndexes: [], rollback: null };
+        }
+        if (typeof api.insertRow !== 'function') {
+            return { ...buildMethodMissingResult('insertRow'), payloads, rowIndexes: [], rollback: null };
         }
 
         const insertedRowIndexes = [];
@@ -806,22 +854,23 @@ export async function insertTableRowsBatch(tableName, rows = [], options = {}) {
         try {
             for (let index = 0; index < payloads.length; index++) {
                 const payload = payloads[index];
-                const rawRowIndex = await callApiWithTimeout(
+                const rawRowIndex = await callMutationApiToSettlement(
                     () => api.insertRow(safeTableName, payload),
-                    insertTimeoutMs,
                     `insertTableRowsBatch.insertRow.${index + 1}`,
                 );
-                const rowIndex = normalizeDbInsertedRowIndex(rawRowIndex);
-                if (rowIndex < 1) {
+                const mutation = normalizeInsertMutationResult(rawRowIndex);
+                if (!mutation.ok) {
                     failedAt = index;
                     failureResult = {
+                        code: mutation.code,
+                        message: mutation.message,
                         rawRowIndex,
-                        rowIndex,
+                        rowIndex: mutation.rowIndex,
                         payloadKeys: getPayloadKeys(payload),
                     };
                     break;
                 }
-                insertedRowIndexes.push(rowIndex);
+                insertedRowIndexes.push(mutation.rowIndex);
             }
         } catch (error) {
             logger.warn({
@@ -835,14 +884,19 @@ export async function insertTableRowsBatch(tableName, rows = [], options = {}) {
                 error,
             });
             failedAt = failedAt < 0 ? insertedRowIndexes.length : failedAt;
-            failureResult = { errorMessage: error?.message || '未知错误' };
+            failureResult = {
+                code: 'mutation_rejected',
+                message: error?.message || '未知错误',
+                errorMessage: error?.message || '未知错误',
+            };
         }
 
         if (failedAt >= 0) {
             const rollback = await rollbackInsertedRows(api, safeTableName, insertedRowIndexes);
+            const failureCode = failureResult?.code || 'mutation_failed';
             return {
                 ok: false,
-                code: rollback.ok ? 'insert_failed_rolled_back' : 'insert_failed_rollback_failed',
+                code: rollback.ok ? `${failureCode}_rolled_back` : `${failureCode}_rollback_failed`,
                 message: rollback.ok
                     ? `批量新增失败：第 ${failedAt + 1} 行未确认写入，已回滚本批次已插入行`
                     : `批量新增失败：第 ${failedAt + 1} 行未确认写入，且回滚部分已插入行失败`,
@@ -851,20 +905,20 @@ export async function insertTableRowsBatch(tableName, rows = [], options = {}) {
                 rowIndexes: insertedRowIndexes,
                 failedAt,
                 failureResult,
+                failureCode,
                 rollback,
                 refreshed: false,
             };
         }
 
-        const refreshed = await refreshTableProjection(api, 'insertTableRowsBatch.refreshProjection', options);
         return {
             ok: true,
-            code: refreshed ? 'ok' : 'ok_refresh_failed',
-            message: refreshed ? '批量新增成功' : '批量新增成功，但刷新投影失败',
+            code: 'ok',
+            message: '批量新增成功',
             tableName: safeTableName,
             payloads,
             rowIndexes: insertedRowIndexes,
-            refreshed,
+            refreshed: true,
             rollback: null,
         };
     });
@@ -891,8 +945,8 @@ async function rollbackInsertedRows(api, tableName, insertedRowIndexes = []) {
 
     for (const dbRowIndex of dbIndexes) {
         try {
-            const deleted = await callDeleteRowApi(api, tableName, dbRowIndex);
-            if (deleted) {
+            const deletion = await callDeleteRowApi(api, tableName, dbRowIndex);
+            if (deletion.ok) {
                 deletedCount += 1;
             } else {
                 failed.push(dbRowIndex);
@@ -918,6 +972,7 @@ async function rollbackInsertedRows(api, tableName, insertedRowIndexes = []) {
 
 export async function deleteTableRowViaApi(tableName, rowIndex, options = {}) {
     return enqueueTableMutation('deleteTableRowViaApi', async () => {
+        void options;
         const api = getDB();
         const safeTableName = normalizeTableName(tableName);
         const dbRowIndex = Number(rowIndex);
@@ -925,22 +980,18 @@ export async function deleteTableRowViaApi(tableName, rowIndex, options = {}) {
         if (!Number.isInteger(dbRowIndex) || dbRowIndex < 1) {
             return { ok: false, code: 'row_index_invalid', message: '删除失败：行索引无效', refreshed: false };
         }
-        if (!api || typeof api.deleteRow !== 'function') {
-            return buildApiUnavailableResult();
-        }
+        if (!api) return buildApiUnavailableResult();
+        if (typeof api.deleteRow !== 'function') return buildMethodMissingResult('deleteRow');
 
         try {
-            const ok = await callDeleteRowApi(api, safeTableName, dbRowIndex);
-            const refreshed = ok ? await refreshTableProjection(api, 'deleteTableRow.refreshProjection', options) : false;
+            const deletion = await callDeleteRowApi(api, safeTableName, dbRowIndex);
             return {
-                ok,
-                code: ok ? (refreshed ? 'ok' : 'ok_refresh_failed') : 'failed',
-                message: ok
-                    ? (refreshed ? undefined : '删除成功，但刷新投影失败')
-                    : `deleteRow 未确认删除第 ${dbRowIndex} 行`,
+                ok: deletion.ok,
+                code: deletion.code,
+                message: deletion.message || undefined,
                 rowIndex: dbRowIndex,
-                deletedCount: ok ? 1 : 0,
-                refreshed,
+                deletedCount: deletion.ok ? 1 : 0,
+                refreshed: deletion.ok,
             };
         } catch (error) {
             logger.warn({
@@ -949,7 +1000,7 @@ export async function deleteTableRowViaApi(tableName, rowIndex, options = {}) {
                 context: { tableName: safeTableName, rowIndex: dbRowIndex },
                 error,
             });
-            return { ok: false, code: 'error', message: error?.message || '未知错误', refreshed: false };
+            return { ok: false, code: 'mutation_rejected', message: error?.message || '未知错误', refreshed: false };
         }
     });
 }
@@ -1000,7 +1051,7 @@ export async function deleteTableRowsBatch(tableName, rowIndexes = [], options =
             };
         }
 
-        const sqlResult = await tryDeleteRowsViaSqlMutation(api, safeTableName, normalizedRowIndexes, options);
+        const sqlResult = await tryDeleteRowsViaSqlMutation(api, safeTableName, normalizedRowIndexes);
         if (!sqlResult.shouldFallback) {
             return sqlResult;
         }
@@ -1008,7 +1059,7 @@ export async function deleteTableRowsBatch(tableName, rowIndexes = [], options =
         if (typeof api.deleteRow !== 'function') {
             const fallbackReason = sqlResult.fallbackReason || 'deleteRow_missing';
             return {
-                ...buildApiUnavailableResult('数据库API不可用：缺少 executeSqlMutation 快路径且缺少 deleteRow 回退'),
+                ...buildMethodMissingResult('deleteRow', '数据库 API 缺少 executeSqlMutation 快路径及 deleteRow 回退方法'),
                 tableName: safeTableName,
                 deletedCount: 0,
                 ...buildBatchDeleteRowIndexResult({ requestedRowIndexes: normalizedRowIndexes }),

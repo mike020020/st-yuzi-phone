@@ -4,6 +4,8 @@ import { getPhoneCoreState } from './state.js';
 
 const logger = Logger.withScope({ scope: 'phone-core/callbacks', feature: 'callbacks' });
 const tableUpdateSubscribers = new Set();
+let viewingSheetOwnerCounter = 0;
+let activeViewingSheetOwner = null;
 
 function clearRegisteredTableUpdateCallback(state = getPhoneCoreState()) {
     state.registeredTableUpdateCallback = null;
@@ -67,14 +69,14 @@ export function subscribeTableUpdate(callback) {
             action: 'table-update.subscribe',
             message: '表格更新订阅失败：回调必须是函数',
         });
-        return () => {};
+        return null;
     }
 
     tableUpdateSubscribers.add(callback);
     const registered = ensureTableUpdateNativeListener();
     if (!registered) {
         tableUpdateSubscribers.delete(callback);
-        return () => {};
+        return null;
     }
 
     logger.debug({
@@ -216,11 +218,36 @@ export function unregisterTableFillStartListener() {
 }
 
 export function setCurrentViewingSheet(sheetKey) {
-    getPhoneCoreState().currentViewingSheetKey = sheetKey;
+    const normalizedSheetKey = String(sheetKey ?? '').trim();
+    getPhoneCoreState().currentViewingSheetKey = normalizedSheetKey || null;
+    if (!normalizedSheetKey) activeViewingSheetOwner = null;
 }
 
 export function getCurrentViewingSheet() {
     return getPhoneCoreState().currentViewingSheetKey;
+}
+
+export function acquireCurrentViewingSheet(sheetKey) {
+    const normalizedSheetKey = String(sheetKey ?? '').trim();
+    if (!normalizedSheetKey) return null;
+    const owner = Object.freeze({
+        id: ++viewingSheetOwnerCounter,
+        sheetKey: normalizedSheetKey,
+    });
+    activeViewingSheetOwner = owner;
+    getPhoneCoreState().currentViewingSheetKey = normalizedSheetKey;
+    return owner;
+}
+
+export function releaseCurrentViewingSheet(owner) {
+    if (!owner || activeViewingSheetOwner !== owner) return false;
+    activeViewingSheetOwner = null;
+    getPhoneCoreState().currentViewingSheetKey = null;
+    return true;
+}
+
+export function isCurrentViewingSheetOwner(owner) {
+    return !!owner && activeViewingSheetOwner === owner;
 }
 
 function computeDataVersion(data) {

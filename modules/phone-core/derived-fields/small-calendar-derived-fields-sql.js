@@ -57,6 +57,14 @@ calendar_inputs AS (
         CASE WHEN ${VALID_DATE_CONDITION} THEN 1 ELSE 0 END AS is_valid_date
     FROM ${SMALL_CALENDAR_DERIVED_FIELDS_TABLE}
 ),
+computed_calendar_fields AS (
+    SELECT
+        row_id,
+        ${WEEKDAY_CASE_SQL} AS new_weekday_text,
+        ${MONTH_DAYS_SQL} AS new_month_days
+    FROM ${SMALL_CALENDAR_DERIVED_FIELDS_TABLE}
+    WHERE ${VALID_DATE_CONDITION}
+),
 ordered_sources AS (
     SELECT CAST(row_id AS TEXT) || char(31) || date_text AS source_part
     FROM calendar_inputs
@@ -72,12 +80,21 @@ invalid_inputs AS (
     FROM calendar_inputs
     WHERE date_text <> '' AND is_valid_date = 0
     ORDER BY row_id
+),
+pending_updates AS (
+    SELECT calendar_inputs.row_id
+    FROM calendar_inputs
+    INNER JOIN computed_calendar_fields
+        ON computed_calendar_fields.row_id = calendar_inputs.row_id
+    WHERE COALESCE(calendar_inputs.weekday_text, '') <> COALESCE(computed_calendar_fields.new_weekday_text, '')
+        OR COALESCE(calendar_inputs.month_days, '') <> COALESCE(CAST(computed_calendar_fields.new_month_days AS TEXT), '')
 )
 SELECT
     COALESCE((SELECT group_concat(source_part, char(30)) FROM ordered_sources), '') AS source_signature,
     COALESCE((SELECT group_concat(signature_part, char(30)) FROM ordered_inputs), '') AS input_signature,
     COALESCE((SELECT COUNT(*) FROM invalid_inputs), 0) AS invalid_count,
-    COALESCE((SELECT group_concat(CAST(row_id AS TEXT), ',') FROM invalid_inputs), '') AS invalid_row_ids`;
+    COALESCE((SELECT group_concat(CAST(row_id AS TEXT), ',') FROM invalid_inputs), '') AS invalid_row_ids,
+    COALESCE((SELECT COUNT(*) FROM pending_updates), 0) AS pending_update_count`;
 }
 
 export function buildSmallCalendarDerivedFieldsUpdateSql() {

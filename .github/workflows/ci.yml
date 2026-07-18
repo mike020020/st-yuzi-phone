@@ -32,6 +32,12 @@ jobs:
       - name: Run contract checks
         run: npm run check:ci
 
+      - name: Check Yuzi Beautify workshop
+        run: npm run beautify:check
+
+      - name: Pack and read back Yuzi Beautify example
+        run: npm run beautify:readback
+
       - name: Build production bundle
         run: npm run build
 

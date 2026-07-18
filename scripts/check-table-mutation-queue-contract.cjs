@@ -7,6 +7,8 @@ const FILES = {
     repository: 'modules/phone-core/data-api/table-repository.js',
     queue: 'modules/phone-core/data-api/mutation-queue.js',
     projection: 'modules/phone-core/chat-support/message-projection.js',
+    importExport: 'modules/phone-core/data-api/import-export-repository.js',
+    panelActions: 'modules/phone-core/data-api/panel-actions.js',
 };
 
 function read(relativePath) {
@@ -40,6 +42,9 @@ function main() {
     check(results, 'repository', 'insertTableRowsBatch() 通过 enqueueTableMutation 串行化', has(contents.repository, "return enqueueTableMutation('insertTableRowsBatch'"));
     check(results, 'repository', 'deleteTableRowViaApi() 通过 enqueueTableMutation 串行化', has(contents.repository, "return enqueueTableMutation('deleteTableRowViaApi'"));
     check(results, 'repository', 'deleteTableRowsBatch() 通过 enqueueTableMutation 串行化', has(contents.repository, "return enqueueTableMutation('deleteTableRowsBatch'"));
+    check(results, 'repository', '所有 CRUD 使用真实 settlement helper', has(contents.repository, 'callMutationApiToSettlement('));
+    check(results, 'repository', '正常 CRUD 不再调用手机端第二次刷新', !has(contents.repository, 'function refreshTableProjection(') && !has(contents.repository, 'refreshDataAndWorldbook'));
+    check(results, 'repository', '批量插入不再接受本地 hard timeout 控制', !has(contents.repository, 'insertTimeoutMs'));
 
     check(results, 'projection', 'message-projection 仍通过 data-api facade 使用写接口', has(contents.projection, "from '../data-api.js';"));
     check(results, 'projection', 'message-projection 继续使用 insertTableRow()', has(contents.projection, 'insertTableRow('));
@@ -47,6 +52,17 @@ function main() {
     check(results, 'projection', 'message-projection 使用 insertTableRowsBatch() 批量归档', has(contents.projection, 'insertTableRowsBatch('));
     check(results, 'projection', 'message-projection 使用 deleteTableRowsBatch() 批量删除', has(contents.projection, 'deleteTableRowsBatch('));
     check(results, 'projection', 'message-projection 不再使用 saveTableData()', !has(contents.projection, 'saveTableData('));
+    check(results, 'projection', '显式 projection refresh 进入共享 mutation queue', has(contents.projection, "enqueueTableMutation('refreshPhoneTableProjection'"));
+    check(results, 'projection', '显式 projection refresh 等待真实 settlement', has(contents.projection, 'callMutationApiToSettlement('));
+
+    check(results, 'importExport', '模板导入进入共享 mutation queue', has(contents.importExport, "enqueueTableMutation('importTemplateFromDataViaApi'"));
+    check(results, 'importExport', '显式数据库投影刷新进入共享 mutation queue', has(contents.importExport, "enqueueTableMutation('refreshDatabaseProjectionViaApi'"));
+    check(results, 'importExport', '模板导入和显式刷新等待真实 settlement', has(contents.importExport, 'callMutationApiToSettlement('));
+    check(results, 'panelActions', 'manualUpdate 进入共享 mutation queue', has(contents.panelActions, "enqueueTableMutation('triggerManualUpdate'"));
+    check(results, 'panelActions', 'manualUpdate 等待真实 settlement', has(contents.panelActions, 'callMutationApiToSettlement('));
+    check(results, 'panelActions', 'manualUpdate API 缺失时结构化报告 method-unavailable', has(contents.panelActions, 'manual-update.method-unavailable'));
+    check(results, 'panelActions', 'manualUpdate 不再查询数据库面板 DOM 按钮', !has(contents.panelActions, 'manual-update-card'));
+    check(results, 'panelActions', 'manualUpdate 不再通过 button.click() 发出不可等待写入', !has(contents.panelActions, 'button.click()'));
 
     const failed = results.filter(item => !item.ok);
     if (failed.length > 0) {

@@ -52,7 +52,13 @@ import {
     registerPhoneEventListeners,
 } from './modules/bootstrap/event-registry.js';
 import { repairActiveBeautifyTemplateSettings } from './modules/phone-beautify-templates/repository.js';
+import { initializeContentPresetIndex } from './modules/content-presets/startup.js';
 import { subscribeTableUpdate } from './modules/phone-core/callbacks.js';
+import {
+    handlePhoneBackgroundChatChanged,
+    startPhoneBackgroundServices,
+    stopPhoneBackgroundServices,
+} from './modules/phone-core/background-services.js';
 import { getCurrentRoute } from './modules/phone-core/routing.js';
 import { requestHomePhoneRouteRender } from './modules/phone-core/route-runtime.js';
 
@@ -337,7 +343,18 @@ function togglePhone(show) {
  * @param {boolean} enabled 是否启用
  */
 function setPhoneEnabledWithUI(enabled) {
-    return setPhoneBootstrapEnabledState(enabled, {
+    if (enabled) {
+        const result = setPhoneBootstrapEnabledState(true, {
+            onToggle: togglePhone,
+        });
+        startPhoneBackgroundServices('settings-enabled');
+        return result;
+    }
+
+    stopPhoneBackgroundServices('settings-disabled');
+    cancelPendingHomeRefresh('settings-disabled');
+    destroyPhoneRuntime();
+    return setPhoneBootstrapEnabledState(false, {
         onToggle: togglePhone,
     });
 }
@@ -365,6 +382,7 @@ function setupSlashCommandHandlers() {
  */
 async function registerEventListeners() {
     await registerPhoneEventListeners({
+        onBackgroundChatChanged: handlePhoneBackgroundChatChanged,
         onVisiblePhoneRefresh: scheduleVisibleHomeRefreshAfterTableUpdate,
     });
 }
@@ -432,7 +450,7 @@ async function doInitialize() {
         return;
     }
 
-    await initializePhoneBootstrapUi({
+    const { settings } = await initializePhoneBootstrapUi({
         migrateLegacyPhoneSettings,
         getPhoneSettings,
         createPhoneSettingsPanel,
@@ -441,7 +459,14 @@ async function doInitialize() {
         onToggle: togglePhone,
     });
 
+    if (settings?.enabled !== false) {
+        startPhoneBackgroundServices('initialize-enabled');
+    } else {
+        stopPhoneBackgroundServices('initialize-disabled');
+    }
+
     repairActiveBeautifyTemplateSettings();
+    void initializeContentPresetIndex();
 
     // 6. 注册 Slash 命令
     if (registerSlashCommands()) {
@@ -496,6 +521,7 @@ async function doInitialize() {
             await ensureInitialized();
         } catch (error) {
             setOwnedInstanceStatus('failed', { lastError: error?.message || String(error) });
+            stopPhoneBackgroundServices('initialize-failed');
             releaseSingletonGuard();
             handleError(error, '玉子手机初始化失败');
             // 重置初始化状态，允许重试
@@ -548,6 +574,7 @@ export function destroy() {
     cancelPendingHomeRefresh('destroy');
 
     try {
+        stopPhoneBackgroundServices('extension-destroy');
         logger.info({
             feature: 'lifecycle',
             action: 'destroy.start',

@@ -256,11 +256,28 @@ current_anchor AS (
     LIMIT 1
 ),
 chronicle_inputs AS (
-    SELECT row_id, COALESCE(TRIM(time_span), '') AS time_span, ${TARGET_DATE_EXPRESSION} AS target_date
+    SELECT
+        row_id,
+        COALESCE(TRIM(time_span), '') AS time_span,
+        COALESCE(TRIM(today_relation), '') AS today_relation,
+        ${TARGET_DATE_EXPRESSION} AS target_date,
+        (SELECT today_date FROM current_anchor) AS today_date
     FROM chronicle
 ),
+computed_relation AS (
+    SELECT
+        row_id,
+        ${buildRelativeRelationCaseSql('CAST(julianday(today_date) - julianday(target_date) AS INTEGER)')} AS new_relation
+    FROM chronicle_inputs
+    WHERE today_date IS NOT NULL AND target_date IS NOT NULL
+),
+ordered_sources AS (
+    SELECT CAST(row_id AS TEXT) || char(31) || time_span AS source_part
+    FROM chronicle_inputs
+    ORDER BY row_id
+),
 ordered_inputs AS (
-    SELECT CAST(row_id AS TEXT) || char(31) || time_span AS signature_part
+    SELECT CAST(row_id AS TEXT) || char(31) || time_span || char(31) || today_relation AS signature_part
     FROM chronicle_inputs
     ORDER BY row_id
 ),
@@ -269,11 +286,21 @@ invalid_inputs AS (
     FROM chronicle_inputs
     WHERE time_span <> '' AND target_date IS NULL
     ORDER BY row_id
+),
+pending_updates AS (
+    SELECT chronicle_inputs.row_id
+    FROM chronicle_inputs
+    INNER JOIN computed_relation
+        ON computed_relation.row_id = chronicle_inputs.row_id
+    WHERE computed_relation.new_relation IS NOT NULL
+        AND COALESCE(chronicle_inputs.today_relation, '') <> COALESCE(computed_relation.new_relation, '')
 )
 SELECT
+    COALESCE((SELECT cur_time FROM current_anchor), '') || char(29) || COALESCE((SELECT group_concat(source_part, char(30)) FROM ordered_sources), '') AS source_signature,
     COALESCE((SELECT cur_time FROM current_anchor), '') || char(29) || COALESCE((SELECT group_concat(signature_part, char(30)) FROM ordered_inputs), '') AS input_signature,
     COALESCE((SELECT COUNT(*) FROM invalid_inputs), 0) AS invalid_count,
-    COALESCE((SELECT group_concat(CAST(row_id AS TEXT), ',') FROM invalid_inputs), '') AS invalid_row_ids`;
+    COALESCE((SELECT group_concat(CAST(row_id AS TEXT), ',') FROM invalid_inputs), '') AS invalid_row_ids,
+    COALESCE((SELECT COUNT(*) FROM pending_updates), 0) AS pending_update_count`;
 }
 
 export function buildChronicleTodayRelationUpdateSql(anchorTable = 'global_state') {

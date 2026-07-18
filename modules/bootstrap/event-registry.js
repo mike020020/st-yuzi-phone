@@ -19,11 +19,12 @@ import {
 } from './toggle-button.js';
 
 export async function registerPhoneEventListeners(options = {}) {
-    const { onVisiblePhoneRefresh } = options;
+    const { onVisiblePhoneRefresh, onBackgroundChatChanged } = options;
 
     try {
         await onChatChanged((chatId) => {
             Logger.info('聊天切换:', chatId);
+            onBackgroundChatChanged?.(chatId);
             const container = document.getElementById(DOM_IDS.container);
             if (container && container.classList.contains('visible')) {
                 onVisiblePhoneRefresh?.();

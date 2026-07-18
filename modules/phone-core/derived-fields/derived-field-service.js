@@ -1,0 +1,672 @@
+const DEFAULT_DEBOUNCE_MS = 600;
+const DEFAULT_PROBE_RETRY_DELAYS = Object.freeze([1000, 2000, 5000]);
+const DEFAULT_QUERY_RETRY_DELAYS = Object.freeze([1000, 2000, 5000]);
+const DEFAULT_MUTATION_RETRY_DELAY_MS = 2000;
+const DEFAULT_MAX_MUTATION_ATTEMPTS = 2;
+const DEFAULT_MAX_SIGNATURE_RETRY = 1;
+
+function normalizeText(value) {
+    return String(value ?? '').trim();
+}
+
+function normalizeCount(value) {
+    const count = Number(value);
+    return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+}
+
+function failureKey(result, fallback) {
+    return `${normalizeText(result?.code) || fallback}:${normalizeText(result?.message) || 'unknown'}`;
+}
+
+function cloneDelays(value, fallback) {
+    const source = Array.isArray(value) ? value : fallback;
+    return source
+        .map((delay) => Number(delay))
+        .filter((delay) => Number.isFinite(delay) && delay >= 0)
+        .map((delay) => Math.round(delay));
+}
+
+export function readDerivedField(result, name, index) {
+    const row = Array.isArray(result?.rows) ? result.rows[0] : null;
+    if (row && typeof row === 'object' && !Array.isArray(row) && name in row) {
+        return row[name];
+    }
+    if (Array.isArray(row)) {
+        return row[index];
+    }
+    const values = Array.isArray(result?.values) ? result.values[0] : null;
+    return Array.isArray(values) ? values[index] : '';
+}
+
+export function createDerivedFieldService(config = {}) {
+    const defaultDeps = Object.freeze({ ...(config.defaultDeps || {}) });
+    let deps = { ...defaultDeps };
+    const actionPrefix = normalizeText(config.actionPrefix) || 'derived-fields';
+    const debounceMs = Number.isFinite(Number(config.debounceMs))
+        ? Math.max(0, Math.round(Number(config.debounceMs)))
+        : DEFAULT_DEBOUNCE_MS;
+    const probeRetryDelays = cloneDelays(config.probeRetryDelays, DEFAULT_PROBE_RETRY_DELAYS);
+    const queryRetryDelays = cloneDelays(config.queryRetryDelays, DEFAULT_QUERY_RETRY_DELAYS);
+    const mutationRetryDelayMs = Number.isFinite(Number(config.mutationRetryDelayMs))
+        ? Math.max(0, Math.round(Number(config.mutationRetryDelayMs)))
+        : DEFAULT_MUTATION_RETRY_DELAY_MS;
+    const maxMutationAttempts = Number.isFinite(Number(config.maxMutationAttempts))
+        ? Math.max(1, Math.round(Number(config.maxMutationAttempts)))
+        : DEFAULT_MAX_MUTATION_ATTEMPTS;
+    const maxSignatureRetry = Number.isFinite(Number(config.maxSignatureRetry))
+        ? Math.max(0, Math.round(Number(config.maxSignatureRetry)))
+        : DEFAULT_MAX_SIGNATURE_RETRY;
+
+    const runtime = {
+        unsubscribe: null,
+        started: false,
+        generation: 0,
+        debounceTimer: null,
+        probeTimer: null,
+        queryRetryTimer: null,
+        mutationRetryTimer: null,
+        probeRetryIndex: 0,
+        queryRetryIndex: 0,
+        notificationVersion: 0,
+        consumedVersion: 0,
+        running: false,
+        lastInputSignature: null,
+        lastInvalidWarningSignature: null,
+        lastContextWarningSignature: null,
+        lastProbeErrorKey: null,
+        lastFailureErrorKey: null,
+        mutationSourceSignature: null,
+        mutationAttempts: 0,
+        mutationCircuitOpen: false,
+        pendingConfirmationSourceSignature: null,
+        lastCircuitWarningSignature: null,
+    };
+
+    function isCurrent(generation) {
+        return runtime.started && runtime.generation === generation;
+    }
+
+    function warnLifecycle(action, message, context = {}, error = undefined) {
+        try {
+            deps.logger?.warn?.({ action, message, context, error });
+        } catch {
+            // 生命周期清理不能被日志实现反向打断。
+        }
+    }
+
+    function clearTimer(name) {
+        const timerId = runtime[name];
+        runtime[name] = null;
+        if (timerId === null) return;
+        try {
+            deps.clearTimeout(timerId);
+        } catch (error) {
+            warnLifecycle(
+                `${actionPrefix}.timer-clear-failed`,
+                '派生字段定时器清理失败',
+                { timer: name },
+                error,
+            );
+        }
+    }
+
+    function hasRetryTimer() {
+        return runtime.probeTimer !== null
+            || runtime.queryRetryTimer !== null
+            || runtime.mutationRetryTimer !== null;
+    }
+
+    function warnOnce(result, fallbackKey, payload) {
+        const key = failureKey(result, fallbackKey);
+        if (key === runtime.lastFailureErrorKey) return;
+        runtime.lastFailureErrorKey = key;
+        deps.logger.warn(payload);
+    }
+
+    function warnInvalid(signature, generation) {
+        if (!isCurrent(generation) || typeof config.getInvalidWarning !== 'function') return;
+        const warning = config.getInvalidWarning(signature);
+        const key = normalizeText(warning?.key);
+        if (!key) {
+            runtime.lastInvalidWarningSignature = null;
+            return;
+        }
+        if (key === runtime.lastInvalidWarningSignature) return;
+        runtime.lastInvalidWarningSignature = key;
+        deps.logger.warn({
+            action: warning.action || `${actionPrefix}.invalid-input`,
+            message: warning.message || '派生字段输入包含无法解析的值，已跳过对应行',
+            context: warning.context,
+        });
+    }
+
+    function warnContext(result) {
+        const warning = result?.warning;
+        if (!warning) {
+            runtime.lastContextWarningSignature = null;
+            return;
+        }
+        const key = normalizeText(warning.key) || `${warning.action || 'context'}:${warning.message || ''}`;
+        if (key === runtime.lastContextWarningSignature) return;
+        runtime.lastContextWarningSignature = key;
+        deps.logger.warn({
+            action: warning.action || `${actionPrefix}.context-blocked`,
+            message: warning.message || '派生字段运行条件不满足，已跳过',
+            context: warning.context,
+        });
+    }
+
+    function alignMutationBudget(sourceSignature) {
+        const source = normalizeText(sourceSignature);
+        if (runtime.mutationSourceSignature === source) return;
+        runtime.mutationSourceSignature = source;
+        runtime.mutationAttempts = 0;
+        runtime.mutationCircuitOpen = false;
+        runtime.pendingConfirmationSourceSignature = null;
+        runtime.lastCircuitWarningSignature = null;
+        clearTimer('mutationRetryTimer');
+    }
+
+    function markMutationConfirmed(sourceSignature) {
+        alignMutationBudget(sourceSignature);
+        runtime.pendingConfirmationSourceSignature = null;
+        runtime.lastCircuitWarningSignature = null;
+        clearTimer('mutationRetryTimer');
+    }
+
+    function beginMutationAttempt(sourceSignature) {
+        alignMutationBudget(sourceSignature);
+        if (runtime.mutationCircuitOpen || runtime.mutationAttempts >= maxMutationAttempts) {
+            runtime.mutationCircuitOpen = true;
+            return false;
+        }
+        runtime.mutationAttempts += 1;
+        return true;
+    }
+
+    function markMutationFailed(sourceSignature) {
+        alignMutationBudget(sourceSignature);
+        if (runtime.mutationAttempts >= maxMutationAttempts) {
+            runtime.mutationCircuitOpen = true;
+            return false;
+        }
+        return true;
+    }
+
+    function warnMutationCircuit(sourceSignature) {
+        const source = normalizeText(sourceSignature);
+        if (runtime.lastCircuitWarningSignature === source) return;
+        runtime.lastCircuitWarningSignature = source;
+        deps.logger.warn({
+            action: `${actionPrefix}.mutation-circuit-open`,
+            message: config.messages?.mutationCircuitOpen || '同一业务输入的派生写入已连续失败两次，已暂停继续写入，等待输入或聊天上下文变化',
+            context: {
+                sourceSignature: source,
+                attempts: runtime.mutationAttempts,
+                maxAttempts: maxMutationAttempts,
+            },
+        });
+    }
+
+    async function loadContext(generation) {
+        const result = await deps.query(config.buildContextSql());
+        if (!isCurrent(generation)) return { status: 'stale-generation' };
+        if (!result?.ok) {
+            warnOnce(result, 'context-query', {
+                action: `${actionPrefix}.context-query-failed`,
+                message: config.messages?.contextQueryFailed || '派生字段运行条件查询失败',
+                context: { code: result?.code, message: result?.message },
+            });
+            return { status: 'query-failed' };
+        }
+
+        const normalized = typeof config.normalizeContext === 'function'
+            ? config.normalizeContext(result)
+            : { status: 'ready', context: null };
+        warnContext(normalized);
+        return normalized?.status ? normalized : { status: 'completed' };
+    }
+
+    async function querySignature(stage, context, generation) {
+        const result = await deps.query(config.buildSignatureSql(context));
+        if (!isCurrent(generation)) return { status: 'stale-generation' };
+        if (!result?.ok) {
+            warnOnce(result, `signature-${stage}`, {
+                action: `${actionPrefix}.signature-query-failed`,
+                message: config.messages?.signatureQueryFailed || '派生字段签名查询失败',
+                context: { stage, code: result?.code, message: result?.message },
+            });
+            return { status: 'query-failed' };
+        }
+
+        const value = config.normalizeSignature(result);
+        return {
+            status: 'completed',
+            value: {
+                ...value,
+                sourceSignature: normalizeText(value?.sourceSignature),
+                inputSignature: normalizeText(value?.inputSignature),
+                pendingUpdateCount: normalizeCount(value?.pendingUpdateCount),
+            },
+        };
+    }
+
+    async function runPass(attempt, generation) {
+        const contextResult = await loadContext(generation);
+        if (contextResult.status !== 'ready') return contextResult.status;
+        const context = contextResult.context;
+
+        const preResult = await querySignature('pre-update', context, generation);
+        if (preResult.status !== 'completed') return preResult.status;
+        const pre = preResult.value;
+        warnInvalid(pre, generation);
+        alignMutationBudget(pre.sourceSignature);
+
+        if (pre.pendingUpdateCount === 0) {
+            runtime.lastInputSignature = pre.inputSignature;
+            markMutationConfirmed(pre.sourceSignature);
+            return 'completed';
+        }
+
+        if (runtime.pendingConfirmationSourceSignature === pre.sourceSignature) {
+            runtime.pendingConfirmationSourceSignature = null;
+            const unconfirmed = {
+                code: 'mutation_result_unconfirmed',
+                message: `写入已完成，但确认查询仍显示 ${pre.pendingUpdateCount} 行待更新`,
+            };
+            warnOnce(unconfirmed, 'mutation-unconfirmed', {
+                action: `${actionPrefix}.sql-update-unconfirmed`,
+                message: config.messages?.mutationUnconfirmed || '派生字段写入已完成，但确认查询仍显示存在待更新行',
+                context: {
+                    attempt,
+                    mutationAttempt: runtime.mutationAttempts,
+                    sourceSignature: pre.sourceSignature,
+                    pendingUpdateCount: pre.pendingUpdateCount,
+                    confirmationOnly: true,
+                },
+            });
+            return { status: 'mutation-failed', sourceSignature: pre.sourceSignature };
+        }
+
+        if (runtime.mutationCircuitOpen) {
+            warnMutationCircuit(pre.sourceSignature);
+            return 'mutation-blocked';
+        }
+
+        if (!beginMutationAttempt(pre.sourceSignature)) {
+            warnMutationCircuit(pre.sourceSignature);
+            return 'mutation-blocked';
+        }
+
+        let mutation;
+        try {
+            mutation = await deps.mutation(config.buildMutationSql(context));
+        } catch (error) {
+            if (!isCurrent(generation)) return 'stale-generation';
+            const rejected = {
+                code: error?.code || 'mutation_rejected',
+                message: error?.message || String(error),
+            };
+            warnOnce(rejected, 'mutation-rejected', {
+                action: `${actionPrefix}.sql-update-failed`,
+                message: config.messages?.mutationFailed || '派生字段 SQL 写入未确认成功',
+                context: {
+                    attempt,
+                    mutationAttempt: runtime.mutationAttempts,
+                    maxMutationAttempts,
+                    sourceSignature: pre.sourceSignature,
+                    code: rejected.code,
+                    message: rejected.message,
+                },
+                error,
+            });
+            return { status: 'mutation-failed', sourceSignature: pre.sourceSignature };
+        }
+        if (!isCurrent(generation)) return 'stale-generation';
+        if (!mutation?.ok) {
+            warnOnce(mutation, 'mutation', {
+                action: `${actionPrefix}.sql-update-failed`,
+                message: config.messages?.mutationFailed || '派生字段 SQL 写入未确认成功',
+                context: {
+                    attempt,
+                    mutationAttempt: runtime.mutationAttempts,
+                    maxMutationAttempts,
+                    sourceSignature: pre.sourceSignature,
+                    code: mutation?.code,
+                    message: mutation?.message,
+                },
+            });
+            return { status: 'mutation-failed', sourceSignature: pre.sourceSignature };
+        }
+
+        runtime.pendingConfirmationSourceSignature = pre.sourceSignature;
+        const postResult = await querySignature('post-update', context, generation);
+        if (postResult.status !== 'completed') return postResult.status;
+        const post = postResult.value;
+        warnInvalid(post, generation);
+
+        if (post.sourceSignature === pre.sourceSignature && post.pendingUpdateCount === 0) {
+            runtime.lastInputSignature = post.inputSignature;
+            markMutationConfirmed(post.sourceSignature);
+            return 'completed';
+        }
+
+        if (post.sourceSignature === pre.sourceSignature) {
+            runtime.pendingConfirmationSourceSignature = null;
+            const unconfirmed = {
+                code: 'mutation_result_unconfirmed',
+                message: `写入返回成功，但仍有 ${post.pendingUpdateCount} 行待更新`,
+            };
+            warnOnce(unconfirmed, 'mutation-unconfirmed', {
+                action: `${actionPrefix}.sql-update-unconfirmed`,
+                message: config.messages?.mutationUnconfirmed || '派生字段写入返回成功，但写后签名仍显示存在待更新行',
+                context: {
+                    attempt,
+                    mutationAttempt: runtime.mutationAttempts,
+                    sourceSignature: pre.sourceSignature,
+                    pendingUpdateCount: post.pendingUpdateCount,
+                },
+            });
+            return { status: 'mutation-failed', sourceSignature: pre.sourceSignature };
+        }
+
+        runtime.pendingConfirmationSourceSignature = null;
+        deps.logger.warn({
+            action: `${actionPrefix}.source-changed`,
+            message: config.messages?.sourceChanged || '派生字段写入期间源数据发生变化，将进行一次有界签名重跑',
+            context: { attempt, maxRetry: maxSignatureRetry },
+        });
+        return 'signature-changed';
+    }
+
+    async function runRound(generation) {
+        for (let attempt = 0; attempt <= maxSignatureRetry; attempt += 1) {
+            const result = await runPass(attempt, generation);
+            if (result !== 'signature-changed') return result;
+        }
+        if (isCurrent(generation)) {
+            deps.logger.warn({
+                action: `${actionPrefix}.signature-retry-exhausted`,
+                message: config.messages?.signatureRetryExhausted || '派生字段未能在有界重跑内确认源数据稳定',
+                context: { maxRetry: maxSignatureRetry },
+            });
+        }
+        return 'retry-exhausted';
+    }
+
+    function scheduleDebounce(generation) {
+        if (!isCurrent(generation) || runtime.running || hasRetryTimer()) return false;
+        clearTimer('debounceTimer');
+        runtime.debounceTimer = deps.setTimeout(() => {
+            runtime.debounceTimer = null;
+            void runRunner(generation);
+        }, debounceMs);
+        return true;
+    }
+
+    function scheduleProbeRetry(generation) {
+        if (!isCurrent(generation) || runtime.probeRetryIndex >= probeRetryDelays.length) return false;
+        const delay = probeRetryDelays[runtime.probeRetryIndex++];
+        clearTimer('probeTimer');
+        runtime.probeTimer = deps.setTimeout(() => {
+            runtime.probeTimer = null;
+            void runRunner(generation);
+        }, delay);
+        return true;
+    }
+
+    function scheduleQueryRetry(generation) {
+        if (!isCurrent(generation) || runtime.queryRetryIndex >= queryRetryDelays.length) return false;
+        const delay = queryRetryDelays[runtime.queryRetryIndex++];
+        clearTimer('queryRetryTimer');
+        runtime.queryRetryTimer = deps.setTimeout(() => {
+            runtime.queryRetryTimer = null;
+            void runRunner(generation);
+        }, delay);
+        return true;
+    }
+
+    function scheduleMutationRetry(sourceSignature, generation) {
+        if (!isCurrent(generation) || !markMutationFailed(sourceSignature)) return false;
+        clearTimer('mutationRetryTimer');
+        runtime.mutationRetryTimer = deps.setTimeout(() => {
+            runtime.mutationRetryTimer = null;
+            void runRunner(generation);
+        }, mutationRetryDelayMs);
+        return true;
+    }
+
+    function clearReadFailureState() {
+        clearTimer('queryRetryTimer');
+        runtime.queryRetryIndex = 0;
+        runtime.lastFailureErrorKey = null;
+    }
+
+    async function runRunner(generation) {
+        if (!isCurrent(generation) || runtime.running) return;
+        runtime.running = true;
+        let rounds = 0;
+
+        try {
+            while (rounds < 2 && isCurrent(generation)) {
+                const capturedVersion = runtime.notificationVersion;
+                const probe = await deps.probe();
+                if (!isCurrent(generation)) return;
+
+                if (!probe?.ok) {
+                    const key = failureKey(probe, 'probe');
+                    if (key !== runtime.lastProbeErrorKey) {
+                        runtime.lastProbeErrorKey = key;
+                        deps.logger.warn({
+                            action: `${actionPrefix}.probe-failed`,
+                            message: config.messages?.probeFailed || 'SQLite 能力探测失败，派生字段本轮跳过',
+                            context: { code: probe?.code, message: probe?.message },
+                        });
+                    }
+                    const scheduled = scheduleProbeRetry(generation);
+                    runtime.consumedVersion = capturedVersion;
+                    if (!scheduled && runtime.probeRetryIndex >= probeRetryDelays.length) {
+                        runtime.lastProbeErrorKey = key;
+                    }
+                    return;
+                }
+
+                runtime.probeRetryIndex = 0;
+                runtime.lastProbeErrorKey = null;
+                const result = await runRound(generation);
+                if (!isCurrent(generation) || result === 'stale-generation') return;
+
+                const status = typeof result === 'string' ? result : result?.status;
+                if (status === 'query-failed') {
+                    const scheduled = scheduleQueryRetry(generation);
+                    runtime.consumedVersion = capturedVersion;
+                    if (!scheduled && runtime.queryRetryIndex >= queryRetryDelays.length) {
+                        clearTimer('queryRetryTimer');
+                    }
+                    return;
+                }
+
+                if (status === 'mutation-failed') {
+                    const scheduled = scheduleMutationRetry(result.sourceSignature, generation);
+                    runtime.consumedVersion = capturedVersion;
+                    if (!scheduled) {
+                        warnMutationCircuit(result.sourceSignature);
+                    }
+                    return;
+                }
+
+                clearReadFailureState();
+                runtime.consumedVersion = capturedVersion;
+                rounds += 1;
+                if (runtime.notificationVersion === capturedVersion) break;
+            }
+        } catch (error) {
+            if (isCurrent(generation)) {
+                const result = { code: error?.code || 'runner_exception', message: error?.message || String(error) };
+                warnOnce(result, 'runner', {
+                    action: `${actionPrefix}.run-error`,
+                    message: config.messages?.runError || '派生字段运行异常',
+                    error,
+                });
+                const capturedVersion = runtime.notificationVersion;
+                scheduleQueryRetry(generation);
+                runtime.consumedVersion = capturedVersion;
+            }
+        } finally {
+            if (runtime.generation === generation) {
+                runtime.running = false;
+                if (isCurrent(generation)
+                    && !hasRetryTimer()
+                    && runtime.notificationVersion > runtime.consumedVersion) {
+                    scheduleDebounce(generation);
+                }
+            }
+        }
+    }
+
+    function requestRun() {
+        if (!runtime.started) return;
+        runtime.notificationVersion += 1;
+        if (!runtime.running && !hasRetryTimer()) {
+            scheduleDebounce(runtime.generation);
+        }
+    }
+
+    function clearRuntimeState() {
+        clearTimer('debounceTimer');
+        clearTimer('probeTimer');
+        clearTimer('queryRetryTimer');
+        clearTimer('mutationRetryTimer');
+        runtime.unsubscribe = null;
+        runtime.running = false;
+        runtime.probeRetryIndex = 0;
+        runtime.queryRetryIndex = 0;
+        runtime.notificationVersion = 0;
+        runtime.consumedVersion = 0;
+        runtime.lastInputSignature = null;
+        runtime.lastInvalidWarningSignature = null;
+        runtime.lastContextWarningSignature = null;
+        runtime.lastProbeErrorKey = null;
+        runtime.lastFailureErrorKey = null;
+        runtime.mutationSourceSignature = null;
+        runtime.mutationAttempts = 0;
+        runtime.mutationCircuitOpen = false;
+        runtime.pendingConfirmationSourceSignature = null;
+        runtime.lastCircuitWarningSignature = null;
+    }
+
+    function rollbackFailedStart(generation, unsubscribe, stage, error) {
+        runtime.started = false;
+        runtime.generation += 1;
+        const disposer = typeof unsubscribe === 'function'
+            ? unsubscribe
+            : runtime.unsubscribe;
+        runtime.unsubscribe = null;
+
+        try {
+            if (typeof disposer === 'function') disposer();
+        } catch (disposeError) {
+            warnLifecycle(
+                `${actionPrefix}.start-rollback-unsubscribe-failed`,
+                '派生字段启动回滚时解除订阅失败',
+                { stage, generation },
+                disposeError,
+            );
+        } finally {
+            clearRuntimeState();
+        }
+
+        warnLifecycle(
+            `${actionPrefix}.start-failed`,
+            '派生字段服务启动失败，已回滚全部运行状态',
+            { stage, generation },
+            error,
+        );
+        return false;
+    }
+
+    function start() {
+        if (runtime.started) return true;
+        runtime.started = true;
+        runtime.generation += 1;
+        const generation = runtime.generation;
+        let unsubscribe = null;
+
+        try {
+            unsubscribe = deps.subscribe(requestRun);
+        } catch (error) {
+            return rollbackFailedStart(generation, unsubscribe, 'subscribe', error);
+        }
+
+        if (typeof unsubscribe !== 'function') {
+            return rollbackFailedStart(
+                generation,
+                unsubscribe,
+                'invalid-disposer',
+                new TypeError('派生字段订阅未返回有效 disposer'),
+            );
+        }
+
+        if (!isCurrent(generation)) {
+            return rollbackFailedStart(generation, unsubscribe, 'stale-generation');
+        }
+
+        runtime.unsubscribe = unsubscribe;
+        try {
+            requestRun();
+        } catch (error) {
+            return rollbackFailedStart(generation, unsubscribe, 'initial-schedule', error);
+        }
+        return true;
+    }
+
+    function stop() {
+        runtime.generation += 1;
+        runtime.started = false;
+        const unsubscribe = runtime.unsubscribe;
+        runtime.unsubscribe = null;
+
+        try {
+            if (typeof unsubscribe === 'function') unsubscribe();
+        } catch (error) {
+            warnLifecycle(
+                `${actionPrefix}.stop-unsubscribe-failed`,
+                '派生字段服务停止时解除订阅失败，继续清理其余运行状态',
+                { generation: runtime.generation },
+                error,
+            );
+        } finally {
+            clearRuntimeState();
+        }
+    }
+
+    function setDeps(overrides = {}) {
+        stop();
+        deps = { ...defaultDeps, ...overrides };
+    }
+
+    function reset() {
+        stop();
+        deps = { ...defaultDeps };
+    }
+
+    function getState() {
+        return {
+            started: runtime.started,
+            generation: runtime.generation,
+            running: runtime.running,
+            notificationVersion: runtime.notificationVersion,
+            consumedVersion: runtime.consumedVersion,
+            mutationSourceSignature: runtime.mutationSourceSignature,
+            mutationAttempts: runtime.mutationAttempts,
+            mutationCircuitOpen: runtime.mutationCircuitOpen,
+            pendingConfirmationSourceSignature: runtime.pendingConfirmationSourceSignature,
+            hasDebounceTimer: runtime.debounceTimer !== null,
+            hasProbeTimer: runtime.probeTimer !== null,
+            hasQueryRetryTimer: runtime.queryRetryTimer !== null,
+            hasMutationRetryTimer: runtime.mutationRetryTimer !== null,
+        };
+    }
+
+    return Object.freeze({ start, stop, setDeps, reset, getState, requestRun });
+}

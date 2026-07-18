@@ -54,45 +54,45 @@ graph TD
 
 [`index.js`](../index.js:12) 是扩展生命周期入口，负责：
 
-- 配置错误处理：[`configureErrorHandler()`](../index.js:218)。
-- 绑定全局 window 事件：[`bindPhoneBootstrapWindowEvents()`](../index.js:224)。
-- DOM 就绪后执行初始化：[`ensureInitialized()`](../index.js:131)。
-- 挂载 bootstrap UI：[`doInitialize()`](../index.js:169)。
-- 注册 Slash 命令：[`registerSlashCommands()`](../index.js:189)。
-- 卸载清理：[`destroy()`](../index.js:269)。
+- 配置错误处理：[`configureErrorHandler()`](../index.js:503)。
+- 绑定全局 window 事件：[`bindPhoneBootstrapWindowEvents()`](../index.js:509)。
+- DOM 就绪后执行初始化：[`ensureInitialized()`](../index.js:402)。
+- 挂载 bootstrap UI：[`doInitialize()`](../index.js:441)。
+- 注册 Slash 命令：[`registerSlashCommands()`](../index.js:472)。
+- 卸载清理：[`destroy()`](../index.js:561)。
 
 维护规则：
 
 - [`index.js`](../index.js:12) 不应承载业务页面逻辑。
-- 新增全局生命周期资源时，必须能被 [`destroy()`](../index.js:269) 清理。
-- 所有初始化失败必须通过 [`handleError()`](../index.js:238) 或 [`Logger`](../modules/error-handler.js:34) 进入统一错误系统。
+- 新增全局生命周期资源时，必须能被 [`destroy()`](../index.js:561) 清理。
+- 所有初始化失败必须通过 [`handleError()`](../modules/error-handler.js:534) 或 [`Logger`](../modules/error-handler.js:430) 进入统一错误系统。
 
 ### 2.2 Bootstrap 层
 
 主要文件：
 
 - [`app-bootstrap.js`](../modules/bootstrap/app-bootstrap.js:13)：创建 root、container、toggle，初始化设置面板与事件监听。
-- [`toggle-button.js`](../modules/bootstrap/toggle-button.js:14)：定义 DOM ID、toggle 视觉、位置、拖拽。
+- [`toggle-button.js`](../modules/bootstrap/toggle-button.js:15)：定义 DOM ID、toggle 视觉、位置、拖拽。
 - [`event-registry.js`](../modules/bootstrap/event-registry.js:21)：注册 SillyTavern 事件桥。
-- [`command-registry.js`](../modules/bootstrap/command-registry.js:14)：注册 phone 相关 Slash 命令 handler。
+- [`command-registry.js`](../modules/bootstrap/command-registry.js:224)：注册 phone 相关 Slash 命令 handler。
 
 边界：
 
 - Bootstrap 只负责挂载与入口交互，不直接渲染业务页面。
-- 手机开关通过 [`togglePhoneBootstrapVisibility()`](../modules/bootstrap/app-bootstrap.js:54) 调用 [`onPhoneActivated()`](../modules/phone-core/lifecycle.js:255) 或 [`onPhoneDeactivated()`](../modules/phone-core/lifecycle.js:272)。
+- 手机开关通过 [`togglePhoneBootstrapVisibility()`](../modules/bootstrap/app-bootstrap.js:54) 调用 [`onPhoneActivated()`](../modules/phone-core/lifecycle.js:215) 或 [`onPhoneDeactivated()`](../modules/phone-core/lifecycle.js:235)。
 
 ## 3. Phone Core 生命周期
 
-核心状态在 [`state.js`](../modules/phone-core/state.js:7) 创建，关键字段包括：
+核心状态在 [`state.js`](../modules/phone-core/state.js:18) 创建，关键字段包括：
 
-- [`currentRoute`](../modules/phone-core/state.js:9)
-- [`routeHistory`](../modules/phone-core/state.js:10)
-- [`phoneContainer`](../modules/phone-core/state.js:11)
-- [`isPhoneUiInitialized`](../modules/phone-core/state.js:13)
-- [`isPhoneActive`](../modules/phone-core/state.js:14)
-- [`isDestroying`](../modules/phone-core/state.js:15)
-- [`routeRenderToken`](../modules/phone-core/state.js:20)
-- [`currentViewingSheetKey`](../modules/phone-core/state.js:26)
+- [`currentRoute`](../modules/phone-core/state.js:20)
+- [`routeHistory`](../modules/phone-core/state.js:21)
+- [`phoneContainer`](../modules/phone-core/state.js:22)
+- [`isPhoneUiInitialized`](../modules/phone-core/state.js:24)
+- [`isPhoneActive`](../modules/phone-core/state.js:25)
+- [`isDestroying`](../modules/phone-core/state.js:26)
+- [`routeRenderToken`](../modules/phone-core/state.js:31)
+- [`currentViewingSheetKey`](../modules/phone-core/state.js:33)
 
 ### 3.1 激活流程
 
@@ -117,13 +117,26 @@ sequenceDiagram
 
 对应代码：
 
-- [`onPhoneActivated()`](../modules/phone-core/lifecycle.js:255)
-- [`initPhoneUI()`](../modules/phone-core/lifecycle.js:220)
-- [`requestPhoneRuntimeActivationRoute()`](../modules/phone-core/lifecycle.js:165)
-- [`requestPhoneRouteRender()`](../modules/phone-core/route-runtime.js:74)
-- [`renderPhoneRoute()`](../modules/phone-core/route-renderer.js:285)
+- [`onPhoneActivated()`](../modules/phone-core/lifecycle.js:215)
+- [`initPhoneUI()`](../modules/phone-core/lifecycle.js:177)
+- [`requestPhoneRuntimeActivationRoute()`](../modules/phone-core/lifecycle.js:124)
+- [`requestPhoneRouteRender()`](../modules/phone-core/route-runtime.js:89)
+- [`renderPhoneRoute()`](../modules/phone-core/route-renderer.js:390)
 
-### 3.2 路由系统
+### 3.2 后台派生服务生命周期
+
+[`background-services.js`](../modules/phone-core/background-services.js) 统一拥有“纪要今日关系”和“小日历派生字段”两个后台服务的启停与聊天切换屏障。它属于扩展 enabled 生命周期，不属于手机页面可见性生命周期：
+
+- 扩展 enabled 后启动；手机隐藏或关闭 UI 时继续运行。
+- 扩展 disabled 或执行 `destroy()` 时停止两侧服务，清理订阅、timer、聊天切换屏障和旧 generation。
+- 任一服务启动返回 `false`、抛错或启动期间 generation 失效时，两侧都必须执行幂等 `stop`，不能只回滚报告成功的一侧。
+- 日志设施不得打断停止和回滚；清理路径必须在 logger 自身异常时继续执行。
+- 聊天切换会先停止旧 generation，忽略第一段 `table-update` 中间态，等待第二段通知后再稳定 250ms；3.5 秒仍未收齐通知时只对最新 generation 执行一次兜底恢复。
+- 旧 generation 的回调、Promise 或 timer 晚到时不得重新启动服务，也不得改写新聊天状态。
+- [`subscribeTableUpdate()`](../modules/phone-core/callbacks.js:66) 不可用或注册失败时返回 `null`，禁止伪造 noop disposer。底层只注册一个 native callback，并通过 subscriber `Set` 复用；全局注销必须把同一个 native callback 传回数据库 API。
+- 派生服务收到无效 disposer 时必须把 `start()` 判为失败并完整回滚；聊天切换屏障允许订阅不可用，此时保持等待并由 3.5 秒 timeout fallback 恢复最新 generation。
+
+### 3.3 路由系统
 
 路由状态由 [`routing.js`](../modules/phone-core/routing.js:39) 管理：
 
@@ -133,36 +146,36 @@ sequenceDiagram
 - [`navigateBack()`](../modules/phone-core/routing.js:107)：从 routeHistory 回退。
 - [`onRouteChange()`](../modules/phone-core/routing.js:123)：注册 route change 回调。
 
-渲染由 [`route-runtime.js`](../modules/phone-core/route-runtime.js:84) 和 [`route-renderer.js`](../modules/phone-core/route-renderer.js:27) 执行。
+渲染由 [`route-runtime.js`](../modules/phone-core/route-runtime.js:84) 和 [`route-renderer.js`](../modules/phone-core/route-renderer.js:30) 执行。
 
 已确认路由：
 
-- home route -> [`renderHomeScreen()`](../modules/phone-home/render.js:121)
-- `table:<sheetKey>` 物理表 route -> 通过统一目录按 Theater → Special → Generic 分类，分别进入 [`renderTheaterScene()`](../modules/phone-theater/render.js:129) 或 [`renderTableViewer()`](../modules/table-viewer/render.js:20)
+- home route -> [`renderHomeScreen()`](../modules/phone-home/render.js:139)
+- `table:<sheetKey>` 物理表 route -> 通过统一目录按 Theater → Special → Generic 分类，分别进入 [`renderTheaterScene()`](../modules/phone-theater/render.js:118) 或 [`renderTableViewer()`](../modules/table-viewer/render.js:23)
 - `app:<sheetKey>` 兼容 route -> 复用同一目录分类；它不是跨表循环的目标 route
 - theater route -> [`renderTheaterScene()`](../modules/phone-theater/render.js:118)
-- table-generic route -> [`renderTableViewer()`](../modules/table-viewer/render.js:20) with force generic list mode
+- table-generic route -> [`renderTableViewer()`](../modules/table-viewer/render.js:23) with force generic list mode
 - table-update-review route -> [`renderTableUpdateReview()`](../modules/table-update-review/index.js:112)
-- settings route -> [`renderSettings()`](../modules/settings-app/render.js:79)
+- settings route -> [`renderSettings()`](../modules/settings-app/render.js:102)
 - fusion route -> [`renderFusion()`](../modules/phone-fusion/render.js:80)
-- variable manager route -> [`renderVariableManager()`](../modules/variable-manager/index.js:145)
+- variable manager route -> [`renderVariableManager()`](../modules/variable-manager/index.js:233)
 
 小剧场编辑桥：
 
 - 小剧场美化页如果声明 `editableTables`，编辑目标统一为 `table-generic:<sheetKey>`。首次编辑以及从首页或审核来源进入后的首次编辑使用 [`navigateTo()`](../modules/phone-core/routing.js:52)，把当前 Theater 美化页保留为编辑页的返回锚点。
 - 在 `table:<sheetKey>` 跨表浏览链中再次进入编辑时，通用交互层使用 [`navigateToReplacingHistoryTop()`](../modules/phone-core/routing.js:69)：移除 history 顶部的旧 Theater / 兼容 App / 物理表浏览锚点，再压入当前 Theater。它不得用于审核来源，也不得替代 [`replaceCurrentRoute()`](../modules/phone-core/routing.js:94) 的表级切换语义。
-- `table-generic:<sheetKey>` 由 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27) 识别，并调用 [`renderTableViewer()`](../modules/table-viewer/render.js:20) 的强制通用列表模式，绕开小剧场子表重定向和 special 模板检测。
+- `table-generic:<sheetKey>` 由 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:30) 识别，并调用 [`renderTableViewer()`](../modules/table-viewer/render.js:23) 的强制通用列表模式，绕开小剧场子表重定向和 special 模板检测。
 - 编辑页返回必须先通过 [`navigateBack()`](../modules/phone-core/routing.js:107) 回到当前 Theater，再次返回才到初始 Home / Review。最新编辑 route 渲染失败时会撤销当前 Theater 的临时入栈并恢复被替换的旧锚点；过期 `routeRenderToken` 的失败不得改写新 history。
 
 审核 App 跳转桥：
 
-- [`table-update-review`](../modules/table-update-review/constants.js:2) 是系统 App route，由 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27) 动态加载 [`renderTableUpdateReview()`](../modules/table-update-review/index.js:112)。
+- [`table-update-review`](../modules/table-update-review/constants.js:2) 是系统 App route，由 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:30) 动态加载 [`renderTableUpdateReview()`](../modules/table-update-review/index.js:112)。
 - Theater 物理表命中可用 scene 时，审核交互在写入 pending navigation intent 之前分流，直接通过标准 [`navigateTo()`](../modules/phone-core/routing.js:52) 进入 `table:<sheetKey>` 美化场景；该分支不创建或清理 Generic intent。
 - Generic 与 Special（当前为消息记录表）仍先写入 pending navigation intent，再进入 `table-generic:<sheetKey>`；Table Viewer 消费 intent 后进入对应行详情。详情本地返回只回列表，列表路由返回继续依赖 route history 回到审核页。
 
 表级循环切换：
 
-- 唯一顺序来源是 [`getSheetKeys()`](../modules/phone-core/data-api/table-repository.js:560)，统一目录位于 [`table-navigation/catalog.js`](../modules/table-navigation/catalog.js)。禁止在页面层复制 `orderNo` 排序、使用 `Object.keys(rawData)` 或按表名猜测展示类型。
+- 唯一顺序来源是 [`getSheetKeys()`](../modules/phone-core/data-api/table-repository.js:645)，统一目录位于 [`table-navigation/catalog.js`](../modules/table-navigation/catalog.js)。禁止在页面层复制 `orderNo` 排序、使用 `Object.keys(rawData)` 或按表名猜测展示类型。
 - Generic 列表、Theater 公共标题栏和消息会话列表只共享目录与 [`requestTableNavigationSwitch()`](../modules/table-navigation/controls.js:32)，各自保留现有模板与生命周期。
 - 三类页面都将“上一张、当前标题、下一张”渲染为同一标题导航组；Theater 编辑/删除和 Generic 批量删除属于独立操作区。窄屏可以让操作区换行，但不得把切表按钮移出标题组。
 - 切换成功只调用 [`replaceCurrentRoute()`](../modules/phone-core/routing.js:94)，不压入或弹出 `routeHistory`。因此 A→B→C 后执行一次返回，仍回到进入 A 前的页面。
@@ -171,9 +184,9 @@ sequenceDiagram
 
 维护规则：
 
-- 新增 route 必须同步改 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27)。
+- 新增 route 必须同步改 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:30)。
 - 如果希望首开不白屏，还要同步维护 [`ROUTE_MODULES`](../modules/phone-core/preload.js:32)。
-- 异步渲染必须尊重 [`routeRenderToken`](../modules/phone-core/state.js:20)，不能绕开现有 token 防护。
+- 异步渲染必须尊重 [`routeRenderToken`](../modules/phone-core/state.js:31)，不能绕开现有 token 防护。
 
 ## 4. SillyTavern 集成层
 
@@ -182,7 +195,7 @@ sequenceDiagram
 文件职责：
 
 - [`context-bridge.js`](../modules/integration/context-bridge.js:5)：获取并缓存 SillyTavern context。
-- [`event-bridge.js`](../modules/integration/event-bridge.js:66)：初始化 eventSource，提供 [`onEvent()`](../modules/integration/event-bridge.js:126)、[`triggerEvent()`](../modules/integration/event-bridge.js:183)、[`waitForEvent()`](../modules/integration/event-bridge.js:205)。
+- [`event-bridge.js`](../modules/integration/event-bridge.js:66)：初始化 eventSource，提供 [`onEvent()`](../modules/integration/event-bridge.js:136)、[`triggerEvent()`](../modules/integration/event-bridge.js:193)、[`waitForEvent()`](../modules/integration/event-bridge.js:215)。
 - [`tavern-helper-bridge.js`](../modules/integration/tavern-helper-bridge.js:27)：获取 TavernHelper，包装聊天消息、变量、世界书、角色数据等 API。
 - [`toast-bridge.js`](../modules/integration/toast-bridge.js:3)：封装 toastr，并注册错误处理通知回调。
 - [`cleanup.js`](../modules/integration/cleanup.js:17)：清理 context、event、TavernHelper 缓存。
@@ -209,40 +222,70 @@ sequenceDiagram
   Repo->>Queue: 加入写入队列
   Queue->>Bridge: 获取数据库 API
   Bridge->>API: 调用外部表格接口
-  API-->>Bridge: 返回布尔值或行索引
+  API-->>Bridge: Promise 真实 fulfilled/rejected
   Bridge-->>Repo: 返回结果
   Repo-->>UI: 返回结构化结果
 ```
 
 关键文件：
 
-- [`db-bridge.js`](../modules/phone-core/db-bridge.js:6)：解析 [`AutoCardUpdaterAPI`](../modules/phone-core/db-bridge.js:8)。
-- [`table-repository.js`](../modules/phone-core/data-api/table-repository.js:389)：读取、写入、插入、更新、删除表格。
+- [`db-bridge.js`](../modules/phone-core/db-bridge.js:7)：解析 [`AutoCardUpdaterAPI`](../modules/phone-core/db-bridge.js:9)。
+- [`table-repository.js`](../modules/phone-core/data-api/table-repository.js:600)：读取、写入、插入、更新、删除表格。
 - [`mutation-queue.js`](../modules/phone-core/data-api/mutation-queue.js:9)：串行化表格写入任务。
-- [`lock-repository.js`](../modules/phone-core/data-api/lock-repository.js:81)：封装行、列、单元格锁。
-- [`config-repository.js`](../modules/phone-core/data-api/config-repository.js:51)：数据库配置读写。
+- [`lock-repository.js`](../modules/phone-core/data-api/lock-repository.js:128)：封装行、列、单元格锁。
+- [`config-repository.js`](../modules/phone-core/data-api/config-repository.js:52)：数据库配置读写。
 - [`preset-repository.js`](../modules/phone-core/data-api/preset-repository.js:6)：API 预设桥接。
+
+等待边界分为两类：
+
+- query/probe 使用 [`callApiWithTimeout()`](../modules/phone-core/db-bridge.js)，保留有界超时，避免只读 UI 永久等待。
+- mutation 使用 [`callMutationApiToSettlement()`](../modules/phone-core/db-bridge.js)，必须等待底层 Promise 真实 fulfilled/rejected 后才能释放 [`mutation-queue.js`](../modules/phone-core/data-api/mutation-queue.js)。30 秒 watchdog 只输出一次慢调用诊断，不代表失败，也不得提前释放队列。
+- 第三方 mutation 永不 settle 时采用 fail-closed：当前队列保持占用，阻止后续写入重叠。没有取消协议时，不能用本地 hard timeout 伪造失败并继续重试。
 
 外部 API 契约来自文档：
 
 - [`updateRow()`](reference/API_DOCUMENTATION.md:234) 返回 [`Promise<boolean>`](reference/API_DOCUMENTATION.md:245)，用于行级更新。
 - [`insertRow()`](reference/API_DOCUMENTATION.md:269) 成功返回 rowIndex，失败返回 [`-1`](reference/API_DOCUMENTATION.md:279)，用于行级新增。
 - [`deleteRow()`](reference/API_DOCUMENTATION.md:301) 返回 [`Promise<boolean>`](reference/API_DOCUMENTATION.md:311)，用于行级删除。
-- [`exportTableAsJson()`](reference/API_DOCUMENTATION.md:201) 只允许作为读取、展示、校验与对账入口，不允许作为写入基准再覆盖回数据库。
+- [`exportTableAsJson()`](reference/API_DOCUMENTATION.md:163) 只允许作为读取、展示、校验与对账入口，不允许作为写入基准再覆盖回数据库。
+
+SQL settlement 合同由 [`normalizeSqlMutationSettlement()`](../modules/phone-core/data-api/mutation-settlement.js:30) 集中归一化：
+
+- 原始 settlement 必须是对象，包含数组 `errors` 与非负整数 `changes`；`{ changes: 0, errors: [] }` 只是结构成功，不代表业务目标已经命中。
+- `errors` 非空、`saved === false`、`ok === false` 或 `success === false` 都是失败。失败结果的顶层 `changes` 必须为 `null`，原始值只保留在 `result.changes`；顶层不得残留 `code: 'ok'` 或成功文案。
+- SQL 批量删除只有 settlement `ok` 且 `changes === 请求数` 时可以直接确认全部成功。其余 settlement 必须按删除前保存的 `row_id` 对账：对账不可用或失败返回 `partial_unknown`；确认零删除返回 `mutation_failed` 或保留底层失败码；确认部分删除返回 `partial_failed`。
+- SQL 一旦发出，严禁 fallback 到 `deleteRow`，因为底层可能已经提交、只是在保存或刷新阶段失败。仅 SQL 发出前发现能力缺失、快照不可用、`row_id`/物理表映射失败或参数数量超限时允许进入逐行 fallback。
 
 维护规则：
 
 - 表格写入必须走 [`enqueueTableMutation()`](../modules/phone-core/data-api/mutation-queue.js:9)，不要绕过队列并发写入。
-- 运行时新增、保存、删除、消息归档、小剧场级联删除必须使用 [`updateTableRow()`](../modules/phone-core/data-api/table-repository.js:239)、[`insertTableRow()`](../modules/phone-core/data-api/table-repository.js:294)、[`insertTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:360)、[`deleteTableRowViaApi()`](../modules/phone-core/data-api/table-repository.js:491)、[`deleteTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:529) 等行级仓库接口。
+- 正常 CRUD 与 Raw SQL mutation 的保存、merged-data/worldbook 刷新和通知由 shujuku 所有；小手机不得在成功后追加第二次刷新。显式刷新只保留给手动刷新、恢复和对账路径，并且同样必须进入 mutation queue 等待真实 settlement。
+- 聊天级模板导入只保证底层尝试应用、保存和刷新：shujuku 内部聊天保存与刷新存在 fire-and-forget/异常吞掉路径，仍可能返回 `success: true`，因此不能把返回值写成“聊天持久化和投影已可靠完成”。全局 scope 只保存预设，不改变当前聊天投影。
+- Fusion 模板导入不得在 [`importTemplateFromDataViaApi()`](../modules/phone-core/data-api/import-export-repository.js) 返回成功后追加投影刷新。二次刷新不是聊天保存屏障，本身也会产生写入副作用，不能用来补救模板导入的上游完成边界缺口。
+- mutation 调用不得传 `skipChatSave` 或 `skipNotify` 绕开一致性；写后聊天、世界书和 UI 必须以底层正式 Promise 为共同完成边界。
+- 手动更新只能调用正式 `manualUpdate()` API；虽然 shujuku 文档声明 `Promise<boolean>`，实际成功、失败、取消和前置失败都可能返回 `undefined`，所以小手机只把严格 `true` 判为成功。API 缺失时必须结构化报告 `method-unavailable` 并返回失败，禁止 DOM 点击 fallback，也禁止用二次刷新补救。
+- 运行时新增、保存、删除、消息归档、小剧场级联删除必须使用 [`updateTableRow()`](../modules/phone-core/data-api/table-repository.js:691)、[`insertTableRow()`](../modules/phone-core/data-api/table-repository.js:754)、[`insertTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:832)、[`deleteTableRowViaApi()`](../modules/phone-core/data-api/table-repository.js:973)、[`deleteTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:1008) 等行级仓库接口。
 - [`importTableAsJson()`](reference/API_DOCUMENTATION.md:177) 是整库覆盖接口，禁止出现在 [`modules/`](../modules) 运行时 CRUD 写入链路中；不能把某次 UI 改动包装成全量快照导入，否则会污染全局表与当前聊天表快照，并让数据库误判所有表都更新。
 - 成功判定必须严格遵守外部 API 契约：布尔接口只接受 `true`，插入接口只接受有效行号。
 - 批量删除的 partial failure 结果必须同时表达 `attemptedRowIndexes`、`failedRowIndexes`、`unattemptedRowIndexes` 与 `notDeletedRowIndexes`；`failedRowIndexes` 只表示已尝试但失败，UI 保留选择和反馈应优先消费 `notDeletedRowIndexes` 或映射后的 view 坐标，不要把“未尝试”伪装成“删除失败”。
-- UI 层不要直接调用 [`AutoCardUpdaterAPI`](../modules/phone-core/db-bridge.js:8)，应经 [`data-api.js`](../modules/phone-core/data-api.js:1) 或更具体 repository。
+- UI 层不要直接调用 [`AutoCardUpdaterAPI`](../modules/phone-core/db-bridge.js:9)，应经 [`data-api.js`](../modules/phone-core/data-api.js:1) 或更具体 repository。
 - Raw SQL 派生字段如果需要读取某张表作为业务锚点，必须使用代码内集中维护的英文物理表名白名单；例如 [`chronicle-today-relation-sql.js`](../modules/phone-core/derived-fields/chronicle-today-relation-sql.js:1) 的 `CHRONICLE_TODAY_RELATION_ANCHOR_TABLES` 当前只允许 `global_state` 与 `current_status`，并要求候选表同时具备 `row_id` 与 `cur_time`。
 - Raw SQL 路径承认 SQLite 只能识别真实物理表名：不要走 `NameMapper` 自动反查中文显示名，不要扫描所有包含 `cur_time` 的表猜测锚点，也不要把 UI 表头别名（例如“行号”）当成 SQL 字段。未来新增模板的同类 today anchor，只能在集中白名单里追加明确的英文物理表名，并同步合同数据。
 
 
-### 5.2 消息记录实时回复数据流
+### 5.2 派生字段后台调度契约
+
+[`derived-field-service.js`](../modules/phone-core/derived-fields/derived-field-service.js) 是两个派生器的共享调度器，负责读侧退避、通知合并、签名判定、mutation 预算和完整清理。
+
+- 每次读取必须区分 `source_signature`、完整 `input_signature` 与 `pending_update_count`；`pending_update_count === 0` 时不得调用 mutation。
+- 普通 `table-update` 只把服务标记为 dirty，并通过 600ms debounce 合并通知风暴；通知本身不得清空同一 source 的 mutation 预算。
+- query/probe 失败按 1 秒、2 秒、5 秒退避；这属于读侧恢复预算，不能与 mutation 写入预算混用。
+- 同一 `source_signature` 最多发出两次真实 mutation：首次写入 + 至多一次同源补写；补写可能来自明确失败，也可能来自写后确认仍未 clean。成功确认只清除待确认签名和 retry timer，不返还次数，也不关闭同源熔断预算。
+- 只有 source signature、聊天 generation 或 enabled 生命周期发生变化时，才能为新的业务输入重新建立预算。
+- `start()` 的订阅异常、无效 disposer、同步回调后 generation 失效，以及 `stop()` 的 disposer 异常，都必须完整清理四类 timer、订阅、运行状态、签名、读侧重试和 mutation 预算。
+
+
+### 5.3 消息记录实时回复数据流
 
 ```mermaid
 sequenceDiagram
@@ -279,7 +322,7 @@ sequenceDiagram
 关键文件：
 
 - [`message-viewer-actions.js`](../modules/table-viewer/special/message-viewer-actions.js:317)：发送消息主流程，负责本地临时气泡、AI 调用、AI 阶段取消等待、归档失败当前页重试。
-- [`parseStructuredAiReply()`](../modules/table-viewer/special/message-viewer-actions.js:153)：解析多气泡结构化回复，最多保留 4 条。
+- [`parseStructuredAiReply()`](../modules/table-viewer/special/message-viewer-actions.js:303)：解析多气泡结构化回复，最多保留 4 条。
 - [`message-projection.js`](../modules/phone-core/chat-support/message-projection.js:81)：把领域消息映射到表格字段，并提供批量追加归档。
 - [`settings-context.js`](../modules/phone-core/chat-support/settings-context.js:116)：读取聊天设置、世界书、故事上下文。
 - [`ai-instruction-store.js`](../modules/phone-core/chat-support/ai-instruction-store.js:124)：AI 指令预设与多气泡输出协议。
@@ -294,16 +337,16 @@ sequenceDiagram
 - 一条气泡一行；多气泡回复必须写入多行，不能把多条气泡塞进同一个消息内容字段。
 - 删除按钮只能删除表格真实行；归档失败或已取消等待的临时气泡只存在当前页面，返回、刷新或重进会话后直接消失。
 - 消息字段绑定属于运行时协议，应由共享契约维护；新增候选字段时必须同步写入、读取、列表渲染、详情渲染、AI prompt 历史消息。
-- 修改 AI 结构化回复格式时，必须同步提示词、[`parseStructuredAiReply()`](../modules/table-viewer/special/message-viewer-actions.js:153)、表格投影和历史消息构造。
+- 修改 AI 结构化回复格式时，必须同步提示词、[`parseStructuredAiReply()`](../modules/table-viewer/special/message-viewer-actions.js:303)、表格投影和历史消息构造。
 - 输入框性能优化属于消息详情页交互合同：草稿值必须在 input 事件内同步写入，自动高度计算应通过 viewer runtime 的 requestAnimationFrame 调度，避免每次键入都触发完整 compose patch 与重复 scrollHeight 测量。
 
 ## 6. UI 模块职责
 
 ### 6.1 Home 主屏
 
-- [`renderHomeScreen()`](../modules/phone-home/render.js:121)：主屏入口。
+- [`renderHomeScreen()`](../modules/phone-home/render.js:139)：主屏入口。
 - [`buildHomeScreenViewModel()`](../modules/phone-home/view-model.js:23)：把 rawData 与 settings 转成 app 列表。
-- [`patchHomeGrid()`](../modules/phone-home/render.js:70)、[`patchHomeDock()`](../modules/phone-home/render.js:103)：局部更新 DOM。
+- [`patchHomeGrid()`](../modules/phone-home/render.js:88)、[`patchHomeDock()`](../modules/phone-home/render.js:121)：局部更新 DOM。
 - [`bindHomeGridInteractions()`](../modules/phone-home/interactions.js:37)、[`bindHomeDockInteractions()`](../modules/phone-home/interactions.js:82)：绑定点击交互。
 - [`TABLE_UPDATE_REVIEW_APP_ID`](../modules/table-update-review/constants.js:1) 由 [`buildHomeScreenViewModel()`](../modules/phone-home/view-model.js:23) 作为系统 App 注入 Home，route 固定为 [`TABLE_UPDATE_REVIEW_ROUTE`](../modules/table-update-review/constants.js:2)。
 
@@ -320,87 +363,87 @@ sequenceDiagram
 
 ### 6.2 Table Viewer 表格查看器
 
-- [`renderTableViewer()`](../modules/table-viewer/render.js:20)：根据 sheetKey 解析上下文，判断专属模板或通用模板。
-- [`createViewerRuntime()`](../modules/table-viewer/runtime.js:60)：管理 viewer 生命周期、外部表更新监听、草稿预览。
-- [`renderGenericListPage()`](../modules/table-viewer/list-page-renderer.js:352)：通用表列表页渲染和局部 patch。
-- [`bindGenericListPageController()`](../modules/table-viewer/list-page-controller.js:248)：通用表列表事件委托。
+- [`renderTableViewer()`](../modules/table-viewer/render.js:23)：根据 sheetKey 解析上下文，判断专属模板或通用模板。
+- [`createViewerRuntime()`](../modules/table-viewer/runtime.js:64)：管理 viewer 生命周期、外部表更新监听、草稿预览。
+- [`renderGenericListPage()`](../modules/table-viewer/list-page-renderer.js:473)：通用表列表页渲染和局部 patch。
+- [`bindGenericListPageController()`](../modules/table-viewer/list-page-controller.js:521)：通用表列表事件委托。
 
 #### 6.2.1 Table Viewer 入口分流
 
-[`renderTableViewer()`](../modules/table-viewer/render.js:20) 是 Table Viewer 唯一入口。流程固定为：
+[`renderTableViewer()`](../modules/table-viewer/render.js:23) 是 Table Viewer 唯一入口。流程固定为：
 
-1. 创建 viewer runtime：[`createViewerRuntime()`](../modules/table-viewer/runtime.js:60)。
-2. 解析表格上下文：[`resolveTableViewerContext()`](../modules/table-viewer/context.js:1)。
-3. 启动 viewer session：[`startViewerSession()`](../modules/table-viewer/runtime.js:182)。
-4. 先调用 [`detectSpecialTemplateForTable()`](../modules/phone-beautify-templates/matcher.js:37) 判断专属模板。
-5. 如果命中专属类型，进入 [`createSpecialTableViewerRuntime()`](../modules/table-viewer/special/runtime.js:149)。
-6. 否则调用 [`detectGenericTemplateForTable()`](../modules/phone-beautify-templates/matcher.js:142)，并进入 [`renderGenericTableViewer()`](../modules/table-viewer/generic-viewer.js:3)。
+1. 创建 viewer runtime：[`createViewerRuntime()`](../modules/table-viewer/runtime.js:64)。
+2. 解析表格上下文：[`resolveTableViewerContext()`](../modules/table-viewer/context.js:4)。
+3. 启动 viewer session：[`startViewerSession()`](../modules/table-viewer/runtime.js:211)。
+4. 先调用 [`detectSpecialTemplateForTable()`](../modules/phone-beautify-templates/matcher.js:36) 判断专属模板。
+5. 如果命中专属类型，进入 [`createSpecialTableViewerRuntime()`](../modules/table-viewer/special/runtime.js:151)。
+6. 否则调用 [`detectGenericTemplateForTable()`](../modules/phone-beautify-templates/matcher.js:144)，并进入 [`renderGenericTableViewer()`](../modules/table-viewer/generic-viewer.js:6)。
 
-新增表格视觉能力时，必须从模板检测或 special runtime 扩展，不要在 [`renderTableViewer()`](../modules/table-viewer/render.js:20) 内堆业务条件。
+新增表格视觉能力时，必须从模板检测或 special runtime 扩展，不要在 [`renderTableViewer()`](../modules/table-viewer/render.js:23) 内堆业务条件。
 
 #### 6.2.2 Viewer runtime 生命周期
 
-[`createViewerRuntime()`](../modules/table-viewer/runtime.js:60) 会在 container 上挂载当前 viewer 的 cleanup 与 runtime 引用：
+[`createViewerRuntime()`](../modules/table-viewer/runtime.js:64) 会在 container 上挂载当前 viewer 的 cleanup 与 runtime 引用：
 
-- cleanup key：[`VIEWER_INSTANCE_CLEANUP_KEY`](../modules/table-viewer/runtime.js:7)。
-- runtime key：[`VIEWER_RUNTIME_INSTANCE_KEY`](../modules/table-viewer/runtime.js:8)。
-- 草稿预览 cleanup key：[`DRAFT_PREVIEW_CLEANUP_KEY`](../modules/table-viewer/runtime.js:9)。
+- cleanup key：[`VIEWER_INSTANCE_CLEANUP_KEY`](../modules/table-viewer/runtime.js:11)。
+- runtime key：[`VIEWER_RUNTIME_INSTANCE_KEY`](../modules/table-viewer/runtime.js:12)。
+- 草稿预览 cleanup key：[`DRAFT_PREVIEW_CLEANUP_KEY`](../modules/table-viewer/runtime.js:13)。
 
 创建新 viewer 前会先执行旧实例 cleanup；dispose 时会释放 runtime scope、清理新增行 modal、清理模板草稿预览，并把当前 viewing sheet 置空。
 
 viewer runtime 对外提供：
 
-- DOM 事件：[`addEventListener()`](../modules/table-viewer/runtime.js:216)。
-- cleanup：[`registerCleanup()`](../modules/table-viewer/runtime.js:219)。
-- DOM 断连观察：[`observeDisconnection()`](../modules/table-viewer/runtime.js:222)。
-- RAF 与 timeout：[`requestAnimationFrame()`](../modules/table-viewer/runtime.js:225)、[`setTimeout()`](../modules/table-viewer/runtime.js:231)。
-- 外部表更新监听：[`bindExternalTableUpdate()`](../modules/table-viewer/runtime.js:159)。
-- 本地写入期间抑制外部刷新：[`setSuppressExternalTableUpdate()`](../modules/table-viewer/runtime.js:237)。
+- DOM 事件：[`addEventListener()`](../modules/table-viewer/runtime.js:245)。
+- cleanup：[`registerCleanup()`](../modules/table-viewer/runtime.js:248)。
+- DOM 断连观察：[`observeDisconnection()`](../modules/table-viewer/runtime.js:251)。
+- RAF 与 timeout：[`requestAnimationFrame()`](../modules/table-viewer/runtime.js:254)、[`setTimeout()`](../modules/table-viewer/runtime.js:260)。
+- 外部表更新监听：[`bindExternalTableUpdate()`](../modules/table-viewer/runtime.js:188)。
+- 本地写入期间抑制外部刷新：[`setSuppressExternalTableUpdate()`](../modules/table-viewer/runtime.js:266)。
 - 通用详情页处于 edit dirty 状态时，外部表更新只记录 `pendingExternalTableUpdate`，不覆盖当前 draft；退出编辑、进入字段锁管理或保存成功后再同步真实 sheet 并校验当前行是否仍存在。
 
 页面内事件、modal、局部 controller 应优先使用 viewer runtime；裸 `addEventListener` 只应作为无 runtime fallback。
 
 #### 6.2.3 通用表 runtime 与状态
 
-通用表 runtime 由 [`createGenericTableViewerRuntime()`](../modules/table-viewer/generic-runtime.js:23) 创建。它接收 sheetKey、tableName、headers、rawHeaders、rows 和 genericMatch，并创建 [`createTableViewerState()`](../modules/table-viewer/state.js:422)。
+通用表 runtime 由 [`createGenericTableViewerRuntime()`](../modules/table-viewer/generic-runtime.js:92) 创建。它接收 sheetKey、tableName、headers、rawHeaders、rows 和 genericMatch，并创建 [`createTableViewerState()`](../modules/table-viewer/state.js:559)。
 
 通用表 state 字段包括：
 
-- 页面模式：[`mode`](../modules/table-viewer/state.js:424)，值为 `list` 或 `detail`。
-- 当前详情行：[`rowIndex`](../modules/table-viewer/state.js:425)。
-- 编辑态：[`editMode`](../modules/table-viewer/state.js:426)、[`draftValues`](../modules/table-viewer/state.js:428)、[`saving`](../modules/table-viewer/state.js:430)。
-- 锁管理：[`lockState`](../modules/table-viewer/state.js:429)、[`lockManageMode`](../modules/table-viewer/state.js:431)、[`cellLockManageMode`](../modules/table-viewer/state.js:427)。
-- 删除管理：[`deleteManageMode`](../modules/table-viewer/state.js:432)、[`deletingRowIndex`](../modules/table-viewer/state.js:433)、[`selectedDeleteRowIndexes`](../modules/table-viewer/state.js:417)、[`deletingSelection`](../modules/table-viewer/state.js:445)。
-- 列表 UI：[`listScrollTop`](../modules/table-viewer/state.js:434)、[`listSearchQuery`](../modules/table-viewer/state.js:435)、[`listSortDescending`](../modules/table-viewer/state.js:436)。
+- 页面模式：[`mode`](../modules/table-viewer/state.js:561)，值为 `list` 或 `detail`。
+- 当前详情行：[`rowIndex`](../modules/table-viewer/state.js:562)。
+- 编辑态：[`editMode`](../modules/table-viewer/state.js:563)、[`draftValues`](../modules/table-viewer/state.js:565)、[`saving`](../modules/table-viewer/state.js:567)。
+- 锁管理：[`lockState`](../modules/table-viewer/state.js:566)、[`lockManageMode`](../modules/table-viewer/state.js:568)、[`cellLockManageMode`](../modules/table-viewer/state.js:564)。
+- 删除管理：[`deleteManageMode`](../modules/table-viewer/state.js:569)、[`deletingRowIndex`](../modules/table-viewer/state.js:570)、[`selectedDeleteRowIndexes`](../modules/table-viewer/state.js:571)、[`deletingSelection`](../modules/table-viewer/state.js:572)。
+- 列表 UI：[`listScrollTop`](../modules/table-viewer/state.js:573)、[`listSearchQuery`](../modules/table-viewer/state.js:575)、[`listSortDescending`](../modules/table-viewer/state.js:576)。
 
-[`TableViewerState`](../modules/table-viewer/state.js:48) 通过 allowedKeys 限制未知字段写入，并通过 [`subscribe()`](../modules/table-viewer/state.js:167) 通知局部刷新。列表模式下 [`createGenericTableViewerRuntime()`](../modules/table-viewer/generic-runtime.js:70) 只对搜索、排序、锁、删除等列表相关字段触发局部刷新。
+[`TableViewerState`](../modules/table-viewer/state.js:86) 通过 allowedKeys 限制未知字段写入，并通过 [`subscribe()`](../modules/table-viewer/state.js:229) 通知局部刷新。列表模式下 [`createGenericTableViewerRuntime()`](../modules/table-viewer/generic-runtime.js:92) 只对搜索、排序、锁、删除等列表相关字段触发局部刷新。
 
 #### 6.2.4 通用表列表页
 
-[`renderGenericListPage()`](../modules/table-viewer/list-page-renderer.js:352) 使用 [`buildGenericListPageViewModel()`](../modules/table-viewer/list-page-renderer.js:29) 构建列表视图模型。核心规则：
+[`renderGenericListPage()`](../modules/table-viewer/list-page-renderer.js:473) 使用 [`buildGenericListPageViewModel()`](../modules/table-viewer/list-page-renderer.js:58) 构建列表视图模型。核心规则：
 
-- 每行由 [`buildGenericRowViewModel()`](../modules/table-viewer/row-view-model.js:199) 生成标题、状态、时间、摘要、搜索索引。
+- 每行由 [`buildGenericRowViewModel()`](../modules/table-viewer/row-view-model.js:221) 生成标题、状态、时间、摘要、搜索索引。
 - 模板字段绑定来自 [`createGenericTemplateStylePayload()`](../modules/table-viewer/generic-style-payload.js:96) 输出的 `fieldBindings`。
-- 列表 patch 使用 `rowKey` 与 `rowVersion`，见 [`buildGenericListRowRenderVersion()`](../modules/table-viewer/list-page-renderer.js:166)。删除选择态会进入 `rowVersion`，否则圆圈勾选变化不会触发行节点替换。
-- 搜索基于 [`searchText`](../modules/table-viewer/row-view-model.js:240)，排序通过 [`listSortDescending`](../modules/table-viewer/state.js:436) 控制。删除态下搜索变化必须把 [`selectedDeleteRowIndexes`](../modules/table-viewer/state.js:417) 约束到当前可见且未锁定行，防止隐藏行被误删。
-- 新增、锁定、删除按钮是否显示由模板 `structureOptions.bottomBar` 影响，最终进入 [`buildGenericListBottomBarHtml()`](../modules/table-viewer/list-page-template.js:257)。删除态下右侧单行删除按钮会替换为圆形选择控件，标题栏右侧由 [`buildGenericListNavHtml()`](../modules/table-viewer/list-page-template.js:86) 渲染全选、清空、批量删除按钮。
+- 列表 patch 使用 `rowKey` 与 `rowVersion`，见 [`buildGenericListRowRenderVersion()`](../modules/table-viewer/list-page-renderer.js:264)。删除选择态会进入 `rowVersion`，否则圆圈勾选变化不会触发行节点替换。
+- 搜索基于 [`searchText`](../modules/table-viewer/row-view-model.js:262)，排序通过 [`listSortDescending`](../modules/table-viewer/state.js:576) 控制。删除态下搜索变化必须把 [`selectedDeleteRowIndexes`](../modules/table-viewer/state.js:571) 约束到当前可见且未锁定行，防止隐藏行被误删。
+- 新增、锁定、删除按钮是否显示由模板 `structureOptions.bottomBar` 影响，最终进入 [`buildGenericListBottomBarHtml()`](../modules/table-viewer/list-page-template.js:313)。删除态下右侧单行删除按钮会替换为圆形选择控件，标题栏右侧由 [`buildGenericListNavHtml()`](../modules/table-viewer/list-page-template.js:117) 渲染全选、清空、批量删除按钮。
 
-列表页事件由 [`bindGenericListPageController()`](../modules/table-viewer/list-page-controller.js:544) 委托处理。新增行弹窗入口是 [`showGenericAddRowModal()`](../modules/table-viewer/add-row-modal.js:126)。删除入口由 [`createRowDeleteController()`](../modules/table-viewer/row-delete-controller.js:55) 生成。通用表批量删除通过 [`deleteRowsFromList()`](../modules/table-viewer/row-delete-controller.js:72) 调用行级 [`deletePhoneSheetRows()`](../modules/phone-core/chat-support/message-projection.js:283)，底层进入 [`deleteTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:588)。成功删除后保留删除管理态并清空本次选择，方便连续清理；部分失败时将失败行索引按成功删除结果重映射后继续选中。
+列表页事件由 [`bindGenericListPageController()`](../modules/table-viewer/list-page-controller.js:521) 委托处理。新增行弹窗入口是 [`showGenericAddRowModal()`](../modules/table-viewer/add-row-modal.js:223)。删除入口由 [`createRowDeleteController()`](../modules/table-viewer/row-delete-controller.js:80) 生成。通用表批量删除通过 [`deleteRowsFromList()`](../modules/table-viewer/row-delete-controller.js:97) 调用行级 [`deletePhoneSheetRows()`](../modules/phone-core/chat-support/message-projection.js:321)，底层进入 [`deleteTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:1008)。成功删除后保留删除管理态并清空本次选择，方便连续清理；部分失败时将失败行索引按成功删除结果重映射后继续选中。
 
 #### 6.2.5 通用表详情页与编辑保存
 
-[`renderGenericDetailPage()`](../modules/table-viewer/detail-page-renderer.js:7) 会先同步锁状态，再通过 [`buildGenericDetailRowPayload()`](../modules/table-viewer/detail-row-payload.js:1) 生成字段详情 payload，最后调用 [`bindGenericDetailEditController()`](../modules/table-viewer/detail-edit-controller.js:45) 绑定详情页交互。
+[`renderGenericDetailPage()`](../modules/table-viewer/detail-page-renderer.js:53) 会先同步锁状态，再通过 [`buildGenericDetailRowPayload()`](../modules/table-viewer/detail-row-payload.js:36) 生成字段详情 payload，最后调用 [`bindGenericDetailEditController()`](../modules/table-viewer/detail-edit-controller.js:46) 绑定详情页交互。
 
 详情页编辑规则：
 
-- [`setEditMode()`](../modules/table-viewer/state.js:267) 进入或退出编辑态。
-- [`updateDraftValue()`](../modules/table-viewer/state.js:305) 按列索引记录草稿。
-- [`setCellLockManageMode()`](../modules/table-viewer/state.js:281) 进入字段锁管理态，并关闭编辑态。
-- 保存时 [`handleSaveRow()`](../modules/table-viewer/detail-edit-controller.js:201) 从 draftValues 构造 updateData，通过 runtime 注入的 [`getLiveTableName()`](../modules/table-viewer/generic-runtime.js:146) 取得当前表名，并调用 [`updateTableRow()`](../modules/phone-core/data-api/table-repository.js:239) 行级更新目标数据行；详情保存禁止克隆整库快照后全量覆盖。
-- 保存期间会开启外部表更新 suppress，并在 finally 释放；保存成功后必须调用 [`syncRowsFromSheet()`](../modules/table-viewer/generic-runtime.js:155) 对账真实 sheet。若刷新失败或当前行已不存在，详情页返回列表并提示；保存失败时保持 edit mode 与 draft。
+- [`setEditMode()`](../modules/table-viewer/state.js:341) 进入或退出编辑态。
+- [`updateDraftValue()`](../modules/table-viewer/state.js:405) 按列索引记录草稿。
+- [`setCellLockManageMode()`](../modules/table-viewer/state.js:356) 进入字段锁管理态，并关闭编辑态。
+- 保存时 [`handleSaveRow()`](../modules/table-viewer/detail-edit-controller.js:275) 从 draftValues 构造 updateData，通过 runtime 注入的 [`getLiveTableName()`](../modules/table-viewer/generic-runtime.js:204) 取得当前表名，并调用 [`updateTableRow()`](../modules/phone-core/data-api/table-repository.js:691) 行级更新目标数据行；详情保存禁止克隆整库快照后全量覆盖。
+- 保存期间会开启外部表更新 suppress，并在 finally 释放；保存成功后必须调用 [`syncRowsFromSheet()`](../modules/table-viewer/generic-runtime.js:172) 对账真实 sheet。若刷新失败或当前行已不存在，详情页返回列表并提示；保存失败时保持 edit mode 与 draft。
 - 用户退出编辑或进入字段锁管理时，如果此前存在 pending external update，controller 会消费该 pending、同步真实 sheet 并重新渲染，避免把外部更新静默丢弃。
 
-详情页 controller 每次绑定前会执行旧 cleanup，标识是 [`DETAIL_CONTROLLER_CLEANUP_KEY`](../modules/table-viewer/detail-edit-controller.js:4)。这是通用表详情页避免 per-render 事件泄漏的基本机制。
+详情页 controller 每次绑定前会执行旧 cleanup，标识是 [`DETAIL_CONTROLLER_CLEANUP_KEY`](../modules/table-viewer/detail-edit-controller.js:5)。这是通用表详情页避免 per-render 事件泄漏的基本机制。
 
 #### 6.2.6 通用模板 style payload
 
@@ -415,57 +458,57 @@ CSS 层读取这些 data attributes 和 CSS 变量，见 [`styles/05-phone-gener
 
 #### 6.2.7 专属消息表 runtime
 
-专属表由 [`createSpecialTableViewerRuntime()`](../modules/table-viewer/special/runtime.js:149) 创建。目前稳定 special type 是 `message`，表名直判入口为 [`detectSpecialTableType()`](../modules/table-viewer/special/runtime.js:21)，模板匹配入口为 [`detectSpecialTemplateForTable()`](../modules/phone-beautify-templates/matcher.js:37)。
+专属表由 [`createSpecialTableViewerRuntime()`](../modules/table-viewer/special/runtime.js:151) 创建。目前稳定 special type 是 `message`，表名直判入口为 [`detectSpecialTableType()`](../modules/table-viewer/special/runtime.js:23)，模板匹配入口为 [`detectSpecialTemplateForTable()`](../modules/phone-beautify-templates/matcher.js:36)。
 
-专属模板 style payload 由 [`createSpecialTemplateStylePayload()`](../modules/table-viewer/special/runtime.js:26) 生成：
+专属模板 style payload 由 [`createSpecialTemplateStylePayload()`](../modules/table-viewer/special/runtime.js:28) 生成：
 
 - class scope：`phone-special-template-scope`。
 - style tokens：转成 `--sp*` CSS 变量。
-- style options：经 [`normalizeSpecialStyleOptionsForViewer()`](../modules/table-viewer/special/field-reader.js:1) 归一化。
+- style options：经 [`normalizeSpecialStyleOptionsForViewer()`](../modules/table-viewer/special/field-reader-normalizers.js:75) 归一化。
 - structureOptions、typographyOptions、motionOptions 会转成 data attributes 或 CSS 变量。
 - 自定义 CSS 通过 [`buildScopedCustomCss()`](../modules/table-viewer/template-runtime.js:72) 包裹到 `.phone-special-template-*` 作用域。
 
 #### 6.2.8 专属消息表状态与会话模型
 
-[`renderMessageTable()`](../modules/table-viewer/special/message-viewer.js:44) 创建本地 state。关键字段包括：
+[`renderMessageTable()`](../modules/table-viewer/special/message-viewer.js:61) 创建本地 state。关键字段包括：
 
-- 页面模式：[`mode`](../modules/table-viewer/special/message-viewer.js:59)，`conversation` 或 `detail`。
-- 当前会话：[`conversationId`](../modules/table-viewer/special/message-viewer.js:60)。
-- 当前行数据副本：[`rowsData`](../modules/table-viewer/special/message-viewer.js:62)。
-- 会话草稿：[`draftByConversation`](../modules/table-viewer/special/message-viewer.js:63)。
-- AI 发送状态：[`sending`](../modules/table-viewer/special/message-viewer.js:64)、[`statusText`](../modules/table-viewer/special/message-viewer.js:65)、[`errorText`](../modules/table-viewer/special/message-viewer.js:66)。
-- 联系人选择：[`selectedTarget`](../modules/table-viewer/special/message-viewer.js:68)、[`contactPickerVisible`](../modules/table-viewer/special/message-viewer.js:69)。
-- 删除管理：[`deleteManageMode`](../modules/table-viewer/special/message-viewer.js:70)、[`deletingSelection`](../modules/table-viewer/special/message-viewer.js:71)、[`selectedMessageRowIndexes`](../modules/table-viewer/special/message-viewer.js:72)。
+- 页面模式：[`mode`](../modules/table-viewer/special/message-viewer.js:76)，`conversation` 或 `detail`。
+- 当前会话：[`conversationId`](../modules/table-viewer/special/message-viewer.js:77)。
+- 当前行数据副本：[`rowsData`](../modules/table-viewer/special/message-viewer.js:79)。
+- 会话草稿：[`draftByConversation`](../modules/table-viewer/special/message-viewer.js:80)。
+- AI 发送状态：[`sending`](../modules/table-viewer/special/message-viewer.js:88)、[`statusText`](../modules/table-viewer/special/message-viewer.js:91)、[`errorText`](../modules/table-viewer/special/message-viewer.js:92)。
+- 联系人选择：[`selectedTarget`](../modules/table-viewer/special/message-viewer.js:94)、[`contactPickerVisible`](../modules/table-viewer/special/message-viewer.js:95)。
+- 删除管理：[`deleteManageMode`](../modules/table-viewer/special/message-viewer.js:96)、[`deletingSelection`](../modules/table-viewer/special/message-viewer.js:97)、[`selectedMessageRowIndexes`](../modules/table-viewer/special/message-viewer.js:98)。
 
-会话行聚合由 [`getConversationRows()`](../modules/table-viewer/special/message-viewer-helpers.js:37) 和 [`getConversationRowEntries()`](../modules/table-viewer/special/message-viewer-helpers.js:41) 负责。默认消息字段绑定会为 [`threadId`](../modules/table-viewer/special/field-reader-config.js:3) 提供 [`@const:default_thread`](../modules/table-viewer/special/field-reader-config.js:3)；[`createSpecialFieldReader()`](../modules/table-viewer/special/field-reader-runtime.js:37) 会优先返回该常量，因此在默认绑定存在且行内没有会话 ID 时，多行会合并到同一个 `default_thread` 会话。只有当字段绑定没有返回有效值时，[`getConversationRowEntries()`](../modules/table-viewer/special/message-viewer-helpers.js:43) 的 `default_thread_${rowIndex + 1}` 才作为最后兜底，按行生成临时会话 id。
+会话行聚合由 [`getConversationRows()`](../modules/table-viewer/special/message-viewer-helpers.js:37) 和 [`getConversationRowEntries()`](../modules/table-viewer/special/message-viewer-helpers.js:41) 负责。默认消息字段绑定会为 [`threadId`](../modules/table-viewer/special/field-reader-config.js:3) 提供 [`@const:default_thread`](../modules/table-viewer/special/field-reader-config.js:3)；[`createSpecialFieldReader()`](../modules/table-viewer/special/field-reader-runtime.js:7) 会优先返回该常量，因此在默认绑定存在且行内没有会话 ID 时，多行会合并到同一个 `default_thread` 会话。只有当字段绑定没有返回有效值时，[`getConversationRowEntries()`](../modules/table-viewer/special/message-viewer-helpers.js:41) 的 `default_thread_${rowIndex + 1}` 才作为最后兜底，按行生成临时会话 id。
 
 #### 6.2.9 专属消息表 AI 数据流
 
-消息发送与重试逻辑由 [`createMessageViewerActions()`](../modules/table-viewer/special/message-viewer-actions.js:45) 生成。依赖通过 `actionDeps` 注入，默认依赖包括：
+消息发送与重试逻辑由 [`createMessageViewerActions()`](../modules/table-viewer/special/message-viewer-actions.js:50) 生成。依赖通过 `actionDeps` 注入，默认依赖包括：
 
-- 表格投影：[`insertPhoneMessageRecord()`](../modules/table-viewer/special/message-viewer-actions.js:31)、[`updatePhoneMessageRecord()`](../modules/table-viewer/special/message-viewer-actions.js:33)、[`refreshPhoneMessageProjection()`](../modules/table-viewer/special/message-viewer-actions.js:32)。
-- AI 设置与上下文：[`getCurrentPhoneAiInstructionPreset()`](../modules/table-viewer/special/message-viewer-actions.js:26)、[`getPhoneChatSettings()`](../modules/table-viewer/special/message-viewer-actions.js:28)、[`getPhoneChatWorldbookContext()`](../modules/table-viewer/special/message-viewer-actions.js:29)、[`getPhoneStoryContext()`](../modules/table-viewer/special/message-viewer-actions.js:30)。
-- AI 调用：[`callPhoneChatAI()`](../modules/table-viewer/special/message-viewer-actions.js:25)。
-- prompt 构造：[`buildPhoneChatSystemMessages()`](../modules/table-viewer/special/message-viewer-helpers.js:79)、[`buildPhoneChatConversationMessages()`](../modules/table-viewer/special/message-viewer-helpers.js:52)。
+- 消息表写入与归档：[`appendPhoneMessageRecordsBatch()`](../modules/table-viewer/special/message-viewer-actions.js:31)、[`buildPhoneMessagePayloadFromHeaders()`](../modules/table-viewer/special/message-viewer-actions.js:32)、[`insertPhoneMessageRecord()`](../modules/table-viewer/special/message-viewer-actions.js:33)、[`updatePhoneMessageRecord()`](../modules/table-viewer/special/message-viewer-actions.js:34)。
+- AI 设置与上下文：[`getCurrentPhoneAiInstructionPreset()`](../modules/table-viewer/special/message-viewer-actions.js:36)、[`getPhoneChatSettings()`](../modules/table-viewer/special/message-viewer-actions.js:38)、[`getPhoneChatWorldbookContext()`](../modules/table-viewer/special/message-viewer-actions.js:39)、[`getPhoneStoryContext()`](../modules/table-viewer/special/message-viewer-actions.js:40)。
+- AI 调用：[`callPhoneChatAI()`](../modules/table-viewer/special/message-viewer-actions.js:35)。
+- prompt 构造：[`buildPhoneChatSystemMessages()`](../modules/table-viewer/special/message-viewer-helpers.js:78)、[`buildPhoneChatConversationMessages()`](../modules/table-viewer/special/message-viewer-helpers.js:52)。
 
-AI 回复解析协议由 [`parseStructuredAiReply()`](../modules/table-viewer/special/message-viewer-actions.js:175) 定义。推荐回复字段为“正文”、“图片描述”、“视频描述”。历史消息构造会通过 [`resolvePhoneAiInstructionMediaMarkers()`](../modules/table-viewer/special/message-viewer-helpers.js:53) 把媒体描述拼入 prompt。
+AI 回复解析协议由 [`parseStructuredAiReply()`](../modules/table-viewer/special/message-viewer-actions.js:303) 定义。推荐回复字段为“正文”、“图片描述”、“视频描述”。历史消息构造会通过 [`resolvePhoneAiInstructionMediaMarkers()`](../modules/table-viewer/special/message-viewer-helpers.js:53) 把媒体描述拼入 prompt。
 
-AI 指令预设的 `mediaMarkers.imagePrefix` 与 `mediaMarkers.videoPrefix` 是历史 prompt 协议字段，不是单纯 UI 显示文案。默认值来自 [`DEFAULT_PHONE_AI_MEDIA_MARKERS`](../modules/phone-core/chat-support/ai-instruction-store.js:147)，当前为 `[图片]` 与 `[视频]`；设置页会把这两个字段作为预设草稿保存，见 [`buildPresetPayload()`](../modules/settings-app/pages/ai-instruction-presets/draft-helpers.js:100)。实时回复构造历史消息时，[`buildPhoneChatConversationMessages()`](../modules/table-viewer/special/message-viewer-helpers.js:52) 会读取当前指令预设并将媒体描述拼成 `${imagePrefix} ${imageDesc}` / `${videoPrefix} ${videoDesc}` 后交给 AI。因此修改这两个前缀会改变 AI 读取历史媒体描述的格式。
+AI 指令预设的 `mediaMarkers.imagePrefix` 与 `mediaMarkers.videoPrefix` 是历史 prompt 协议字段，不是单纯 UI 显示文案。默认值来自 [`DEFAULT_PHONE_AI_MEDIA_MARKERS`](../modules/phone-core/chat-support/ai-instruction-store.js:158)，当前为 `[图片]` 与 `[视频]`；设置页会把这两个字段作为预设草稿保存，见 [`buildPresetPayload()`](../modules/settings-app/pages/ai-instruction-presets/draft-helpers.js:96)。实时回复构造历史消息时，[`buildPhoneChatConversationMessages()`](../modules/table-viewer/special/message-viewer-helpers.js:52) 会读取当前指令预设并将媒体描述拼成 `${imagePrefix} ${imageDesc}` / `${videoPrefix} ${videoDesc}` 后交给 AI。因此修改这两个前缀会改变 AI 读取历史媒体描述的格式。
 
-维护规则：新增媒体描述字段或调整媒体标记格式时，必须同步 [`normalizeMediaMarkers()`](../modules/phone-core/chat-support/ai-instruction-store.js:168)、AI 指令预设页编辑入口、[`buildPromptContentFromRow()`](../modules/table-viewer/special/message-viewer-helpers.js:88)、媒体标记合同脚本和本架构说明。空字符串前缀是合法协议值，表示只把媒体描述本身写入历史 prompt，不应被运行时强制回退成默认标记。
+维护规则：新增媒体描述字段或调整媒体标记格式时，必须同步 [`normalizeMediaMarkers()`](../modules/phone-core/chat-support/ai-instruction-store.js:176)、AI 指令预设页编辑入口、[`buildPromptContentFromRow()`](../modules/table-viewer/special/message-viewer-helpers.js:87)、媒体标记合同脚本和本架构说明。空字符串前缀是合法协议值，表示只把媒体描述本身写入历史 prompt，不应被运行时强制回退成默认标记。
 
 #### 6.2.10 模板草稿预览与自定义 CSS
 
 [`bindTemplateDraftPreviewForViewer()`](../modules/table-viewer/template-runtime.js:260) 为 Table Viewer 接收模板草稿预览事件。草稿模板会先经过 [`resolveTemplateWithDraftForViewer()`](../modules/table-viewer/template-runtime.js:50) 去掉 annotated wrapper，并把 advanced customCss 合并到运行时结构。
 
-自定义 CSS 统一走 [`buildScopedCustomCss()`](../modules/table-viewer/template-runtime.js:72)：先调用 [`sanitizeCSS()`](../modules/utils/sanitize.js:1)，再把普通 selector 加上模板 scope；`:root` 会被替换为当前 scope。
+自定义 CSS 统一走 [`buildScopedCustomCss()`](../modules/table-viewer/template-runtime.js:72)：先调用 [`sanitizeCSS()`](../modules/utils/sanitize.js:54)，再把普通 selector 加上模板 scope；`:root` 会被替换为当前 scope。
 
 维护规则：
 
 - 新增专属表类型必须走 special runtime，不要在通用表里塞条件分支。
 - 列表页 patch 依赖 rowKey 和 rowVersion，改 row view model 时要维护版本字段；新增批量操作状态也必须进入对应 patch 计划和 nav/content region，否则标题栏数量或行选择态会停留在旧 DOM。
-- 通用表批量删除只能删除当前可见且未锁定行；搜索、排序、锁状态变化后必须重新计算可选集合，不能把隐藏行或锁定行留在 [`selectedDeleteRowIndexes`](../modules/table-viewer/state.js:417)。
-- 通用表批量删除必须走 [`deleteRowsFromList()`](../modules/table-viewer/row-delete-controller.js:72) 与行级仓库接口，并在成功删除后调用 [`remapTableLockStateAfterRowsDelete()`](../modules/phone-core/data-api/lock-repository.js:159) 一次性重排锁状态；禁止逐个调用单行重排后再叠加索引偏移。
+- 通用表批量删除只能删除当前可见且未锁定行；搜索、排序、锁状态变化后必须重新计算可选集合，不能把隐藏行或锁定行留在 [`selectedDeleteRowIndexes`](../modules/table-viewer/state.js:571)。
+- 通用表批量删除必须走 [`deleteRowsFromList()`](../modules/table-viewer/row-delete-controller.js:97) 与行级仓库接口，并在成功删除后调用 [`remapTableLockStateAfterRowsDelete()`](../modules/phone-core/data-api/lock-repository.js:169) 一次性重排锁状态；禁止逐个调用单行重排后再叠加索引偏移。
 - 通用表新增字段展示能力时，应优先扩展模板 fieldBindings 和 row view model，不要硬编码某个表头。
 - 专属消息表新增字段时，要同步 field reader、message projection、AI prompt 构造、列表/详情渲染和模板默认绑定。
 - 所有数据写入都应经 phone-core data-api 或 chat-support 投影层，不要在 UI 控制器里直接访问宿主全局 API。
@@ -474,22 +517,22 @@ AI 指令预设的 `mediaMarkers.imagePrefix` 与 `mediaMarkers.videoPrefix` 是
 
 ### 6.3 Settings App
 
-- [`renderSettings()`](../modules/settings-app/render.js:79)：设置 App 总入口。
+- [`renderSettings()`](../modules/settings-app/render.js:102)：设置 App 总入口。
 - [`createSettingsAppState()`](../modules/settings-app/state-machine.js:18)：集中定义设置页 state。
 - [`createPageRuntimeManager()`](../modules/settings-app/page-runtime.js:30)：管理每个 mode 的页面 runtime。
-- [`createSettingsPageRenderers()`](../modules/settings-app/page-renderers.js:111)：组合 personalization、dataConfig、editor 三类渲染器。
+- [`createSettingsPageRenderers()`](../modules/settings-app/page-renderers.js:146)：组合 personalization、dataConfig、editor 三类渲染器。
 
 #### 6.3.1 Settings App 渲染主循环
 
-[`renderSettings()`](../modules/settings-app/render.js:79) 的主流程是：创建 state、消费 settings intent、创建 page runtime 管理器、创建 renderer 依赖、执行按 mode 分发的页面渲染。外部路由只需要调用 [`renderSettings()`](../modules/settings-app/render.js:79)，不要直接调用设置页子页面。
+[`renderSettings()`](../modules/settings-app/render.js:102) 的主流程是：创建 state、消费 settings intent、创建 page runtime 管理器、创建 renderer 依赖、执行按 mode 分发的页面渲染。外部路由只需要调用 [`renderSettings()`](../modules/settings-app/render.js:102)，不要直接调用设置页子页面。
 
 页面切换时，设置 App 采用“页面对象 + page runtime”的生命周期模型：
 
-1. [`render()`](../modules/settings-app/render.js:157) 读取 [`state.mode`](../modules/settings-app/state-machine.js:21)。
-2. 若当前页面不能原地更新，则 [`disposeCurrentPageSession()`](../modules/settings-app/render.js:97) 先调用旧页面的 [`dispose()`](../modules/settings-app/render.js:99)，再释放旧 page runtime。
+1. [`render()`](../modules/settings-app/render.js:182) 读取 [`state.mode`](../modules/settings-app/state-machine.js:21)。
+2. 若当前页面不能原地更新，则 [`disposeCurrentPageSession()`](../modules/settings-app/render.js:122) 先调用旧页面的 [`dispose()`](../modules/settings-app/render.js:124)，再释放旧 page runtime。
 3. [`createCurrentPageRuntime()`](../modules/settings-app/page-runtime.js:41) 为新 mode 创建新的 runtime scope。
 4. 页面定义通过 [`createPage()`](../modules/settings-app/page-renderers/data-config-renderers.js:49) / [`createPage()`](../modules/settings-app/page-renderers/editor-renderers.js:39) / [`createPage()`](../modules/settings-app/page-renderers/personalization-renderers.js:43) 返回页面对象。
-5. 页面对象可提供 [`mount()`](../modules/settings-app/render.js:94)、[`update()`](../modules/settings-app/render.js:94)、[`dispose()`](../modules/settings-app/render.js:94) 三类生命周期入口。
+5. 页面对象可提供 [`mount()`](../modules/settings-app/render.js:119)、[`update()`](../modules/settings-app/render.js:119)、[`dispose()`](../modules/settings-app/render.js:119) 三类生命周期入口。
 
 #### 6.3.2 Settings state 契约
 
@@ -498,7 +541,7 @@ AI 指令预设的 `mediaMarkers.imagePrefix` 与 `mediaMarkers.videoPrefix` 是
 - 页面 mode：[`mode`](../modules/settings-app/state-machine.js:21)。
 - 各页面滚动位置：[`databaseScrollTop`](../modules/settings-app/state-machine.js:24)、[`appearanceScrollTop`](../modules/settings-app/state-machine.js:25)、[`beautifyScrollTop`](../modules/settings-app/state-machine.js:26)、[`buttonStyleScrollTop`](../modules/settings-app/state-machine.js:27)、[`apiPromptConfigScrollTop`](../modules/settings-app/state-machine.js:28)。
 - Prompt Editor 状态：[`promptEditorName`](../modules/settings-app/state-machine.js:31)、[`promptEditorContent`](../modules/settings-app/state-machine.js:32)、[`promptEditorIsNew`](../modules/settings-app/state-machine.js:33)、[`promptEditorOriginalName`](../modules/settings-app/state-machine.js:34)。
-- AI 指令预设草稿状态：[`aiInstructionSelectedPresetName`](../modules/settings-app/state-machine.js:37)、[`aiInstructionDraftName`](../modules/settings-app/state-machine.js:38)、[`aiInstructionDraftOriginalName`](../modules/settings-app/state-machine.js:39)、[`aiInstructionDraftImagePrefix`](../modules/settings-app/state-machine.js:40)、[`aiInstructionDraftVideoPrefix`](../modules/settings-app/state-machine.js:41)、[`aiInstructionDraftPromptGroup`](../modules/settings-app/state-machine.js:42)。
+- AI 指令预设草稿状态：[`aiInstructionSelectedPresetName`](../modules/settings-app/state-machine.js:38)、[`aiInstructionDraftName`](../modules/settings-app/state-machine.js:39)、[`aiInstructionDraftOriginalName`](../modules/settings-app/state-machine.js:40)、[`aiInstructionDraftImagePrefix`](../modules/settings-app/state-machine.js:41)、[`aiInstructionDraftVideoPrefix`](../modules/settings-app/state-machine.js:42)、[`aiInstructionDraftPromptGroup`](../modules/settings-app/state-machine.js:43)。
 - API Prompt 与世界书工作台状态：[`worldbookLoading`](../modules/settings-app/state-machine.js:46)、[`worldbookError`](../modules/settings-app/state-machine.js:47)、[`worldbookList`](../modules/settings-app/state-machine.js:48)、[`currentWorldbook`](../modules/settings-app/state-machine.js:49)、[`worldbookSourceMode`](../modules/settings-app/state-machine.js:50)、[`boundWorldbookNames`](../modules/settings-app/state-machine.js:51)、[`worldbookEntries`](../modules/settings-app/state-machine.js:52)、[`worldbookSearchQuery`](../modules/settings-app/state-machine.js:53)。
 
 新增 state 字段时，必须先进入 [`createSettingsAppState()`](../modules/settings-app/state-machine.js:18)，再同步 intent、context builder、页面 renderer 和类型声明。不要在某个页面局部临时塞匿名字段，否则下一次切页、滚动保留或 intent 投影会找不到它。
@@ -514,14 +557,14 @@ AI 指令预设的 `promptGroup[].mainSlot` 是运行时排序协议，不是单
 
 设置页通过 [`draft-helpers.js`](../modules/settings-app/pages/ai-instruction-presets/draft-helpers.js:1) 和 [`template-builders.js`](../modules/settings-app/pages/ai-instruction-presets/template-builders.js:1) 消费共享协议；运行时通过 [`ai-instruction-store.js`](../modules/phone-core/chat-support/ai-instruction-store.js:1) 消费同一协议。新增 C 槽或调整排序时，必须先改 [`ai-instruction-slots.js`](../modules/phone-core/chat-support/ai-instruction-slots.js:1)，再同步 UI 文案、合同脚本与本扩展架构说明，不要修改外部数据库 API 文档 [`reference/API_DOCUMENTATION.md`](reference/API_DOCUMENTATION.md) 来描述本扩展内部协议，也不要在页面或 store 中新增局部硬编码。
 
-AI 指令预设正文支持 `{{placeholderName}}` 形式的运行时占位符。当前实时回复链路只从 [`buildPhoneChatSystemMessages()`](../modules/table-viewer/special/message-viewer-helpers.js:79) 向 [`materializePhoneAiInstructionPresetMessages()`](../modules/phone-core/chat-support/ai-instruction-store.js:735) 传入以下变量：
+AI 指令预设正文支持 `{{placeholderName}}` 形式的运行时占位符。当前实时回复链路只从 [`buildPhoneChatSystemMessages()`](../modules/table-viewer/special/message-viewer-helpers.js:78) 向 [`materializePhoneAiInstructionPresetMessages()`](../modules/phone-core/chat-support/ai-instruction-store.js:726) 传入以下变量：
 
 - `targetCharacterName`：当前聊天目标角色名。
 - `conversationTitle`：当前消息会话标题。
 - `worldbookText`：当前启用的世界书上下文汇总。
 - `storyContext`：正文最近剧情上下文。
 
-[`materializePhoneAiInstructionPresetMessages()`](../modules/phone-core/chat-support/ai-instruction-store.js:735) 会先提取每个片段引用的占位符；只要某个片段引用的任意占位符在本次 variables 中缺失、为 `null`、为空字符串或 trim 后为空，该片段会整段跳过，不会进入最终 AI messages。这个策略是 prompt 协议的一部分，不是 UI 提示文案。新增占位符时，必须同步完成三件事：在实时回复调用链中提供对应变量、在 AI 指令预设页的“可用占位符”说明中列出含义、在占位符合同脚本中增加非空/空值行为验证。否则新增占位符会让整段 prompt 在运行时静默消失，问题表现会很隐蔽。
+[`materializePhoneAiInstructionPresetMessages()`](../modules/phone-core/chat-support/ai-instruction-store.js:726) 会先提取每个片段引用的占位符；只要某个片段引用的任意占位符在本次 variables 中缺失、为 `null`、为空字符串或 trim 后为空，该片段会整段跳过，不会进入最终 AI messages。这个策略是 prompt 协议的一部分，不是 UI 提示文案。新增占位符时，必须同步完成三件事：在实时回复调用链中提供对应变量、在 AI 指令预设页的“可用占位符”说明中列出含义、在占位符合同脚本中增加非空/空值行为验证。否则新增占位符会让整段 prompt 在运行时静默消失，问题表现会很隐蔽。
 
 #### 6.3.4 Page runtime 稳定代理
 
@@ -540,13 +583,13 @@ AI 指令预设正文支持 `{{placeholderName}}` 形式的运行时占位符。
 
 #### 6.3.5 Renderer 分组与依赖注入
 
-[`createSettingsPageRenderers()`](../modules/settings-app/page-renderers.js:111) 先通过 [`validateSettingsRendererDeps()`](../modules/settings-app/page-renderers.js:21) 校验依赖，再构造 services 与 page contexts。页面分为三组：
+[`createSettingsPageRenderers()`](../modules/settings-app/page-renderers.js:146) 先通过 [`validateSettingsRendererDeps()`](../modules/settings-app/page-renderers.js:21) 校验依赖，再构造 services 与 page contexts。页面分为三组：
 
 - Personalization：[`createPersonalizationPageRenderers()`](../modules/settings-app/page-renderers/personalization-renderers.js:16)，包含 home、appearance、button style。
 - Data Config：[`createDataConfigPageRenderers()`](../modules/settings-app/page-renderers/data-config-renderers.js:22)，包含 database、api prompt config、AI instruction presets。
 - Editor：[`createEditorPageRenderers()`](../modules/settings-app/page-renderers/editor-renderers.js:17)，包含 beautify、prompt editor。
 
-[`createSettingsPageContexts()`](../modules/settings-app/page-renderers/page-context-builders.js:253) 是页面上下文聚合入口。各子 context 只暴露页面需要的 service 子集，例如 [`buildDatabasePageContextFromServices()`](../modules/settings-app/page-renderers/page-context-builders.js:139) 暴露数据库配置服务， [`buildAiInstructionPresetsPageContextFromServices()`](../modules/settings-app/page-renderers/page-context-builders.js:183) 暴露 AI 指令预设服务。
+[`createSettingsPageContexts()`](../modules/settings-app/page-renderers/page-context-builders.js:291) 是页面上下文聚合入口。各子 context 只暴露页面需要的 service 子集，例如 [`buildDatabasePageContextFromServices()`](../modules/settings-app/page-renderers/page-context-builders.js:165) 暴露数据库配置服务， [`buildAiInstructionPresetsPageContextFromServices()`](../modules/settings-app/page-renderers/page-context-builders.js:209) 暴露 AI 指令预设服务。
 
 维护规则：
 
@@ -561,26 +604,26 @@ AI 指令预设正文支持 `{{placeholderName}}` 形式的运行时占位符。
 
 Appearance 页面服务统一由 [`appearance-settings.js`](../modules/settings-app/services/appearance-settings.js:1) 聚合，不允许页面直接绕过 facade import 子服务。当前外观页新增两类持久设置：
 
-- [`appearanceResourcePool`](../modules/settings/schema.js:1)：legacy compatibility 字段，仅用于旧设置归一化与旧数据清理；当前外观包导入导出业务不得再读取或写入资源池内容，导入成功后会清空为 `wallpapers: []` 与 `icons: []`。
-- [`appearanceFontLibrary`](../modules/settings/schema.js:1)：保存当前启用字体 id 和用户导入字体列表，内置字体 id 由 [`font-library-service.js`](../modules/settings-app/services/appearance-settings/font-library-service.js:1) 与 schema 白名单共同约束。
+- [`appearanceResourcePool`](../modules/settings/schema.js:124)：legacy compatibility 字段，仅用于旧设置归一化与旧数据清理；当前外观包导入导出业务不得再读取或写入资源池内容，导入成功后会清空为 `wallpapers: []` 与 `icons: []`。
+- [`appearanceFontLibrary`](../modules/settings/schema.js:128)：保存当前启用字体 id 和用户导入字体列表，内置字体 id 由 [`font-library-service.js`](../modules/settings-app/services/appearance-settings/font-library-service.js:1) 与 schema 白名单共同约束。
 
 资源包链路：
 
-1. UI 入口由 [`buildAppearancePageHtml()`](../modules/settings-app/layout/page-builders/appearance-builders.js:9) 输出，事件绑定在 [`bindAppearanceResourcePackActions()`](../modules/settings-app/pages/appearance.js:77)。
-2. 导入导出实现位于 [`resource-pack-service.js`](../modules/settings-app/services/appearance-settings/resource-pack-service.js:1)，格式常量为 `yuzi-phone-appearance-pack`；导出只包含当前 [`backgroundImage`](../modules/settings/schema.js:1) 与当前 [`appIcons`](../modules/settings/schema.js:1)，`iconPool` 仅保留为空数组兼容旧格式。
-3. 图标位枚举必须复用 [`collectAppearanceIconSlots()`](../modules/settings-app/services/appearance-settings/icon-slots.js:1)，不要在资源包服务和图标上传 UI 中各写一套 key 枚举。
+1. UI 入口由 [`buildAppearancePageHtml()`](../modules/settings-app/layout/page-builders/appearance-builders.js:27) 输出，事件绑定在 [`bindAppearanceResourcePackActions()`](../modules/settings-app/pages/appearance.js:199)。
+2. 导入导出实现位于 [`resource-pack-service.js`](../modules/settings-app/services/appearance-settings/resource-pack-service.js:1)，格式常量为 `yuzi-phone-appearance-pack`；导出只包含当前 [`backgroundImage`](../modules/settings/schema.js:107) 与当前 [`appIcons`](../modules/settings/schema.js:108)，`iconPool` 仅保留为空数组兼容旧格式。
+3. 图标位枚举必须复用 [`collectAppearanceIconSlots()`](../modules/settings-app/services/appearance-settings/icon-slots.js:43)，不要在资源包服务和图标上传 UI 中各写一套 key 枚举。
 4. 图标导入先全局按资源项 `name` 与当前图标位 `name` 精准匹配并锁定所有完全同名图标位；剩余图标再按名称相似度打分，从高到低匹配剩余图标位；仍未命中的图标按剩余图标位顺序补位，直到当前图标位填满或美化包图标耗尽。`slotKey` 只作为历史字段保留，不参与导入分配。
-5. 导入使用替换语义写入 [`appIcons`](../modules/settings/schema.js:1)：分配成功的图标写入当前 slot 的真实 key，包内多余图标直接丢弃，包内图标不足的位置不保留旧图标，首页自然回退默认文字图标。
-6. 导入保存使用 [`savePhoneSettingsPatch()`](../modules/settings/persistence.js:161) 的布尔返回值判断是否成功；失败时必须回滚旧 [`backgroundImage`](../modules/settings/schema.js:1)、[`appIcons`](../modules/settings/schema.js:1) 与 legacy [`appearanceResourcePool`](../modules/settings/schema.js:1)。
+5. 导入使用替换语义写入 [`appIcons`](../modules/settings/schema.js:108)：分配成功的图标写入当前 slot 的真实 key，包内多余图标直接丢弃，包内图标不足的位置不保留旧图标，首页自然回退默认文字图标。
+6. 导入保存使用 [`savePhoneSettingsPatch()`](../modules/settings/persistence.js:171) 的布尔返回值判断是否成功；失败时必须回滚旧 [`backgroundImage`](../modules/settings/schema.js:107)、[`appIcons`](../modules/settings/schema.js:108) 与 legacy [`appearanceResourcePool`](../modules/settings/schema.js:124)。
 
 美化包仓库链路：
 
-1. settings 只保存轻量激活标记 [`appearanceActivePackId`](../modules/settings/schema.js:1)，不保存多个完整外观包；该字段由 schema 归一化为最长 160 字符的字符串。
+1. settings 只保存轻量激活标记 [`appearanceActivePackId`](../modules/settings/schema.js:122)，不保存多个完整外观包；该字段由 schema 归一化为最长 160 字符的字符串。
 2. 本地仓库由 [`appearance-pack-repository.js`](../modules/settings-app/services/appearance-settings/appearance-pack-repository.js:1) 封装，使用独立 IndexedDB 数据库 `yuzi-phone-appearance-packs`、object store `appearancePacks`、`keyPath: 'id'`。
 3. 仓库容量边界固定为最多 20 个包、单包 20MB、总量 100MB；写入前会校验外观包格式、数量、单包容量和总容量，IndexedDB quota/access/unknown 错误会被结构化返回。
-4. [`listAppearancePacks()`](../modules/settings-app/services/appearance-settings/appearance-pack-repository.js:212) 只返回 metadata，不把完整 `pack` 复制给 UI；完整包只在应用时通过 [`getAppearancePack()`](../modules/settings-app/services/appearance-settings/appearance-pack-repository.js:227) 读取。
+4. [`listAppearancePacks()`](../modules/settings-app/services/appearance-settings/appearance-pack-repository.js:219) 只返回 metadata，不把完整 `pack` 复制给 UI；完整包只在应用时通过 [`getAppearancePack()`](../modules/settings-app/services/appearance-settings/appearance-pack-repository.js:234) 读取。
 5. 页面只能通过 [`appearance-settings.js`](../modules/settings-app/services/appearance-settings.js:1) facade 暴露的 `importAppearancePackToRepository()`、`listAppearancePacks()`、`applyAppearancePackFromRepository()` 与 `deleteAppearancePackFromRepository()` 操作仓库，不允许页面裸用 IndexedDB。
-6. 导入 JSON 美化包只保存到仓库，不自动应用；应用仓库包时才写入当前 [`backgroundImage`](../modules/settings/schema.js:1)、[`appIcons`](../modules/settings/schema.js:1)，并更新 `appearanceActivePackId`。
+6. 导入 JSON 美化包只保存到仓库，不自动应用；应用仓库包时才写入当前 [`backgroundImage`](../modules/settings/schema.js:107)、[`appIcons`](../modules/settings/schema.js:108)，并更新 `appearanceActivePackId`。
 7. 删除当前激活仓库包只清空 `appearanceActivePackId`，不清空当前已应用的 `backgroundImage` 或 `appIcons`。删除备份不等于撤销当前外观，这条边界别写反。
 
 图片上传与裁剪链路：
@@ -588,26 +631,31 @@ Appearance 页面服务统一由 [`appearance-settings.js`](../modules/settings-
 1. 背景图、自定义 App 图标、悬浮按钮封面等图片上传入口必须统一走 [`media-upload.js`](../modules/settings-app/services/media-upload.js:1) façade；页面和业务服务不得绕过 façade 直接拼接 FileReader、canvas 或裁剪 DOM。
 2. 裁剪弹窗实现位于 [`crop.js`](../modules/settings-app/services/media-upload/crop.js:1)，由 [`picker.js`](../modules/settings-app/services/media-upload/picker.js:1) 在读取图片后调用；弹窗挂载到 `document.body`，是全局 modal，不是小手机内部弹窗。
 3. 裁剪 overlay 层级必须高于小手机容器 `9991` 与悬浮按钮 `10000`；当前样式在 [`08-image-crop.css`](../styles/phone-base/08-image-crop.css:1) 固定为 `z-index: 10020`。这里如果降回普通设置页层级，手机端会再次被小手机和 toggle 遮住，漏洞明显得像是故意写给事故看的。
-4. [`openImageCropDialog()`](../modules/settings-app/services/media-upload/crop.js:207) 支持 `showCropFullImageButton?: boolean` 与 `cropFullImageButtonText?: string`；`showCropFullImageButton` 默认启用，点击 `全图` 将裁剪框设置为整张图片归一化区域 `{ x: 0, y: 0, w: 1, h: 1 }`。
+4. [`openImageCropDialog()`](../modules/settings-app/services/media-upload/crop.js:245) 支持 `showCropFullImageButton?: boolean` 与 `cropFullImageButtonText?: string`；`showCropFullImageButton` 默认启用，点击 `全图` 将裁剪框设置为整张图片归一化区域 `{ x: 0, y: 0, w: 1, h: 1 }`。
 5. 上传链路的异步节点必须检查生命周期：FileReader 读取后、裁剪弹窗返回后、压缩 canvas 返回后，都要通过 `runtime/pageRuntime.isDisposed()` 短路；页面销毁后继续压缩、弹窗或触发保存回调，都是状态污染。
 
 
 字体库链路：
 
 1. 字体视图模型、导入、选择、删除和运行时应用集中在 [`font-library-service.js`](../modules/settings-app/services/appearance-settings/font-library-service.js:1)。
-2. [`appearanceFontLibrary`](../modules/settings/schema.js:1) 同时承载两类用户字体来源：本地 `data-url` 字体保存 `dataUrl` 并计入本地容量；远程 `css-url` 字体只保存 `cssUrl` 与 `family`，固定 `bytes: 0`，不下载、不缓存远程 CSS 或字体文件，也不把远程资源改写成 data URL。
+2. [`appearanceFontLibrary`](../modules/settings/schema.js:128) 同时承载两类用户字体来源：本地 `data-url` 字体保存 `dataUrl` 并计入本地容量；远程 `css-url` 字体只保存 `cssUrl` 与 `family`，固定 `bytes: 0`，不下载、不缓存远程 CSS 或字体文件，也不把远程资源改写成 data URL。
 3. `css-url` 来源只允许 `https://...` 字体 CSS URL；`http://`、相对路径、`javascript:`、`file:`、`data:`、`blob:` 与任意 CSS 片段都不在支持范围内。这里的边界必须由 schema 与 service 双层维持，不能只靠 UI 提示碰运气。
-4. 运行时动态样式顺序固定为：远程字体 `@import` 列表 → `buildBuiltinFontFaceCss(activeFont)` → 本地用户字体 `@font-face` 列表 → [`buildScopedFontOverrideCss(activeFont)`](../modules/settings-app/services/appearance-settings/font-library-service.js:1)。`@import` 必须位于动态 style 顶部，早于任何 `@font-face`，否则浏览器会安静地把错误顺序当成你自找的故障。
+4. 运行时动态样式顺序固定为：远程字体 `@import` 列表 → `buildBuiltinFontFaceCss(activeFont)` → 本地用户字体 `@font-face` 列表 → [`buildScopedFontOverrideCss(activeFont)`](../modules/settings-app/services/appearance-settings/font-library-service.js:217)。`@import` 必须位于动态 style 顶部，早于任何 `@font-face`，否则浏览器会安静地把错误顺序当成你自找的故障。
 5. 作用域字体应用继续通过动态 `@font-face` / `@import` 与 [`--yuzi-phone-font-family`](../styles/phone-base/01-shell-system.css:1) 注入，并用 `#yuzi-phone-standalone[data-yuzi-phone-font-id]` 作用域规则压过 SillyTavern 主题字体；不允许把用户提供的任意 CSS（例如 `body { font-family: ... }`）原样注入到全局页面。
 6. 本地用户字体容量限制已提升为单文件 15MB、总计 30MB；远程 `css-url` 字体仍计入 `userFonts` 数量上限 `12`，但不占用本地 `totalFontBytes`。别把“数量限制”和“本地字节容量”混为一谈，那会直接把 schema 和 UI 说明写坏。
 7. 内置字体入口固定为 `builtin.system-ui`、`builtin.modern-sans`、`builtin.chill-round`、`builtin.basic-sans`；`builtin.chill-round` 的 ChillRoundF OTF 文件只从 [`assets/fonts/chill-round-f/`](../assets/fonts/chill-round-f/) 正式资源目录加载，不依赖临时解压目录。
 8. ChillRoundF 使用 SIL Open Font License 1.1，发布包必须保留 [`LICENSE.txt`](../assets/fonts/chill-round-f/LICENSE.txt)；不要把 `ChillRoundF_Update.pdf` 或 `.ttf` 文件放进运行资源，也不要擅自转换 `woff2` 制造派生字体风险。
 9. 旧内置 ID（`builtin.system`、`builtin.rounded`、`builtin.serif`、`builtin.handwriting`）不做迁移映射；旧设置或非法 `activeFontId` 由 `normalizeAppearanceFontLibrarySettings()` 回退到 `builtin.system-ui`。这不是兼容遗漏，而是避免书面型/手写型旧语义继续污染当前 UI 字体库。
-10. 字体选择、本地字体导入、URL 字体导入、字体删除和资源包导入成功后的重渲染都应走 [`rerenderAppearanceKeepScroll`](../modules/settings-app/render.js:201)，异步 FileReader 回调必须先检查 [`pageRuntime.isDisposed()`](../modules/settings-app/page-runtime.js:118)。这里如果裸调用 `render()`，设置页回顶和销毁后 DOM 写入会一起回来，能跑但不能交付。
+10. 字体选择、本地字体导入、URL 字体导入、字体删除和资源包导入成功后的重渲染都应走 [`rerenderAppearanceKeepScroll`](../modules/settings-app/render.js:219)，异步 FileReader 回调必须先检查 [`pageRuntime.isDisposed()`](../modules/settings-app/page-runtime.js:118)。这里如果裸调用 `render()`，设置页回顶和销毁后 DOM 写入会一起回来，能跑但不能交付。
 
 ### 6.4 Beautify 模板系统
 
-Beautify 模板系统负责把“某张表使用什么视觉模板、字段绑定和布局 token”统一封装，避免 Table Viewer 在渲染阶段直接硬编码每张表的样式规则。产品端的“模板工坊”已经退役模板管理能力，现在只提供用户主动确认的“恢复内置默认”操作。
+Beautify 现在包含两套职责严格隔离的系统：
+
+1. 旧 [`phone-beautify-templates`](../modules/phone-beautify-templates/) 继续负责内置模板与历史用户配置的兼容读取；旧用户写入 API 保持禁用，旧数据不得被新工坊迁移、覆盖或删除。
+2. 新 [`content-presets`](../modules/content-presets/) 负责玉子美化完整预设、独立 IndexedDB、真实表匹配、动态运行实例与模板工坊操作。产品端“模板工坊”只写入新数据库，不得重新连接旧 Beautify store。
+
+两套系统可以同时存在于 Table Viewer 的分派链中，但存储、写入、绑定和页面管理入口不得混用。
 
 #### 6.4.1 内置默认与历史兼容
 
@@ -632,7 +680,7 @@ Beautify 模板系统负责把“某张表使用什么视觉模板、字段绑�
 
 [`getBeautifyTemplateSourceModeRuntime()`](../modules/phone-beautify-templates/repository.js:329) 继续支持历史 `user` source mode：有用户模板时读取用户模板，没有时回退内置模板。不要把“产品端禁写”误实现成 matcher 或 repository 禁读，否则旧用户会在没有确认的情况下丢失外观。
 
-#### 6.4.3 用户写入退役策略
+#### 6.4.3 旧 Beautify 用户写入退役策略
 
 稳定错误码由 [`policy.js`](../modules/phone-beautify-templates/policy.js:1) 定义为 `BEAUTIFY_USER_TEMPLATE_WRITE_DISABLED`。以下兼容 API 保留函数签名，但只返回统一拒绝结果，不再写 settings 或失效缓存：
 
@@ -644,98 +692,113 @@ Beautify 模板系统负责把“某张表使用什么视觉模板、字段绑�
 - `bindSheetToBeautifyTemplate()`
 - `clearSheetBeautifyBinding()`
 
-底层 [`saveTemplateStore()`](../modules/phone-beautify-templates/store.js:86) 没有删除，因为历史读取归一化和受控系统维护仍依赖 store 模型；它不是产品端重新开放用户模板管理的许可。只读导出函数也不再出现在模板工坊页面。
+底层 [`saveTemplateStore()`](../modules/phone-beautify-templates/store.js:86) 没有删除，因为历史读取归一化和受控系统维护仍依赖 store 模型；它不是产品端重新开放旧用户模板管理的许可。新模板工坊的导入导出由 `content-presets` 独立实现，不得调用旧 import/export API。
 
-#### 6.4.4 恢复内置默认用例
+#### 6.4.4 旧 Beautify 恢复内置默认兼容 API
 
-唯一允许的产品清理写路径是 [`restorePhoneBeautifyTemplatesToBuiltinDefaults()`](../modules/phone-beautify-templates/reset.js:76)。它只调用一次 `savePhoneSettingsPatch()`，把五类设置同时收敛为：
+[`restorePhoneBeautifyTemplatesToBuiltinDefaults()`](../modules/phone-beautify-templates/reset.js:76) 作为旧系统的受控兼容清理 API 保留，但不再是当前模板工坊页面入口。它只调用一次 `savePhoneSettingsPatch()`，把五类旧设置同时收敛为：
 
 - store：`templates=[]`、`bindings={}`；
 - special/generic source mode：`builtin`；
 - special active map：精确等于 `{ special_message: 'builtin.special.message.v1' }`；
 - generic active：`builtin.generic.table.v1`。
 
-写入成功后用例统一调用 [`invalidatePhoneBeautifyTemplateCache()`](../modules/phone-beautify-templates/cache.js:121)，并回读原始 settings、规范化 store、source runtime 和两个 matcher。任一验证失败都返回失败结果，页面不得显示成功；固定目标允许用户幂等重试。这里的 settings patch 只表示内存设置已更新并已调度宿主保存，不得声称获得磁盘事务 durability ack。
+写入成功后用例统一调用 [`invalidatePhoneBeautifyTemplateCache()`](../modules/phone-beautify-templates/cache.js:121)，并回读原始 settings、规范化 store、source runtime 和两个 matcher。任一验证失败都返回失败结果；固定目标允许调用方幂等重试。这里的 settings patch 只表示内存设置已更新并已调度宿主保存，不得声称获得磁盘事务 durability ack。
 
 #### 6.4.5 模板工坊页面
 
-[`beautify.js`](../modules/settings-app/pages/beautify.js:1) 不再查询模板全集或 active 状态，不再依赖 FileReader、下载、模板列表 ViewModel 或导入导出模块。页面只保留标题、返回、说明和 `#phone-beautify-restore-defaults-btn`。点击后由 [`beautify-behavior.js`](../modules/settings-app/pages/beautify-behavior.js:1) 显示不可逆二次确认，执行期间使用锁阻止并发恢复，失败后释放按钮允许重试。
+[`beautify.js`](../modules/settings-app/pages/beautify.js:1) 通过注入的 [`contentPresetWorkshopService`](../modules/content-presets/workshop-service.js:47) 读取预设 ViewModel、真实表候选与当前绑定，并订阅 content preset index 更新。页面生命周期负责重渲染、取消旧交互、解除订阅和阻止销毁后的异步提交。
+
+[`beautify-behavior.js`](../modules/settings-app/pages/beautify-behavior.js:1) 使用容器级 `[data-action]` 事件委托提供：
+
+- `import`：读取 `.yuzi-beautify.json`，调用 `prepareImport()`；同 ID 覆盖必须二次确认，再由 `importPrepared()` 原子替换并清除旧绑定。
+- `export`：调用 `exportPreset()` 下载完整 Bundle。
+- `delete`：二次确认后调用 `deletePreset()`，在同一事务删除预设和所有引用绑定。
+- `activate` / `clear`：设置或清除单张真实表的当前预设项。
+- `clear-all`：清除全部新工坊表级绑定，但保留已导入预设。
+
+执行期间使用页面级 busy 锁阻止重复提交；失败后必须释放按钮以允许重试；页面销毁后不得继续 toast、刷新或提交旧回调。页面不得出现旧 `phone-beautify-restore-defaults-btn`，也不得导入 `phone-beautify-templates/`。
+
+新写入链固定为 `beautify page → contentPresetWorkshopService → mutation-coordinator → content-presets/repository`。repository 只有在 IndexedDB transaction `oncomplete` 后才报告成功；提交后再更新内存索引、失效运行实例并收敛当前路由。
 
 维护规则：
 
 - 启动阶段只允许 [`repairActiveBeautifyTemplateSettings()`](../modules/phone-beautify-templates/repository.js:290) 修复无效 active 引用，禁止调用恢复用例或强制清理有效历史用户配置。
 - 恢复只清 store 的表级 `bindings`，绝不能删除内置模板的 `render.fieldBindings`。
+- 新工坊覆盖、删除或清绑定只允许修改 `yuzi-phone-template-workshop`，不得写入旧 `yuziPhoneBeautifyTemplates` settings。
 - 不在 Table Viewer 内复制第二套模板选择或默认渲染架构。
-- 本次边界不包含 Theater、`tables/sources/**`、`tables/generated/**` 或 Fusion；消息记录表是 `special_message` Table Viewer 路径，不得笼统称为“小剧场模板”。
+- 消息记录表不得成为 content preset item 的激活目标；`table-generic:<sheetKey>` 永久旁路新预设查询。Theater、Generic、Special 运行失败时必须精确回到各自原 renderer，不得互相降级。
 
 ### 6.5 Fusion 模板缝合
 
 - [`renderFusion()`](../modules/phone-fusion/render.js:80)：页面入口。
-- [`createFusionPageRuntime()`](../modules/phone-fusion/runtime.js:36)：页面 runtime 与下载 URL 清理。
-- [`createFusionInteractionController()`](../modules/phone-fusion/interactions.js:16)：交互控制器。
+- [`createFusionPageRuntime()`](../modules/phone-fusion/runtime.js:40)：页面 runtime 与下载 URL 清理。
+- [`createFusionInteractionController()`](../modules/phone-fusion/interactions.js:87)：交互控制器。
 
 维护规则：
 
 - Object URL 必须通过 [`revokeFusionDownloadUrl()`](../modules/phone-fusion/runtime.js:7) 清理。
-- 页面切换前必须走 [`cleanupFusionPageResources()`](../modules/phone-fusion/runtime.js:23)。
-- [`setFusionDownloadUrl()`](../modules/phone-fusion/runtime.js:19) 设置新下载 URL 前会 revoke 旧 URL；空合并分支在写入空结果前调用 [`clearFusionResult()`](../modules/phone-fusion/runtime.js:99)，避免旧下载入口和 Object URL 泄漏。该行为由 [`scripts/check-fusion-object-url-behavior.cjs`](../scripts/check-fusion-object-url-behavior.cjs) 守护。
+- 页面切换前必须走 [`cleanupFusionPageResources()`](../modules/phone-fusion/runtime.js:27)。
+- [`setFusionDownloadUrl()`](../modules/phone-fusion/runtime.js:19) 设置新下载 URL 前会 revoke 旧 URL；空合并分支在写入空结果前调用 [`clearFusionResult()`](../modules/phone-fusion/runtime.js:114)，避免旧下载入口和 Object URL 泄漏。该行为由 [`scripts/check-fusion-object-url-behavior.cjs`](../scripts/check-fusion-object-url-behavior.cjs) 守护。
 - 新增 Fusion 输出路径必须继续覆盖“先有旧 URL、再生成空结果”的行为测试，不能只验证成功合并路径。
+- 模板导入结果只接受旧版布尔 `true` 或普通对象且 `success === true`；`{ success:false, message }` 必须按真实失败透传，null、undefined、数组、字符串和缺少严格 success 的对象必须拒绝。
+- 导入成功提示优先使用底层 `message`；底层未提供时再使用 scope 与 presetName 生成本地文案。Fusion 不拥有数据库投影刷新职责。
 
-### 6.5 Theater 小剧场
+### 6.6 Theater 小剧场
 
 Theater 是“把表格数据投影成场景页面”的子系统。它不是 Table Viewer 的换皮，也不是给每张表单独写页面分支；它通过 scene registry 把一张或多张固定表组合成一个虚拟 App，并通过 `theater:` 路由进入对应场景。当前内置 `square` / `forum` / `live` / `calendar` / `diary` 均为单表 scene，但架构仍保留未来扩展多表 scene 的能力。
 
 核心入口：
 
 - [`renderTheaterScene()`](../modules/phone-theater/render.js:118)：场景页面入口，负责读取当前场景状态、拉取 raw table data、构建 view model、生成页面 HTML 并绑定交互。
-- [`buildTheaterSceneViewModel()`](../modules/phone-theater/data.js:117)：把 raw data 和 scene definition 转成渲染用 view model。
-- [`bindTheaterSceneInteractions()`](../modules/phone-theater/interactions.js:195)：绑定通用删除管理态，并把 scene 专属交互委托给 scene definition。
-- [`deleteTheaterEntities()`](../modules/phone-theater/delete-service.js:72)：执行跨表级联删除计划，调用 [`deleteTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:529) 做行级批量删除，随后刷新投影并派发表更新事件。
+- [`buildTheaterSceneViewModel()`](../modules/phone-theater/data.js:151)：把 raw data 和 scene definition 转成渲染用 view model。
+- [`bindTheaterSceneInteractions()`](../modules/phone-theater/interactions.js:408)：绑定通用删除管理态，并把 scene 专属交互委托给 scene definition。
+- [`deleteTheaterEntities()`](../modules/phone-theater/delete-service.js:341)：执行跨表级联删除计划，调用 [`deleteTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:1008) 做行级批量删除，等待底层真实 settlement，再派发小手机本地 UI 更新事件。
 - [`theaterRenderKit`](../modules/phone-theater/core/render-kit.js:62)：提供 scene 渲染共享 helper，例如转义、标签、meta line、删除选择按钮。
 - 场景扩展规范参考 [`theater-scene-extension-spec.md`](reference/theater-scene-extension-spec.md:1)。
 
-#### 6.5.1 scene registry 与路由
+#### 6.6.1 scene registry 与路由
 
-scene registry 位于 [`modules/phone-theater/scenes/index.js`](../modules/phone-theater/scenes/index.js:1)。注册表当前聚合内置 scene：[`squareScene`](../modules/phone-theater/scenes/square.js:189)、[`forumScene`](../modules/phone-theater/scenes/forum.js:273)、[`liveScene`](../modules/phone-theater/scenes/live.js:322)、[`calendarScene`](../modules/phone-theater/scenes/calendar.js:245)、[`diaryScene`](../modules/phone-theater/scenes/diary.js:245)。
+scene registry 位于 [`modules/phone-theater/scenes/index.js`](../modules/phone-theater/scenes/index.js:1)。注册表当前聚合内置 scene：[`squareScene`](../modules/phone-theater/scenes/square.js:232)、[`forumScene`](../modules/phone-theater/scenes/forum.js:158)、[`liveScene`](../modules/phone-theater/scenes/live.js:354)、[`calendarScene`](../modules/phone-theater/scenes/calendar.js:365)、[`diaryScene`](../modules/phone-theater/scenes/diary.js:294)。
 
 注册流程：
 
-1. [`RAW_THEATER_SCENES`](../modules/phone-theater/scenes/index.js:7) 收集原始 scene definition。
-2. [`normalizeSceneDefinition()`](../modules/phone-theater/scenes/index.js:44) 补齐并校验 `id`、`appKey`、`route`、`tables`、`primaryTableRole`、hook 等字段。
-3. [`buildRegistry()`](../modules/phone-theater/scenes/index.js:89) 构建按 `id`、`appKey`、`route`、`tableName` 查询的索引，并强制唯一。
-4. [`buildTheaterRoute()`](../modules/phone-theater/scenes/index.js:24) 生成 `theater:${id}` 路由；[`isTheaterRoute()`](../modules/phone-theater/scenes/index.js:29) 用于路由识别。
+1. [`RAW_THEATER_SCENES`](../modules/phone-theater/scenes/index.js:9) 收集原始 scene definition。
+2. [`normalizeSceneDefinition()`](../modules/phone-theater/scenes/index.js:67) 补齐并校验 `id`、`appKey`、`route`、`tables`、`primaryTableRole`、hook 等字段。
+3. [`buildRegistry()`](../modules/phone-theater/scenes/index.js:114) 构建按 `id`、`appKey`、`route`、`tableName` 查询的索引，并强制唯一。
+4. [`buildTheaterRoute()`](../modules/phone-theater/scenes/index.js:28) 生成 `theater:${id}` 路由；[`isTheaterRoute()`](../modules/phone-theater/scenes/index.js:33) 用于路由识别。
 
 注册表公开查询函数：
 
-- [`getTheaterSceneDefinition()`](../modules/phone-theater/scenes/index.js:126)：按 scene id 查询。
-- [`getTheaterSceneDefinitionByAppKey()`](../modules/phone-theater/scenes/index.js:131)：按首页虚拟 app key 查询。
-- [`getTheaterSceneDefinitionByRoute()`](../modules/phone-theater/scenes/index.js:135)：按路由查询。
-- [`getTheaterSceneDefinitionByTableName()`](../modules/phone-theater/scenes/index.js:139)：按真实表名反查 scene。
-- [`getTheaterChildTableNames()`](../modules/phone-theater/scenes/index.js:143)：列出所有被 theater 接管的表名。
+- [`getTheaterSceneDefinition()`](../modules/phone-theater/scenes/index.js:151)：按 scene id 查询。
+- [`getTheaterSceneDefinitionByAppKey()`](../modules/phone-theater/scenes/index.js:156)：按首页虚拟 app key 查询。
+- [`getTheaterSceneDefinitionByRoute()`](../modules/phone-theater/scenes/index.js:160)：按路由查询。
+- [`getTheaterSceneDefinitionByTableName()`](../modules/phone-theater/scenes/index.js:164)：按真实表名反查 scene。
+- [`getTheaterChildTableNames()`](../modules/phone-theater/scenes/index.js:168)：列出所有被 theater 接管的表名。
 
 维护规则：
 
-- 新增 scene 必须加入 [`RAW_THEATER_SCENES`](../modules/phone-theater/scenes/index.js:7)，不要在路由渲染器、数据层或模板层加 scene id 分支。把分支塞进核心层，漏洞明显得像是故意写给事故看的。
+- 新增 scene 必须加入 [`RAW_THEATER_SCENES`](../modules/phone-theater/scenes/index.js:9)，不要在路由渲染器、数据层或模板层加 scene id 分支。把分支塞进核心层，漏洞明显得像是故意写给事故看的。
 - `id`、`appKey`、`route`、真实表名必须全局唯一；同一真实表不能同时属于两个 scene。
 - `appKey` 是首页虚拟 App 的标识，不能与真实 sheetKey 混用。
 
-#### 6.5.2 scene definition 契约
+#### 6.6.2 scene definition 契约
 
 每个 scene definition 是冻结对象，至少应包含：
 
 - `id`：scene 唯一标识，会映射到 `theater:${id}`。
 - `appKey`：Home 主屏使用的虚拟 App key。
 - `name`、`title`、`subtitle`、`emptyText`、`iconText`、`iconColors`、`orderNo`：展示元数据。
-- `styleScope`：写入页面根节点 [`data-theater-style-scope`](../modules/phone-theater/templates.js:43)。
+- `styleScope`：写入页面根节点 [`data-theater-style-scope`](../modules/phone-theater/templates.js:96)。
 - `primaryTableRole`：主表 role，决定 scene 是否可用。
 - `tables`：role 到真实表名的映射。
 - `fieldSchema`：字段身份与外键说明，用于文档、契约检查和维护者理解。
 - `contract`：样式文件与关键 class 契约。
-- [`buildViewModel`](../modules/phone-theater/scenes/square.js:11)：把 resolved tables 转成 scene 内容模型。
-- [`collectDeletableKeys`](../modules/phone-theater/scenes/square.js:75)：返回当前页面所有可删除实体的 typed delete key。
-- [`deleteEntities`](../modules/phone-theater/scenes/square.js:159)：按 scene 业务关系删除主表实体并级联附表。
-- [`renderContent`](../modules/phone-theater/scenes/square.js:149)：只渲染 scene 内容区，不渲染导航栏、删除管理条或页面根节点。
-- 可选 [`bindInteractions`](../modules/phone-theater/scenes/live.js:313)：绑定 scene 专属交互。
+- [`buildViewModel`](../modules/phone-theater/scenes/square.js:98)：把 resolved tables 转成 scene 内容模型。
+- [`collectDeletableKeys`](../modules/phone-theater/scenes/square.js:124)：返回当前页面所有可删除实体的 typed delete key。
+- [`deleteEntities`](../modules/phone-theater/scenes/square.js:219)：按 scene 自身业务关系收集逐表删除计划；当前 `square` 只收集 `posts` 主表计划。
+- [`renderContent`](../modules/phone-theater/scenes/square.js:209)：只渲染 scene 内容区，不渲染导航栏、删除管理条或页面根节点。
+- 可选 [`bindInteractions`](../modules/phone-theater/scenes/live.js:345)：绑定 scene 专属交互。
 
 当前内置 scene 的表组合：
 
@@ -749,11 +812,11 @@ scene registry 位于 [`modules/phone-theater/scenes/index.js`](../modules/phone
 
 维护规则：
 
-- `renderContent` 只能返回内容区 HTML；核心 shell 属于 [`buildTheaterScenePageHtml()`](../modules/phone-theater/templates.js:38)。
-- 用户数据进入 HTML 前必须使用 [`escapeHtml`](../modules/utils/dom-escape.js:1) 或 [`escapeHtmlAttr`](../modules/utils/dom-escape.js:10)。
-- 辅助表缺失时 scene 应降级为空数组；主表缺失由 [`resolveTheaterSceneTables()`](../modules/phone-theater/data.js:36) 判定 scene 不可用。
+- `renderContent` 只能返回内容区 HTML；核心 shell 属于 [`buildTheaterScenePageHtml()`](../modules/phone-theater/templates.js:91)。
+- 用户数据进入 HTML 前必须使用 [`escapeHtml`](../modules/utils/dom-escape.js:36) 或 [`escapeHtmlAttr`](../modules/utils/dom-escape.js:54)。
+- 辅助表缺失时 scene 应降级为空数组；主表缺失由 [`resolveTheaterSceneTables()`](../modules/phone-theater/data.js:34) 判定 scene 不可用。
 
-#### 6.5.3 表索引与 view model 构建
+#### 6.6.3 表索引与 view model 构建
 
 Theater 数据流固定为：
 
@@ -778,7 +841,7 @@ table descriptor 包含 `sheetKey`、`tableName`、`sheet`、`headers`、`rows`�
 - [`resolveRowIdentity()`](../modules/phone-theater/core/table-index.js:72)：按身份字段生成主实体 identity。
 - [`splitSemicolonText()`](../modules/phone-theater/core/table-index.js:62)：把分号分隔文本转成列表。
 
-[`buildTheaterSceneViewModel()`](../modules/phone-theater/data.js:117) 会把 helpers 冻结后传给 scene，并返回统一结构：
+[`buildTheaterSceneViewModel()`](../modules/phone-theater/data.js:151) 会把 helpers 冻结后传给 scene，并返回统一结构：
 
 - `available`：scene 是否有可用主表。
 - `scene`：标准化后的 scene definition。
@@ -794,9 +857,9 @@ table descriptor 包含 `sheetKey`、`tableName`、`sheet`、`headers`、`rows`�
 - scene 的跨表关联应在 `buildViewModel` 阶段完成，渲染阶段只消费已经归并好的对象。
 - 如果新增场景依赖非唯一外键，必须在 `fieldSchema` 和参考规范中写明限制。你现在缺的不是排版，是事实；这种约束不写，后续 AI 会把非唯一字段当唯一键用。
 
-#### 6.5.4 删除管理态与级联删除契约
+#### 6.6.4 删除管理态与级联删除契约
 
-页面删除 UI 状态保存在 container 私有字段 [`__phoneTheaterSceneState`](../modules/phone-theater/render.js:22)，核心字段包括：
+页面删除 UI 状态保存在 container 私有字段 [`__phoneTheaterSceneState`](../modules/phone-theater/render.js:62)，核心字段包括：
 
 - `sceneId`
 - `deleteManageMode`
@@ -826,16 +889,17 @@ sequenceDiagram
   Service->>Scene: deleteEntities context with deletion tracker
   Scene-->>Service: removed count and row-index deletion plans
   Service->>Data: deleteTableRowsBatch per affected table
-  Service->>Data: refresh projection and dispatch updates
+  Data-->>Service: 返回逐表删除 settlement
+  Service-->>UI: 派发小手机本地表更新事件
 ```
 
-[`deleteTheaterEntities()`](../modules/phone-theater/delete-service.js:72) 会读取当前 rawData，构建 table index，并把 `filterTableRows`、`buildDeleteTargets`、`hasDeleteTarget` 等 helper 注入 scene 的 [`deleteEntities`](../modules/phone-theater/scenes/square.js:159)。scene 只负责根据业务关系标记哪些主表行和附表行需要删除；[`createDeletionPlanTracker()`](../modules/phone-theater/delete-service.js:24) 汇总每张表的 UI rowIndex 删除计划，保存执行由 delete service 统一转换为 [`deleteTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:529) 行级删除。这里禁止回退到整表快照保存，运行时全量覆盖会绕过 mutation queue 并污染其他表的并发写入状态。
+[`deleteTheaterEntities()`](../modules/phone-theater/delete-service.js:341) 会读取当前 rawData，构建 table index，并把 `filterTableRows`、`buildDeleteTargets`、`hasDeleteTarget` 等 helper 注入 scene 的 [`deleteEntities`](../modules/phone-theater/scenes/square.js:219)。scene 只负责根据自身业务关系标记逐表待删行；当前 `square` 只收集 `posts` 主表计划，不创建附表计划。[`createDeletionPlanTracker()`](../modules/phone-theater/delete-service.js:24) 汇总每张表的 UI rowIndex 删除计划，保存执行由 delete service 统一转换为 [`deleteTableRowsBatch()`](../modules/phone-core/data-api/table-repository.js:1008) 行级删除。这里禁止回退到整表快照保存，运行时全量覆盖会绕过 mutation queue 并污染其他表的并发写入状态。
 
 小剧场 scene 只收集删除计划，不拼 SQL。delete service 仍按表调用 `deleteTableRowsBatch()`；仓库层可以在单表多行删除时使用 SQLite `executeSqlMutation` 快路径。当前不做跨表单条 SQL，不承诺跨表事务原子性。未来如需跨表事务删除，必须另开设计，不能把跨表事务语义偷塞进 scene 或 delete service。
 
 内置 scene 删除关系：
 
-- square：删除 `posts` 主贴时，只删除 `广场表` 中匹配行；主贴身份字段兼容 `帖子ID` 与 `帖子唯一标识`，事实源在 [`SQUARE_POST_ID_HEADERS`](../modules/phone-theater/scenes/square.js:11) 和 [`fieldSchema.posts.identityAliases`](../modules/phone-theater/scenes/square.js:219)；删除服务通过 [`getIdentityAliases()`](../modules/phone-theater/delete-service.js:119) 读取同一协议。修改广场主表 ID 表头时必须同步这里，不允许只改渲染读取点。
+- square：删除 `posts` 主贴时，只删除 `广场表` 中匹配行；主贴身份字段兼容 `帖子ID` 与 `帖子唯一标识`，事实源在 [`SQUARE_POST_ID_HEADERS`](../modules/phone-theater/scenes/square.js:9) 和 [`fieldSchema.posts.identityAliases`](../modules/phone-theater/scenes/square.js:253)；删除服务通过 [`getIdentityAliases()`](../modules/phone-theater/delete-service.js:140) 读取同一协议。修改广场主表 ID 表头时必须同步这里，不允许只改渲染读取点。
 - forum：删除 `threads` 主贴时，只删除 `论坛表` 中匹配行。
 - live：删除 `rooms` 直播间时，只删除 `直播表` 中匹配行；不再依赖 `所属直播间名` 或弹幕副表级联。
 - calendar：不可删除，`collectDeletableKeys` 返回空集合，`deleteEntities` 返回 `removed: 0`。
@@ -846,14 +910,14 @@ sequenceDiagram
 - 主实体删除必须同时匹配 role、rowIndex、identity，不允许只按标题、名称或自然键删除。
 - 如果 scene 存在附表级联，必须使用 scene 明确记录的外键字段；当前内置 `square` / `forum` / `live` 不再依赖副表级联。
 - scene 的 `deleteEntities` 返回删除数量，不直接调用保存 API。
-- 删除按钮、选择按钮和删除态样式依赖 [`data-theater-delete-key`](../modules/phone-theater/scenes/square.js:120)，新增 scene 必须在可删除实体根节点输出这个属性。
+- 删除按钮、选择按钮和删除态样式依赖 [`data-theater-delete-key`](../modules/phone-theater/scenes/square.js:175)，新增 scene 必须在可删除实体根节点输出这个属性。
 
-#### 6.5.5 通用 shell、scene 内容与交互边界
+#### 6.6.5 通用 shell、scene 内容与交互边界
 
 [`buildTheaterScenePageHtml()`](../modules/phone-theater/templates.js:91) 负责通用 shell：
 
 - 页面根节点 `.phone-app-page.phone-theater-page`。
-- [`data-theater-scene`](../modules/phone-theater/templates.js:97) 与 [`data-theater-style-scope`](../modules/phone-theater/templates.js:97)。
+- [`data-theater-scene`](../modules/phone-theater/templates.js:96) 与 [`data-theater-style-scope`](../modules/phone-theater/templates.js:96)。
 - 返回按钮，以及按“上一张、标题、下一张”排列的标题导航组。
 - 与标题导航组分离的编辑、删除操作区。
 - 删除管理条。
@@ -871,7 +935,7 @@ sequenceDiagram
 - `theater-toggle-select`
 - `theater-confirm-delete`
 
-表级切换复用共享 `requestTableNavigationSwitch()`，并受删除管理态与 lifecycle active guard 约束；编辑入口统一经过 `navigateToEditableTable()` 的受控 history 策略。scene 专属交互通过 [`bindSceneSpecificInteractions()`](../modules/phone-theater/interactions.js:397) 调用 scene definition 的 [`bindInteractions`](../modules/phone-theater/scenes/live.js:313)。当前直播 scene 使用 dataset 标记避免重复绑定弹幕暂停按钮。
+表级切换复用共享 `requestTableNavigationSwitch()`，并受删除管理态与 lifecycle active guard 约束；编辑入口统一经过 `navigateToEditableTable()` 的受控 history 策略。scene 专属交互通过 [`bindSceneSpecificInteractions()`](../modules/phone-theater/interactions.js:397) 调用 scene definition 的 [`bindInteractions`](../modules/phone-theater/scenes/live.js:345)。当前直播 scene 使用 dataset 标记避免重复绑定弹幕暂停按钮。
 
 维护规则：
 
@@ -879,7 +943,7 @@ sequenceDiagram
 - scene 专属交互应绑定在 scene 自己渲染的 DOM 内，且必须幂等。
 - 如果交互持有定时器、异步任务、外部事件或对象 URL，就不能只靠 DOM 替换“自然释放”，必须设计 cleanup 契约。
 
-#### 6.5.6 样式边界
+#### 6.6.6 样式边界
 
 Theater 样式入口是 [`styles/06-phone-theater.css`](../styles/06-phone-theater.css:7)，它只导入 [`styles/phone-theater/index.css`](../styles/phone-theater/index.css:1)。scene 样式 registry 当前顺序为：
 
@@ -899,7 +963,7 @@ Theater 样式入口是 [`styles/06-phone-theater.css`](../styles/06-phone-theat
 - 新增 scene css 必须在 [`styles/phone-theater/index.css`](../styles/phone-theater/index.css:1) 登记 import。
 - CSS 选择器应以 `.phone-theater-page[data-theater-scene="newScene"]` 或更窄作用域开头。
 
-#### 6.5.7 新增 Theater scene 最短规范
+#### 6.6.7 新增 Theater scene 最短规范
 
 新增 scene 时只允许沿扩展点接入：
 
@@ -916,29 +980,29 @@ Theater 样式入口是 [`styles/06-phone-theater.css`](../styles/06-phone-theat
 
 这套边界的意义很简单：Theater 核心层只认识 scene contract，不认识具体业务页面。只要新增 scene 需要改 [`data.js`](../modules/phone-theater/data.js:1)、[`templates.js`](../modules/phone-theater/templates.js:1)、[`interactions.js`](../modules/phone-theater/interactions.js:1) 或 [`delete-service.js`](../modules/phone-theater/delete-service.js:1)，就说明扩展点不够用，应该先补 contract，而不是把硬编码悄悄塞进去。
 
-### 6.6 Variable Manager
+### 6.7 Variable Manager
 
 Variable Manager 是系统 App，不依赖表格 sheet。它从 SillyTavern 当前聊天的楼层变量读取数据，把嵌套变量拍平成手机内的卡片视图，并提供新增、编辑、删除能力。
 
 核心入口：
 
-- [`renderVariableManager()`](../modules/variable-manager/index.js:145)：变量管理器路由入口。
-- [`VARIABLE_MANAGER_APP`](../modules/variable-manager/index.js:246)：Home 主屏系统 App 定义，route 固定为 `variable-manager`。
+- [`renderVariableManager()`](../modules/variable-manager/index.js:233)：变量管理器路由入口。
+- [`VARIABLE_MANAGER_APP`](../modules/variable-manager/index.js:361)：Home 主屏系统 App 定义，route 固定为 `variable-manager`。
 - [`buildHomeScreenViewModel()`](../modules/phone-home/view-model.js:23)：把 `VARIABLE_MANAGER_APP` 注入 Home App 列表。
-- [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27)：识别 `variable-manager` route 并动态加载页面渲染器。
-- [`createVariableManagerPageInstance()`](../modules/variable-manager/index.js:36)：创建页面实例、runtime、页面状态和 dispose 逻辑。
-- [`getFloorVariables()`](../modules/variable-manager/variable-api.js:46)：读取楼层变量。
-- [`flattenToGroups()`](../modules/variable-manager/flat-view.js:12)：把嵌套对象转换为分组卡片模型。
-- [`bindVariableManagerInteractions()`](../modules/variable-manager/interactions.js:74)：绑定刷新、编辑、新增、删除、长按进入删除态等交互。
+- [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:30)：识别 `variable-manager` route 并动态加载页面渲染器。
+- [`createVariableManagerPageInstance()`](../modules/variable-manager/index.js:44)：创建页面实例、runtime、页面状态和 dispose 逻辑。
+- [`getFloorVariables()`](../modules/variable-manager/variable-api.js:191)：读取楼层变量。
+- [`flattenToGroups()`](../modules/variable-manager/flat-view.js:11)：把嵌套对象转换为分组卡片模型。
+- [`bindVariableManagerInteractions()`](../modules/variable-manager/interactions.js:111)：绑定刷新、编辑、新增、删除、长按进入删除态等交互。
 
-#### 6.6.1 页面实例与生命周期
+#### 6.7.1 页面实例与生命周期
 
-Variable Manager 每次渲染都会先清理旧实例：[`renderVariableManager()`](../modules/variable-manager/index.js:145) 调用 [`disposeVariableManagerPageInstance()`](../modules/variable-manager/index.js:30)，再创建新实例并挂载到 container 私有字段。
+Variable Manager 每次渲染都会先清理旧实例：[`renderVariableManager()`](../modules/variable-manager/index.js:233) 调用 [`disposeVariableManagerPageInstance()`](../modules/variable-manager/index.js:33)，再创建新实例并挂载到 container 私有字段。
 
 页面实例包含：
 
-- `runtime`：由 [`createRuntimeScope()`](../modules/runtime-manager.js:1) 创建，用于事件、定时器、动画帧和断连观察清理。
-- `state.currentMessageId`：当前展示的楼层号，初始化自 [`getLastMessageId()`](../modules/variable-manager/variable-api.js:28)。
+- `runtime`：由 [`createRuntimeScope()`](../modules/runtime-manager.js:48) 创建，用于事件、定时器、动画帧和断连观察清理。
+- `state.currentMessageId`：当前展示的楼层号，初始化自 [`getLastMessageId()`](../modules/variable-manager/variable-api.js:34)。
 - `mount()`：构建页面 HTML、同步底栏 inset、渲染变量内容并绑定交互。
 - `refreshView()`：重新解析最新楼层、刷新 MVU badge、重渲染内容并同步底栏高度。
 - `dispose()`：释放 runtime，并从 container 移除实例引用。
@@ -960,25 +1024,25 @@ graph TD
 
 - 新增页面级事件、定时器、动画帧、ResizeObserver 或弹窗资源，必须注册进页面 runtime。
 - 页面刷新只更新当前楼层内容；不要在交互函数里绕过 `refreshView()` 手动拼接整页 shell。
-- 页面断连由 [`observePageDisconnectionAfterMount()`](../modules/variable-manager/index.js:99) 兜底清理，新增资源不能依赖全局泄漏后“下次刷新覆盖”。这不是方案，只是把事故延后。
+- 页面断连由 [`observePageDisconnectionAfterMount()`](../modules/variable-manager/index.js:187) 兜底清理，新增资源不能依赖全局泄漏后“下次刷新覆盖”。这不是方案，只是把事故延后。
 
-#### 6.6.2 变量 API 双路径
+#### 6.7.2 变量 API 双路径
 
 变量读写封装在 [`variable-api.js`](../modules/variable-manager/variable-api.js:1)。它优先检测 MVU，可用时走 MVU；MVU 失败或不可用时降级到 TavernHelper。
 
 读取路径：
 
-1. [`getLastMessageId()`](../modules/variable-manager/variable-api.js:28) 通过 TavernHelper 获取最新楼层号。
-2. [`getFloorVariables()`](../modules/variable-manager/variable-api.js:46) 把 `latest` 解析成实际 message id。
-3. [`isMvuAvailable()`](../modules/variable-manager/variable-api.js:14) 检测 `window.Mvu.getMvuData`。
+1. [`getLastMessageId()`](../modules/variable-manager/variable-api.js:34) 通过 TavernHelper 获取最新楼层号。
+2. [`getFloorVariables()`](../modules/variable-manager/variable-api.js:191) 把 `latest` 解析成实际 message id。
+3. [`isMvuAvailable()`](../modules/variable-manager/variable-api.js:20) 检测 `window.Mvu.getMvuData`。
 4. MVU 路径读取 `window.Mvu.getMvuData({ type: 'message', message_id })` 的 `stat_data`。
-5. TavernHelper 路径读取 [`getVariables()`](../modules/integration/tavern-helper-bridge.js:215) 对应的楼层变量。
+5. TavernHelper 路径读取 [`getVariables()`](../modules/integration/tavern-helper-bridge.js:81) 对应的楼层变量。
 
 写入路径：
 
-- 编辑变量：[`setFloorVariable()`](../modules/variable-manager/variable-api.js:87)。
-- 新增变量：[`addFloorVariable()`](../modules/variable-manager/variable-api.js:176)，当前复用 `setFloorVariable`。
-- 删除变量：[`deleteFloorVariable()`](../modules/variable-manager/variable-api.js:133)。
+- 编辑变量：[`setFloorVariable()`](../modules/variable-manager/variable-api.js:301)。
+- 新增变量：[`addFloorVariable()`](../modules/variable-manager/variable-api.js:403)，当前复用 `setFloorVariable`。
+- 删除变量：[`deleteFloorVariable()`](../modules/variable-manager/variable-api.js:360)。
 
 MVU 写入流程：
 
@@ -1007,15 +1071,15 @@ sequenceDiagram
 - [`getFloorVariablesAsync()`](../modules/variable-manager/variable-api.js:224) 在 MVU 初始不可用且 `waitMvu !== false` 时会 bounded wait，再复检 `isMvuAvailable()`；返回 meta 必须区分 `waitedMvu`、`mvuInitiallyAvailable`、`mvuAvailableAfterWait` 与 `source`，方便排查首开时序问题。
 - 路径参数当前采用点号路径语法，例如 `角色.络络.好感度`；新增 UI 能力时必须尊重这个路径契约。
 
-#### 6.6.3 扁平化视图与值类型
+#### 6.7.3 扁平化视图与值类型
 
-[`renderVariableContent()`](../modules/variable-manager/index.js:157) 的渲染顺序固定为：
+[`renderVariableContent()`](../modules/variable-manager/index.js:262) 的渲染顺序固定为：
 
 1. 无有效 message id 时显示“当前没有聊天消息”。
-2. [`getFloorVariables()`](../modules/variable-manager/variable-api.js:46) 读取变量数据。
+2. [`getFloorVariables()`](../modules/variable-manager/variable-api.js:191) 读取变量数据。
 3. 空数据时显示“当前楼层没有变量数据”。
-4. [`flattenToGroups()`](../modules/variable-manager/flat-view.js:12) 生成分组结构。
-5. [`renderGroupsHtml()`](../modules/variable-manager/flat-view.js:157) 生成卡片 HTML。
+4. [`flattenToGroups()`](../modules/variable-manager/flat-view.js:11) 生成分组结构。
+5. [`renderGroupsHtml()`](../modules/variable-manager/flat-view.js:343) 生成卡片 HTML。
 
 扁平化规则：
 
@@ -1023,8 +1087,8 @@ sequenceDiagram
 - 顶层非对象值进入 `__misc__` 分组，显示名为“其他”。
 - 嵌套对象继续递归展开，叶子节点成为卡片。
 - 空对象会作为可展示对象卡片保留。
-- 数组与对象显示时通过 [`formatDisplayValue()`](../modules/variable-manager/flat-view.js:83) JSON 化。
-- 用户输入通过 [`parseInputValue()`](../modules/variable-manager/flat-view.js:97) 解析 `null`、布尔值、数字、JSON 数组和 JSON 对象。
+- 数组与对象显示时通过 [`formatDisplayValue()`](../modules/variable-manager/flat-view.js:191) JSON 化。
+- 用户输入通过 [`parseInputValue()`](../modules/variable-manager/flat-view.js:205) 解析 `null`、布尔值、数字、JSON 数组和 JSON 对象。
 
 渲染结构：
 
@@ -1036,22 +1100,22 @@ sequenceDiagram
 维护规则：
 
 - 卡片 `data-var-path` 是编辑和删除的路径事实源，渲染层必须保证路径和展示值一致。
-- 新增值类型时必须同步 [`getValueTypeClass()`](../modules/variable-manager/flat-view.js:114)、[`formatDisplayValue()`](../modules/variable-manager/flat-view.js:83)、[`parseInputValue()`](../modules/variable-manager/flat-view.js:97) 和样式。
-- 变量内容进入 HTML 前必须转义；当前卡片渲染使用 [`escapeHtml()`](../modules/utils/dom-escape.js:1)，属性值路径也必须保持转义。
+- 新增值类型时必须同步 [`getValueTypeClass()`](../modules/variable-manager/flat-view.js:222)、[`formatDisplayValue()`](../modules/variable-manager/flat-view.js:191)、[`parseInputValue()`](../modules/variable-manager/flat-view.js:205) 和样式。
+- 变量内容进入 HTML 前必须转义；当前卡片渲染使用 [`escapeHtml()`](../modules/utils/dom-escape.js:36)，属性值路径也必须保持转义。
 
-#### 6.6.4 交互模型
+#### 6.7.4 交互模型
 
-[`bindVariableManagerInteractions()`](../modules/variable-manager/interactions.js:74) 使用容器级事件委托，避免每张卡片单独持有监听器。主要交互：
+[`bindVariableManagerInteractions()`](../modules/variable-manager/interactions.js:111) 使用容器级事件委托，避免每张卡片单独持有监听器。主要交互：
 
 - 返回：`data-vm-action="nav-back"` 调用路由返回。
 - 刷新：`data-vm-action="refresh"` 调用 `refreshView()`。
 - 点击变量卡片：进入编辑态。
-- 编辑保存：[`handleSaveEdit()`](../modules/variable-manager/interactions.js:320) 解析输入并弹出确认框。
-- 新增变量：[`showAddVariableDialog()`](../modules/variable-manager/interactions.js:560) 打开弹窗，确认后调用 [`addFloorVariable()`](../modules/variable-manager/variable-api.js:176)。
-- 长按删除：[`bindLongPressDelete()`](../modules/variable-manager/interactions.js:371) 在 500ms 后进入删除态。
-- 删除确认：[`doDeleteVariables()`](../modules/variable-manager/interactions.js:533) 逐个调用 [`deleteFloorVariable()`](../modules/variable-manager/variable-api.js:133)。
+- 编辑保存：[`handleSaveEdit()`](../modules/variable-manager/interactions.js:366) 解析输入并弹出确认框。
+- 新增变量：[`showAddVariableDialog()`](../modules/variable-manager/interactions.js:665) 打开弹窗，确认后调用 [`addFloorVariable()`](../modules/variable-manager/variable-api.js:403)。
+- 长按删除：[`bindLongPressDelete()`](../modules/variable-manager/interactions.js:421) 在 500ms 后进入删除态。
+- 删除确认：[`doDeleteVariables()`](../modules/variable-manager/interactions.js:636) 逐个调用 [`deleteFloorVariable()`](../modules/variable-manager/variable-api.js:360)。
 
-删除态选择器由 [`SELECTABLE_DELETE_SELECTOR`](../modules/variable-manager/interactions.js:14) 定义，支持变量卡片、一级分组标题和二级分组标题。删除路径会经 [`normalizeDeletePaths()`](../modules/variable-manager/interactions.js:499) 去重，并优先保留父路径，避免同一分支重复删除。
+删除态选择器由 [`SELECTABLE_DELETE_SELECTOR`](../modules/variable-manager/interactions.js:14) 定义，支持变量卡片、一级分组标题和二级分组标题。删除目标会经 [`normalizeDeleteTargets()`](../modules/variable-manager/interactions.js:563) 按 path 去重，并优先保留父路径，避免同一分支重复删除。
 
 维护规则：
 
@@ -1060,14 +1124,14 @@ sequenceDiagram
 - 异步写入完成后统一通过 `refreshView()` 重读数据，不要只改当前 DOM 卡片制造“看起来成功”的假象。
 - 删除、保存、新增都以 message id 和 path 为最小操作单位；如果未来支持跨楼层变量，必须先扩展 API 契约，再改 UI。
 
-#### 6.6.5 样式边界与能力边界
+#### 6.7.5 样式边界与能力边界
 
 Variable Manager 样式集中在 [`styles/12-variable-manager.css`](../styles/12-variable-manager.css:1)，作用域根是 `.vm-page` 与 `.vm-*` 类。页面布局包含导航栏、滚动主体、底部新增栏、删除栏、弹窗和 toast。
 
 样式关键点：
 
 - `.vm-page` 定义底栏高度变量 `--vm-bottom-bar-height`。
-- [`syncBottomBarInset()`](../modules/variable-manager/index.js:198) 根据 `.vm-footer` 与 `.vm-delete-bar` 实测高度更新底部留白。
+- [`syncBottomBarInset()`](../modules/variable-manager/index.js:313) 根据 `.vm-footer` 与 `.vm-delete-bar` 实测高度更新底部留白。
 - `.vm-body.phone-app-body` 使用 `padding-bottom` 和 `scroll-padding-bottom` 避免底栏遮挡内容。
 - `.vm-dialog-overlay` 和 `.vm-toast` 都在 `.vm-page` 内呈现。
 
@@ -1084,7 +1148,7 @@ Variable Manager 样式集中在 [`styles/12-variable-manager.css`](../styles/12
 - 如果新增跨楼层切换、搜索、过滤、批量编辑或 MVU 高级字段展示，必须先扩展 `variable-api` 的返回结构和 page state，再改模板。
 - 能力边界必须写成契约，不要把“当前碰巧这样工作”当成隐含规则。隐含规则最擅长在下一次功能追加时变成屎山入口。
 
-### 6.7 Table Update Review 审核 App
+### 6.8 Table Update Review 审核 App
 
 Table Update Review 是系统 App，不绑定单张 sheet。它负责监听表格数据净变化，把变更聚合成审核列表，并提供从审核项跳转到通用表详情页的入口。
 
@@ -1093,15 +1157,15 @@ Table Update Review 是系统 App，不绑定单张 sheet。它负责监听表�
 - [`TABLE_UPDATE_REVIEW_APP_ID`](../modules/table-update-review/constants.js:1)：Home 主屏系统 App id，当前为 `table-update-review`。
 - [`TABLE_UPDATE_REVIEW_ROUTE`](../modules/table-update-review/constants.js:2)：审核页 route，当前为 `table-update-review`。
 - [`buildHomeScreenViewModel()`](../modules/phone-home/view-model.js:23)：把审核 App 作为 `isSystemApp` 注入 Home App 列表。
-- [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27)：识别 `table-update-review` route 并动态加载审核页渲染器。
+- [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:30)：识别 `table-update-review` route 并动态加载审核页渲染器。
 - [`ROUTE_MODULES`](../modules/phone-core/preload.js:32)：包含 `../table-update-review/index.js`，确保审核页入口参与 route module preload。
 - [`renderTableUpdateReview()`](../modules/table-update-review/index.js:112)：审核页路由入口。
 - [`startTableUpdateReviewService()`](../modules/table-update-review/service.js:155)：启动表格净变化监听与审核状态更新。
-- [`bindTableUpdateReviewInteractions()`](../modules/table-update-review/interactions.js:5)：绑定审核页交互，包括进入对应表格行详情。
+- [`bindTableUpdateReviewInteractions()`](../modules/table-update-review/interactions.js:37)：绑定审核页交互，包括进入对应表格行详情。
 
-#### 6.7.1 页面实例与生命周期
+#### 6.8.1 页面实例与生命周期
 
-[`renderTableUpdateReview()`](../modules/table-update-review/index.js:112) 每次渲染都会先清理旧页面实例，再通过 `createTableUpdateReviewPageInstance()` 创建新实例。页面实例持有由 [`createRuntimeScope()`](../modules/runtime-manager.js:1) 创建的 runtime，用于事件、订阅和断连观察清理。
+[`renderTableUpdateReview()`](../modules/table-update-review/index.js:112) 每次渲染都会先清理旧页面实例，再通过 `createTableUpdateReviewPageInstance()` 创建新实例。页面实例持有由 [`createRuntimeScope()`](../modules/runtime-manager.js:48) 创建的 runtime，用于事件、订阅和断连观察清理。
 
 生命周期流程：
 
@@ -1123,7 +1187,7 @@ graph TD
 - 页面渲染必须尊重 `renderToken`，过期 route 渲染不能继续 patch 当前屏幕。
 - 审核服务由 [`startTableUpdateReviewService()`](../modules/table-update-review/service.js:155) 统一启动；页面层不要绕过服务直接改 store。
 
-#### 6.7.2 审核到物理表页面的跳转合同
+#### 6.8.2 审核到物理表页面的跳转合同
 
 审核页不是 Table Viewer 或 Theater 的内部模式。审核项点击更新内容时先按物理 `sheetKey` 查询统一表目录：
 
@@ -1134,11 +1198,11 @@ graph TD
 返回语义分两层：
 
 - 详情页本地返回只退出详情模式，回到当前通用表列表。
-- 列表页路由返回走 [`navigateBack()`](../modules/phone-core/routing.js:82)，利用 route history 回到 `table-update-review`。
+- 列表页路由返回走 [`navigateBack()`](../modules/phone-core/routing.js:107)，利用 route history 回到 `table-update-review`。
 
 维护规则：
 
-- 不要为了审核返回链路修改 [`navigateBack()`](../modules/phone-core/routing.js:82) 的全局语义；普通 `app:<sheetKey>` 与 `table-generic:<sheetKey>` 仍依赖同一套 route history。
+- 不要为了审核返回链路修改 [`navigateBack()`](../modules/phone-core/routing.js:107) 的全局语义；普通 `app:<sheetKey>` 与 `table-generic:<sheetKey>` 仍依赖同一套 route history。
 - 不要在 Theater 分流前写 Generic intent，也不要为该分支无条件清理全局 pending intent。
 - 详情本地返回和列表路由返回必须保持不同 action 语义，不能重新让一个泛用返回选择器同时承担两种行为。
 - 审核字段摘要属于审核模板职责；不要把审核字段裁剪或展示规则塞进 Table Viewer。
@@ -1149,7 +1213,7 @@ graph TD
 
 ### 7.1 Slash Commands
 
-Slash 命令入口由 [`registerSlashCommands()`](../modules/slash-commands.js:25) 管理，初始化阶段在 [`doInitialize()`](../index.js:169) 中注册，随后通过 [`setupSlashCommandHandlers()`](../index.js:94) 把 Bootstrap 的运行时动作注入命令系统。
+Slash 命令入口由 [`registerSlashCommands()`](../modules/slash-commands.js:46) 管理，初始化阶段在 [`doInitialize()`](../index.js:441) 中注册，随后通过 [`setupSlashCommandHandlers()`](../index.js:365) 把 Bootstrap 的运行时动作注入命令系统。
 
 模块分层：
 
@@ -1158,7 +1222,7 @@ Slash 命令入口由 [`registerSlashCommands()`](../modules/slash-commands.js:2
 - [`command-actions.js`](../modules/slash-commands/command-actions.js:6)：实现命令动作，包括手机开关、状态、表格命令和设置命令。
 - [`host-adapter.js`](../modules/slash-commands/host-adapter.js:5)：解析 SillyTavern Slash 注册函数，提供 fallback 命令宿主。
 - [`state.js`](../modules/slash-commands/state.js:1)：保存注册状态、已注册命令名和命令 handler。
-- [`command-registry.js`](../modules/bootstrap/command-registry.js:14)：把业务动作注册成 `phone-action`、`open-table`、`list-tables`、`reset-settings`、`export-settings` handler。
+- [`command-registry.js`](../modules/bootstrap/command-registry.js:224)：把业务动作注册成 `phone-action`、`open-table`、`list-tables`、`reset-settings`、`export-settings` handler。
 
 命令清单来自 [`SLASH_COMMAND_DEFINITIONS`](../modules/slash-commands/command-registration.js:6)：
 
@@ -1188,9 +1252,9 @@ graph TD
 维护规则：
 
 - 新增命令必须先写入 [`SLASH_COMMAND_DEFINITIONS`](../modules/slash-commands/command-registration.js:6)，再在 [`command-actions.js`](../modules/slash-commands/command-actions.js:1) 实现动作，不要在 [`index.js`](../index.js:12) 里塞命令逻辑。
-- 命令需要访问 UI 生命周期时，必须通过 [`registerPhoneSlashCommandHandlers()`](../modules/bootstrap/command-registry.js:14) 注入 handler，而不是直接碰 Phone Core 内部状态。
+- 命令需要访问 UI 生命周期时，必须通过 [`registerPhoneSlashCommandHandlers()`](../modules/bootstrap/command-registry.js:224) 注入 handler，而不是直接碰 Phone Core 内部状态。
 - Fallback 命令挂在 [`yuziPhoneCommands`](../modules/slash-commands/host-adapter.js:3)，它是降级入口，不是主协议。
-- 注销时通过 [`unregisterSlashCommands()`](../modules/slash-commands.js:79) 清理宿主命令、fallback 命令、registered commands 和 handler map。
+- 注销时通过 [`unregisterSlashCommands()`](../modules/slash-commands.js:101) 清理宿主命令、fallback 命令、registered commands 和 handler map。
 
 ### 7.2 localStorage Storage Manager
 
@@ -1199,12 +1263,12 @@ graph TD
 核心能力：
 
 - [`set()`](../modules/storage-manager/manager.js:30)：写入 `{ v, expiresAt }` payload，更新索引并执行 LRU 淘汰。
-- [`get()`](../modules/storage-manager/manager.js:79)：读取 payload，处理过期、坏 JSON 和索引刷新。
-- [`remove()`](../modules/storage-manager/manager.js:123)：删除指定 namespace/key。
-- [`clearNamespace()`](../modules/storage-manager/manager.js:143)：清理某个 namespace。
+- [`get()`](../modules/storage-manager/manager.js:114)：读取 payload，处理过期、坏 JSON 和索引刷新。
+- [`remove()`](../modules/storage-manager/manager.js:158)：删除指定 namespace/key。
+- [`clearNamespace()`](../modules/storage-manager/manager.js:178)：清理某个 namespace。
 - [`maintenance()`](../modules/storage-manager/manager.js:22)：清理过期项并按容量淘汰。
-- [`estimate()`](../modules/storage-manager/manager.js:159)：返回当前估算容量和条目数。
-- [`getSessionStorageNamespace()`](../modules/storage-manager/manager.js:179)：生成当前运行会话 namespace。
+- [`estimate()`](../modules/storage-manager/manager.js:194)：返回当前估算容量和条目数。
+- [`getSessionStorageNamespace()`](../modules/storage-manager/manager.js:214)：生成当前运行会话 namespace。
 
 索引结构由 [`loadIndex()`](../modules/storage-manager/core.js:82) 和 [`saveIndex()`](../modules/storage-manager/core.js:111) 管理，容量策略来自 [`DEFAULT_OPTIONS`](../modules/storage-manager/core.js:6)：默认 `maxEntries` 为 600、`maxBytes` 为 512KB、`defaultTTL` 为 14 天。
 
@@ -1225,25 +1289,26 @@ graph TD
 
 公开 API：
 
-- [`cacheSet()`](../modules/cache-manager.js:49)：写入 `{ v, expiresAt }` payload。
-- [`cacheGet()`](../modules/cache-manager.js:58)：读取 payload，过期时调用 [`cacheRemove()`](../modules/cache-manager.js:69)。
-- [`cacheRemove()`](../modules/cache-manager.js:69)：删除指定 key。
-- [`cacheClear()`](../modules/cache-manager.js:74)：清空指定 store。
-- [`CACHE_STORES`](../modules/cache-manager.js:79)：导出 store 名常量。
+- [`cacheSet()`](../modules/cache-manager.js:118)：写入 `{ v, expiresAt }` payload。
+- [`cacheGet()`](../modules/cache-manager.js:127)：读取 payload，过期时调用 [`cacheRemove()`](../modules/cache-manager.js:138)。
+- [`cacheRemove()`](../modules/cache-manager.js:138)：删除指定 key。
+- [`cacheClear()`](../modules/cache-manager.js:143)：清空指定 store。
+- [`CACHE_STORES`](../modules/cache-manager.js:148)：导出 store 名常量。
 
 当前主要使用场景：
 
-- 背景图预览读取与缓存：[`setupBgUpload()`](../modules/settings-app/services/appearance-settings/background-service.js:11) 中使用 [`cacheGet()`](../modules/cache-manager.js:58) 和 [`cacheSet()`](../modules/cache-manager.js:49)。
-- App 图标缓存：[`icon-upload-service.js`](../modules/settings-app/services/appearance-settings/icon-upload-service.js:146) 保存自定义图标 data URL。
+- 背景图预览读取与缓存：[`setupBgUpload()`](../modules/settings-app/services/appearance-settings/background-service.js:11) 中使用 [`cacheGet()`](../modules/cache-manager.js:127) 和 [`cacheSet()`](../modules/cache-manager.js:118)。
+- App 图标持久设置与可再生缓存：[`savePhoneSetting('appIcons', nextIcons)`](../modules/settings-app/services/appearance-settings/icon-upload-service.js:149) 保存设置事实源，随后 [`cacheSet()`](../modules/settings-app/services/appearance-settings/icon-upload-service.js:150) 把同一 data URL 写入 `images` cache store。
 
 维护规则：
 
 - cache 层只保存可再生缓存，不作为唯一事实源；真正设置仍在 settings 系统中。
-- 新增 store 需要更新 [`openDb()`](../modules/cache-manager.js:12) 的 upgrade 逻辑和 [`CACHE_STORES`](../modules/cache-manager.js:79)。
-- 写入大对象必须先确认业务预算，例如背景图和图标已有 [`STORAGE_BUDGETS`](../modules/settings-app/constants.js:11)。
+- 新增 store 需要更新 [`openDb()`](../modules/cache-manager.js:32) 的 upgrade 逻辑和 [`CACHE_STORES`](../modules/cache-manager.js:148)。
+- 写入大对象必须先确认业务预算，例如背景图和图标已有 [`STORAGE_BUDGETS`](../modules/settings-app/constants.js:4)。
 - 读取缓存必须能接受 `undefined` 并降级渲染；缓存不存在不是错误。
 - 外观美化包仓库不是 cache-manager 的 store；[`appearance-pack-repository.js`](../modules/settings-app/services/appearance-settings/appearance-pack-repository.js:1) 使用独立 IndexedDB 保存用户导入的持久本地资产，不能被可再生缓存清理语义覆盖。
-- 裸 `indexedDB.open()` 目前只允许出现在 [`cache-manager.js`](../modules/cache-manager.js:1) 与 [`appearance-pack-repository.js`](../modules/settings-app/services/appearance-settings/appearance-pack-repository.js:1)；页面层和普通业务模块新增 IndexedDB 入口必须先扩展存储边界契约。
+- 玉子美化预设由 [`content-presets/repository.js`](../modules/content-presets/repository.js:1) 使用独立数据库 `yuzi-phone-template-workshop` 持久化；`presets` 与 `activeByTable` 的覆盖、删除和清绑定必须在同一 readwrite transaction 内完成，页面只能经 workshop service 操作。
+- 裸 `indexedDB.open()` 只允许出现在 [`cache-manager.js`](../modules/cache-manager.js:1)、[`appearance-pack-repository.js`](../modules/settings-app/services/appearance-settings/appearance-pack-repository.js:1) 与 [`content-presets/repository.js`](../modules/content-presets/repository.js:1)；页面层和普通业务模块新增 IndexedDB 入口必须先扩展存储边界契约及事务行为检查。
 
 ### 7.4 Window 交互：拖拽、缩放与 runtime 重建
 
@@ -1255,22 +1320,22 @@ Window 子系统负责手机容器本身的拖拽和缩放，不负责页面内�
 - [`drag.js`](../modules/window/drag.js:15)：绑定手机 shell 的 notch/status bar 拖拽。
 - [`resize.js`](../modules/window/resize.js:15)：绑定 `.yuzi-phone-resize` 手柄缩放。
 - [`lifecycle.js`](../modules/phone-core/lifecycle.js:90)：Phone shell 初始化后延迟调用拖拽与缩放初始化。
-- [`destroyPhoneRuntime()`](../modules/phone-core/lifecycle.js:200)：销毁 Phone Core 时调用 [`destroyPhoneWindowInteractions()`](../modules/window/runtime.js:12)。
+- [`destroyPhoneRuntime()`](../modules/phone-core/lifecycle.js:245)：销毁 Phone Core 时调用 [`destroyPhoneWindowInteractions()`](../modules/window/runtime.js:12)。
 
 拖拽规则：
 
 - [`initPhoneShellDrag()`](../modules/window/drag.js:15) 查找 [`yuzi-phone-standalone`](../modules/window/drag.js:16) 与 `.phone-shell`。
 - 可拖拽区域是 `.phone-notch` 与 `.phone-status-bar`。
-- 拖动中通过 [`constrainPosition()`](../modules/settings/layout.js:24) 限制位置。
-- 松手后保存 [`phoneContainerX`](../modules/settings/schema.js:9) 与 [`phoneContainerY`](../modules/settings/schema.js:10)。
+- 拖动中通过 [`constrainPosition()`](../modules/settings/layout.js:23) 限制位置。
+- 松手后保存 [`phoneContainerX`](../modules/settings/schema.js:103) 与 [`phoneContainerY`](../modules/settings/schema.js:104)。
 - 已绑定节点用 [`DRAG_BOUND_ATTR`](../modules/window/runtime.js:3) 防重复。
 
 缩放规则：
 
-- [`initPhoneShellResize()`](../modules/window/resize.js:15) 绑定 `.yuzi-phone-resize` 手柄。
+- [`initPhoneShellResize()`](../modules/window/resize.js:31) 绑定 `.yuzi-phone-resize` 手柄。
 - 支持按 `data-dir` 判断 east/south 方向。
-- 宽高根据 viewport 限制，并在松手后通过 [`constrainPosition()`](../modules/settings/layout.js:24) 修正位置。
-- 松手后保存 [`phoneContainerX`](../modules/settings/schema.js:9)、[`phoneContainerY`](../modules/settings/schema.js:10)、[`phoneContainerWidth`](../modules/settings/schema.js:11)、[`phoneContainerHeight`](../modules/settings/schema.js:12)。
+- 宽高根据 viewport 限制，并在松手后通过 [`constrainPosition()`](../modules/settings/layout.js:23) 修正位置。
+- 松手后保存 [`phoneContainerX`](../modules/settings/schema.js:103)、[`phoneContainerY`](../modules/settings/schema.js:104)、[`phoneContainerWidth`](../modules/settings/schema.js:105)、[`phoneContainerHeight`](../modules/settings/schema.js:106)。
 - 已绑定节点用 [`RESIZE_BOUND_ATTR`](../modules/window/runtime.js:4) 防重复。
 
 生命周期规则：
@@ -1292,7 +1357,7 @@ graph TD
 - Window runtime 被 dispose 后必须重建；[`destroyPhoneWindowInteractions()`](../modules/window/runtime.js:12) 是当前正确模式。
 - 拖拽和缩放只保存容器位置与尺寸，不应触发业务页面刷新。
 - 新增容器级 pointer 交互必须使用 [`getWindowInteractionRuntime()`](../modules/window/runtime.js:8)，不要裸绑 window 或 document。
-- 尺寸约束要同时检查 [`settings/schema.js`](../modules/settings/schema.js:50) 的设置校验范围和 [`resize.js`](../modules/window/resize.js:66) 的运行时范围，两个事实源不一致会制造保存值与运行行为分裂。
+- 尺寸约束要同时检查 [`settings/schema.js`](../modules/settings/schema.js:159) 的设置校验范围和 [`resolveResizeBounds()`](../modules/window/resize.js:10) 的运行时范围，两个事实源不一致会制造保存值与运行行为分裂。
 
 ## 8. 样式组织规则
 
@@ -1322,7 +1387,7 @@ graph TD
 
 主题调度运行契约：
 
-- 主题设置字段为 `phoneThemeMode`，仅允许 `'light' | 'dark'`，默认 `'light'`，由 [`modules/settings/schema.js`](../modules/settings/schema.js:112) 校验与回退。
+- 主题设置字段为 `phoneThemeMode`，仅允许 `'light' | 'dark'`，默认 `'light'`，由 [`modules/settings/schema.js`](../modules/settings/schema.js:111) 校验与回退。
 - 主题服务入口为 [`applyPhoneThemeMode()`](../modules/settings-app/services/appearance-settings/theme-settings.js)，职责仅为同步 DOM 主题属性，不负责保存。
 - 主题属性必须双挂载到：
   - `#yuzi-phone-standalone[data-yuzi-phone-theme="light|dark"]`
@@ -1335,20 +1400,30 @@ graph TD
 
 ## 9. 新增功能前检查清单
 
-- 新增 route：是否更新 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:27) 和 [`ROUTE_MODULES`](../modules/phone-core/preload.js:32)。
+- 新增 route：是否更新 [`loadRouteRenderer()`](../modules/phone-core/route-renderer.js:30) 和 [`ROUTE_MODULES`](../modules/phone-core/preload.js:32)。
 - 新增页面：是否有 runtime、dispose、容器移除清理。
 - 新增表格写入：是否走 [`enqueueTableMutation()`](../modules/phone-core/data-api/mutation-queue.js:9)。
+- 新增数据库 query/probe：是否使用有界超时，并明确 null、异常和超时的降级结果。
+- 新增数据库 mutation：是否使用 [`callMutationApiToSettlement()`](../modules/phone-core/db-bridge.js)，确认 watchdog 只告警、不会释放队列，且永不 settle 时保持 fail-closed。
+- 新增 SQL mutation：是否验证 settlement 为对象、`errors` 为数组、`changes` 为非负整数，并把 `errors`、`saved:false`、`ok:false`、`success:false` 统一归一化为失败。
+- 新增 SQL 批删：是否只在 `ok && changes === 请求数` 时直接确认成功，其余结果按 `row_id` 对账；SQL 发出后是否彻底禁止 `deleteRow` fallback。
+- 新增 mutation 成功路径：是否确认保存、merged-data/worldbook 刷新和通知只有一个所有者；正常 CRUD 与 Raw SQL 后不得追加第二次刷新，也不得传 `skipChatSave` / `skipNotify`。
+- 新增模板导入：是否避免把 `success:true` 夸大为聊天保存和刷新已可靠完成；Fusion 是否保持不追加刷新，也不拿刷新冒充保存屏障。
+- 新增手动数据库动作：是否只走有 Promise 的正式 API，并且只把严格 `true` 判为成功；禁止用 DOM click 或二次刷新补救。
+- 新增派生字段：是否定义 source/input/pending 签名，保证同一 source 最多两次真实写入、普通通知不返还预算，并覆盖 600ms 合并与 1s/2s/5s 读侧退避。
+- 新增 table-update 订阅：不可用时是否返回 `null`，是否复用一个 native callback + subscriber `Set`，注销时是否使用同一 callback；派生服务是否拒绝无效 disposer。
+- 新增后台服务：是否接入 enabled/hidden/disabled/destroy 生命周期，覆盖部分启动回滚、logger/disposer 异常、聊天切换第二次通知 + 250ms 和 3.5 秒兜底；屏障订阅不可用时是否仍保留 timeout fallback。
 - 新增字段：是否更新共享字段契约，而不是复制数组。
 - 新增 SillyTavern API 调用：是否放入 bridge 或 repository。
 - 新增样式：是否有明确作用域根，是否避免扩大宿主覆盖规则。
 - 新增 AI 输出格式：是否同步解析器、提示词、表格字段、UI 展示。
-- 新增 Slash 命令：是否登记 [`SLASH_COMMAND_DEFINITIONS`](../modules/slash-commands/command-registration.js:6)，并通过 [`registerPhoneSlashCommandHandlers()`](../modules/bootstrap/command-registry.js:14) 注入业务 handler。
+- 新增 Slash 命令：是否登记 [`SLASH_COMMAND_DEFINITIONS`](../modules/slash-commands/command-registration.js:6)，并通过 [`registerPhoneSlashCommandHandlers()`](../modules/bootstrap/command-registry.js:224) 注入业务 handler。
 - 新增缓存：是否选择正确存储层，settings、localStorage manager、IndexedDB cache 的事实源边界是否清楚。
 - 新增或修改持久 IndexedDB 用户资产仓库：是否有专用 repository、容量限制、页面层禁用裸 IndexedDB，并确认 [`check-p1-storage-boundary-contract.cjs`](../scripts/check-p1-storage-boundary-contract.cjs:1) 与对应业务契约脚本，例如 [`check-appearance-pack-repository-contract.cjs`](../scripts/check-appearance-pack-repository-contract.cjs:1)，已在 `npm run check` 中通过。
 - 新增窗口交互：是否使用 [`getWindowInteractionRuntime()`](../modules/window/runtime.js:8)，并确认销毁后可重建。
 - 新增发布前改动：是否执行 [`npm run lint`](../package.json:13)、[`npm run check`](../package.json:11)、[`npm run check:ci`](../package.json:12)、[`npm run build`](../package.json:8)，并确认 [`manifest.json`](../manifest.json:6) 指向的 [`dist/yuzi-phone.bundle.js`](../dist/yuzi-phone.bundle.js) 与 [`dist/yuzi-phone.bundle.css`](../dist/yuzi-phone.bundle.css) 已由构建产物更新。源码、样式、版本字段或 loader 变化后，`dist/` 如有差异必须纳入交付。
 - 新增文档事实：是否放入 [`docs/`](README.md) 或 [`docs/reference/`](reference)，并确认所有相对链接可跳转；未实施计划只能放入 [`plans/`](../plans)。
-- 新增或修改表格模板事实源：是否优先修改 [`tables/sources/`](../tables/sources) 下的 Markdown 文件，并通过 [`npm run tables:check`](../package.json:15) 与 [`npm run tables:build`](../package.json:16) 生成 [`tables/generated/`](../tables/generated) 产物；不要手工修改 generated JSON 伪装成事实源。
+- 新增或修改表格模板事实源：是否优先修改 [`tables/sources/`](../tables/sources) 下的 Markdown 文件，并通过 [`npm run tables:check`](../package.json:17) 与 [`npm run tables:build`](../package.json:18) 生成 [`tables/generated/`](../tables/generated) 产物；不要手工修改 generated JSON 伪装成事实源。
 - 当前正式表源是 [`tables/sources/小剧场2.1`](../tables/sources/小剧场2.1) 与 [`tables/sources/纪要`](../tables/sources/纪要)；[`tables/sources/恋爱特化参考`](../tables/sources/恋爱特化参考) 是参考源，必须保留在 source contract 中，但不要把参考源误写成运行时正式表。
 - 新增或修改脚本版 loader、版本字段、发布链路或表源清单时，必须确认 [`check-script-loader-contract.cjs`](../scripts/check-script-loader-contract.cjs:1)、[`check-extension-version-contract.cjs`](../scripts/check-extension-version-contract.cjs:1)、[`check-release-chain-contract.cjs`](../scripts/check-release-chain-contract.cjs:1)、[`check-table-sources-contract.cjs`](../scripts/check-table-sources-contract.cjs:1) 都在 `npm run check` / `npm run check:ci` 中通过。
 

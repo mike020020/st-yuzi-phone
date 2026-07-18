@@ -9,6 +9,7 @@ const SETTINGS_RENDERER_SERVICE_KEYS = [
     'buttonStyle',
     'apiPrompt',
     'promptEditor',
+    'contentPresetWorkshop',
 ];
 
 function ensureObject(value) {
@@ -41,6 +42,7 @@ export function createSettingsRendererServices(deps = {}) {
         buttonStyle: ensureObject(deps.buttonStyle),
         apiPrompt: ensureObject(deps.apiPrompt),
         promptEditor: ensureObject(deps.promptEditor),
+        contentPresetWorkshop: ensureObject(deps.contentPresetWorkshop),
     };
 }
 
@@ -230,9 +232,27 @@ function buildPromptEditorPageContextFromServices(services) {
     };
 }
 
+function buildContentPresetWorkshopPageService(services) {
+    return {
+        getSnapshot: services.contentPresetWorkshop.getSnapshot,
+        subscribe: services.contentPresetWorkshop.subscribe,
+        getViewModel: services.contentPresetWorkshop.getViewModel,
+        prepareImport: services.contentPresetWorkshop.prepareImport,
+        importPrepared: services.contentPresetWorkshop.importPrepared,
+        exportPreset: services.contentPresetWorkshop.exportPreset,
+        deletePreset: services.contentPresetWorkshop.deletePreset,
+        setActive: services.contentPresetWorkshop.setActive,
+        clearActive: services.contentPresetWorkshop.clearActive,
+        clearAllActive: services.contentPresetWorkshop.clearAllActive,
+    };
+}
+
 function buildBeautifyTemplatePageContextFromServices(services) {
     return {
         ...services.common,
+        showToast: services.feedback.showToast,
+        rerenderBeautifyKeepScroll: services.scroll.rerenderBeautifyKeepScroll,
+        contentPresetWorkshopService: buildContentPresetWorkshopPageService(services),
     };
 }
 

@@ -21,6 +21,8 @@ npm install
 | `npm run lint` | 静态代码检查（ESLint） |
 | `npm run check` | 运行全部 contract checks，任何失败都会让命令失败 |
 | `npm run check:ci` | 运行全部 contract checks，并额外校验历史失败基线是否仍匹配；当前基线应为 0 |
+| `npm run beautify:check` | 校验玉子美化 Bundle、真实表匹配和制作工具测试 |
+| `npm run beautify:readback` | 确定性打包玉子美化示例，并按 project/source 字节级回读 |
 | `npm run tables:check` | 校验 `tables/sources/` 与 `tables/generated/` 的表源契约和新鲜度 |
 | `npm run tables:build` | 从 `tables/sources/` 重新生成 `tables/generated/` 表格模板产物 |
 
@@ -33,7 +35,7 @@ npm install
 
 开发构建与监听模式也输出到同一组 `dist/` 文件。发版前必须重新执行 `npm run build`，不要把开发构建产物提交到 main。
 
-发布前的最低自动化门禁是：`npm run lint`、`npm run check`、`npm run check:ci`、`npm run tables:check`、`npm run tables:build`、`npm run build` 全部通过。`check` 证明合同脚本真实全绿；`check:ci` 额外证明历史失败基线没有过期或重新堆积；`tables:check` / `tables:build` 证明表源 Markdown 与 generated JSON 未漂移。当前项目不允许保留历史失败基线，否则发布链路就是假绿。
+发布前的最低自动化门禁是：`npm run lint`、`npm run check`、`npm run check:ci`、`npm run beautify:check`、`npm run beautify:readback`、`npm run tables:check`、`npm run tables:build`、`npm run build` 全部通过。`check` 证明合同脚本真实全绿；`check:ci` 额外证明历史失败基线没有过期或重新堆积；玉子美化门禁证明 Bundle 严格校验、真实表匹配、确定性打包与 source 回读未漂移；`tables:check` / `tables:build` 证明表源 Markdown 与 generated JSON 未漂移。当前项目不允许保留历史失败基线，否则发布链路就是假绿。
 
 当前发布链路还显式检查脚本版 loader 互斥、`window.__YUZI_PHONE_INSTANCE__` singleton guard、版本字段、release/dist 交付与 table source 边界；对应 contract 入口分别是 `scripts/check-script-loader-contract.cjs`、`scripts/check-extension-version-contract.cjs`、`scripts/check-release-chain-contract.cjs` 与 `scripts/check-table-sources-contract.cjs`。
 
@@ -69,6 +71,8 @@ npm run build
 npm run lint
 npm run check
 npm run check:ci
+npm run beautify:check
+npm run beautify:readback
 npm run tables:check
 npm run tables:build
 npm run build

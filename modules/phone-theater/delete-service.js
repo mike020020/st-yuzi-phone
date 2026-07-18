@@ -1,5 +1,5 @@
 import { deleteTableRowsBatch, getTableData } from '../phone-core/data-api.js';
-import { dispatchPhoneTableUpdated, refreshPhoneTableProjection } from '../phone-core/chat-support.js';
+import { dispatchPhoneTableUpdated } from '../phone-core/chat-support.js';
 import { getTheaterSceneDefinition } from './config.js';
 import { buildTheaterTableIndex, getCellByHeader, normalizeText, resolveRowIdentity, splitSemicolonText } from './core/table-index.js';
 import { buildDeleteTargets, hasDeleteTarget, parseTheaterDeleteKey } from './core/delete-key.js';
@@ -304,9 +304,7 @@ async function executeTheaterDeletionPlans(scene, plans = []) {
 
     for (let planIndex = 0; planIndex < orderedPlans.length; planIndex += 1) {
         const plan = orderedPlans[planIndex];
-        const result = await deleteTableRowsBatch(plan.tableName, plan.rowIndexes, {
-            refreshProjection: false,
-        });
+        const result = await deleteTableRowsBatch(plan.tableName, plan.rowIndexes);
         results.push({
             ...result,
             sheetKey: plan.sheetKey,
@@ -385,7 +383,8 @@ export async function deleteTheaterEntities(rawData, sceneId, selectedKeys = [])
     }
 
     const execution = await executeTheaterDeletionPlans(scene, deletionPlans);
-    const refreshed = await refreshPhoneTableProjection();
+    const refreshed = execution.results.length > 0
+        && execution.results.every((result) => result.refreshed !== false);
     const notifiedSheetKeys = Array.from(new Set([
         ...(deletion.affectedSheetKeys || []),
         ...affectedSheetKeys,

@@ -14,6 +14,36 @@ function assertNotIncludes(source, needle, message) {
     assert.ok(!source.includes(needle), message);
 }
 
+function assertSignatureContract(signatureSql, anchorTable) {
+    assertIncludes(signatureSql, `FROM ${anchorTable}`, `signature SQL 必须使用 ${anchorTable} 锚点表`);
+    assertIncludes(
+        signatureSql,
+        'SELECT CAST(row_id AS TEXT) || char(31) || time_span AS source_part',
+        'chronicle source_signature 必须包含 row_id/time_span 业务源',
+    );
+    assertIncludes(
+        signatureSql,
+        'SELECT CAST(row_id AS TEXT) || char(31) || time_span || char(31) || today_relation AS signature_part',
+        'chronicle 完整 input_signature 必须包含 row_id/time_span/today_relation',
+    );
+    assertIncludes(
+        signatureSql,
+        "COALESCE((SELECT cur_time FROM current_anchor), '') || char(29) || COALESCE((SELECT group_concat(source_part, char(30)) FROM ordered_sources), '') AS source_signature",
+        'chronicle source_signature 必须包含锚点 cur_time 与有序业务源',
+    );
+    assertIncludes(
+        signatureSql,
+        "COALESCE((SELECT cur_time FROM current_anchor), '') || char(29) || COALESCE((SELECT group_concat(signature_part, char(30)) FROM ordered_inputs), '') AS input_signature",
+        'chronicle input_signature 必须包含锚点 cur_time 与完整有序输入',
+    );
+    assertIncludes(signatureSql, 'pending_updates AS (', 'chronicle signature SQL 必须计算待更新行集合');
+    assertIncludes(
+        signatureSql,
+        'COALESCE((SELECT COUNT(*) FROM pending_updates), 0) AS pending_update_count',
+        'chronicle signature SQL 必须输出 pending_update_count',
+    );
+}
+
 async function main() {
     const builderSource = fs.readFileSync(BUILDER_PATH, 'utf8');
     const mod = await import(pathToFileURL(BUILDER_PATH).href);
@@ -53,9 +83,11 @@ async function main() {
         assertIncludes(anchorSql, `WHERE name = '${columnName}'`, `anchor SQL 必须从统一 required columns 配置生成 ${columnName} schema 检查`);
     });
 
-    ['WITH', 'UPDATE chronicle', 'today_relation', 'global_state', 'current_status', 'cur_time', 'time_span', 'julianday', 'new_relation IS NOT NULL'].forEach((needle) => {
+    ['WITH', 'UPDATE chronicle', 'today_relation', 'global_state', 'current_status', 'cur_time', 'time_span', 'julianday', 'new_relation IS NOT NULL', 'source_signature', 'input_signature', 'pending_update_count'].forEach((needle) => {
         assertIncludes(allSql, needle, `SQL builder 必须包含 ${needle}`);
     });
+    assertSignatureContract(signatureSql, mod.CHRONICLE_TODAY_RELATION_ANCHOR_TABLES[0]);
+    assertSignatureContract(currentStatusSignatureSql, mod.CHRONICLE_TODAY_RELATION_ANCHOR_TABLES[1]);
     assertIncludes(signatureSql, `FROM ${mod.CHRONICLE_TODAY_RELATION_ANCHOR_TABLES[0]}`, '默认 signature SQL 必须使用白名单第一项 global_state 锚点');
     assertIncludes(updateSql, `FROM ${mod.CHRONICLE_TODAY_RELATION_ANCHOR_TABLES[0]}`, '默认 update SQL 必须使用白名单第一项 global_state 锚点');
     assertIncludes(currentStatusSignatureSql, 'FROM current_status', 'signature SQL 必须支持 current_status 锚点表');

@@ -2,7 +2,6 @@ import {
     getSheetKeys,
     getTableDataAsync,
     importTemplateFromDataViaApi,
-    refreshDatabaseProjectionViaApi,
 } from '../phone-core/data-api.js';
 import { pickJsonFile } from './utils.js';
 import { clearFusionResult } from './runtime.js';
@@ -73,6 +72,11 @@ function getTemplateScopeLabel(scope) {
 }
 
 function getTemplateImportSuccessText(importResult, options) {
+    const apiMessage = typeof importResult?.message === 'string'
+        ? importResult.message.trim()
+        : '';
+    if (apiMessage) return apiMessage;
+
     const scopeLabel = getTemplateScopeLabel(importResult?.scope || options.scope);
     const presetName = String(options.presetName || '').trim();
     return presetName
@@ -181,14 +185,7 @@ export function createFusionInteractionController(deps = {}) {
                 }
 
                 const successText = getTemplateImportSuccessText(importResult, importOptions);
-                const refreshResult = await refreshDatabaseProjectionViaApi();
-                if (!refreshResult.ok) {
-                    Logger?.warn?.('[phone-fusion] 模板已导入，但刷新数据库投影失败', refreshResult);
-                    showNotification?.(`${successText}，但刷新数据库投影失败：${refreshResult.message || refreshResult.code || '未知错误'}。可手动刷新。`, 'warning');
-                    return;
-                }
-
-                showNotification?.(`${successText}，数据库投影已刷新`, 'success');
+                showNotification?.(successText, 'success');
             } finally {
                 if (importButton) importButton.disabled = false;
             }

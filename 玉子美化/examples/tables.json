@@ -1,0 +1,13 @@
+{
+  "chatSheets": {
+    "characters": {
+      "name": "角色表",
+      "content": [["姓名", "状态"], ["助手", "在线"]]
+    },
+    "messages": {
+      "name": "消息记录表",
+      "specialType": "message",
+      "content": [["发送者", "内容"], ["助手", "你好"]]
+    }
+  }
+}

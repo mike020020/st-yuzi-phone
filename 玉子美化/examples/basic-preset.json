@@ -1,0 +1,22 @@
+{
+  "format": "yuzi-beautify-preset",
+  "formatVersion": 1,
+  "manifest": {
+    "id": "yuzi-example-character-table",
+    "name": "角色表示例",
+    "version": "1.0.0",
+    "author": "Yuzi",
+    "items": [{
+      "id": "character-table",
+      "name": "角色表",
+      "target": { "tableName": "角色表", "fields": ["姓名", "状态"] },
+      "entry": { "html": "page.html", "css": "page.css", "js": "page.js", "scriptMode": "classic" },
+      "assets": []
+    }]
+  },
+  "files": {
+    "page.css": { "mimeType": "text/css", "encoding": "text", "content": ".character-card { padding: 16px; }\n" },
+    "page.html": { "mimeType": "text/html", "encoding": "text", "content": "<section class=\"character-card\"><div id=\"rows\"></div></section>\n" },
+    "page.js": { "mimeType": "text/javascript", "encoding": "text", "content": "const context = window.__YUZI_BEAUTIFY_CURRENT_CONTEXT__;\n" }
+  }
+}

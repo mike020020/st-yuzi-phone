@@ -5,6 +5,7 @@ const ROOT = process.cwd();
 
 const FILES = {
     index: 'index.js',
+    backgroundServices: 'modules/phone-core/background-services.js',
     lifecycle: 'modules/phone-core/lifecycle.js',
     state: 'modules/phone-core/state.js',
     routeRuntime: 'modules/phone-core/route-runtime.js',
@@ -31,6 +32,8 @@ function main() {
     const contents = Object.fromEntries(
         Object.entries(FILES).map(([key, relativePath]) => [key, read(relativePath)])
     );
+    const destroyStart = contents.index.indexOf('export function destroy()');
+    const destroyBody = destroyStart >= 0 ? contents.index.slice(destroyStart) : '';
 
     const results = [];
 
@@ -40,6 +43,7 @@ function main() {
     check(results, 'index', 'index 新增 resetInitializationState()', has(contents.index, 'function resetInitializationState() {'));
     check(results, 'index', 'destroy() 继续调用 unregisterSlashCommands()', has(contents.index, 'unregisterSlashCommands();'));
     check(results, 'index', 'destroy() 继续调用 destroyPhoneRuntime()', has(contents.index, 'destroyPhoneRuntime();'));
+    check(results, 'index', 'destroy() 先停止后台派生服务', has(destroyBody, "stopPhoneBackgroundServices('extension-destroy');") && destroyBody.indexOf("stopPhoneBackgroundServices('extension-destroy');") < destroyBody.indexOf('destroyPhoneRuntime();'));
     check(results, 'index', 'destroy() 继续调用 cleanupIntegration()', has(contents.index, 'cleanupIntegration();'));
     check(results, 'index', 'destroy() 在 finally 中重置初始化状态', has(contents.index, 'resetInitializationState();'));
     check(results, 'index', 'index 导入 destroyPhoneSettingsPanel()', has(contents.index, 'destroyPhoneSettingsPanel'));
@@ -64,6 +68,9 @@ function main() {
     check(results, 'lifecycle', 'initPhoneUI() 通过 routeMode=home 激活首屏', has(contents.lifecycle, "activatePhoneRuntimeState(state, { routeMode: 'home' });"));
     check(results, 'lifecycle', 'onPhoneDeactivated() 通过 deactivatePhoneRuntimeState() 收口停用逻辑', has(contents.lifecycle, 'deactivatePhoneRuntimeState(state);'));
     check(results, 'lifecycle', 'destroyPhoneRuntime() 通过 cleanupPhoneRuntimeBindings() 收口清理逻辑', has(contents.lifecycle, 'cleanupPhoneRuntimeBindings(state);'));
+    check(results, 'lifecycle', 'UI lifecycle 不再直接拥有派生器启停', !has(contents.lifecycle, 'startSmallCalendarDerivedFieldsInjection') && !has(contents.lifecycle, 'startChronicleTodayRelationInjection'));
+    check(results, 'backgroundServices', '后台服务集中拥有两个派生器启停', has(contents.backgroundServices, 'startSmallCalendarDerivedFieldsInjection') && has(contents.backgroundServices, 'stopSmallCalendarDerivedFieldsInjection') && has(contents.backgroundServices, 'startChronicleTodayRelationInjection') && has(contents.backgroundServices, 'stopChronicleTodayRelationInjection'));
+    check(results, 'backgroundServices', '后台服务聊天切换屏障固定等待第二次通知、250ms 稳定期和 3.5s fallback', has(contents.backgroundServices, 'TABLE_UPDATE_SIGNAL_TARGET = 2') && has(contents.backgroundServices, 'CHAT_CHANGE_SETTLE_DELAY_MS = 250') && has(contents.backgroundServices, 'CHAT_CHANGE_WAIT_TIMEOUT_MS = 3500'));
 
     check(results, 'routeRuntime', 'route-runtime 暴露 requestPhoneRouteRender()', has(contents.routeRuntime, 'export function requestPhoneRouteRender('));
     check(results, 'routeRuntime', 'route-runtime 暴露 requestCurrentPhoneRouteRender()', has(contents.routeRuntime, 'export function requestCurrentPhoneRouteRender('));

@@ -78,7 +78,8 @@ assertOrdered(deleteBody, [
     'const execution = await executeTheaterDeletionPlans(scene, deletionPlans);',
 ], 'deleteTheaterEntities');
 assert(deleteService.includes('async function executeTheaterDeletionPlans(scene, plans = [])'), 'delete-service 必须通过行级删除执行计划落库');
-assert(deleteService.includes('const result = await deleteTableRowsBatch(plan.tableName, plan.rowIndexes,'), '小剧场删除计划必须调用 deleteTableRowsBatch');
+assert(deleteService.includes('const result = await deleteTableRowsBatch(plan.tableName, plan.rowIndexes);'), '小剧场删除计划必须等待 deleteTableRowsBatch 真实完成');
+assert(!deleteService.includes('refreshProjection'), '小剧场删除计划不得恢复旧 refreshProjection 选项');
 
 const validateBody = extractFunctionBody(
     deleteService,

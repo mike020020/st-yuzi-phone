@@ -4,6 +4,7 @@ const path = require('path');
 const ROOT = process.cwd();
 const FILES = {
     repository: 'modules/phone-core/data-api/table-repository.js',
+    mutationSettlement: 'modules/phone-core/data-api/mutation-settlement.js',
     architectureGuide: 'docs/architecture-guide.md',
     rowDelete: 'modules/table-viewer/row-delete-controller.js',
     theaterDelete: 'modules/phone-theater/delete-service.js',
@@ -63,6 +64,7 @@ function main() {
         Object.entries(FILES).map(([key, relativePath]) => [key, read(relativePath)])
     );
     const results = [];
+    const sqlMutationDeleteSource = extractNamedFunction(contents.repository, 'tryDeleteRowsViaSqlMutation');
 
     check(results, 'repository', 'deleteTableRowsBatch 仍通过 enqueueTableMutation 执行', has(contents.repository, "return enqueueTableMutation('deleteTableRowsBatch', async () => {"));
     check(results, 'repository', '仍集中构建批量删除行索引结果', has(contents.repository, 'function buildBatchDeleteRowIndexResult({'));
@@ -77,18 +79,27 @@ function main() {
     check(results, 'repository', 'SQL partial 已可能写入时不得 fallback', has(contents.repository, 'shouldFallback: false') && has(contents.repository, 'partial_unknown'));
     check(results, 'repository', 'diagnostics 暴露删除策略', has(contents.repository, 'deleteStrategy') && has(contents.repository, 'fallbackReason'));
     check(results, 'repository', 'SQL 快路径有参数上限预检，超限时在执行前 fallback', has(contents.repository, 'const SQL_DELETE_MAX_BOUND_PARAMS = 900;') && has(contents.repository, "fallbackReason: 'sql_param_limit_exceeded'"));
-    check(results, 'repository', 'SQL mutation 归一化识别 ok:false', has(contents.repository, "'ok' in result && result.ok === false"));
+    check(results, 'repository', '只有完整成功且 changes 精确匹配时才能跳过 row_id 对账', has(sqlMutationDeleteSource, 'const changesMatchesRequest = mutationResult.ok && mutationResult.changes === rowIds.length;') && has(sqlMutationDeleteSource, 'const requiresReconciliation = !changesMatchesRequest;') && has(sqlMutationDeleteSource, '} else if (requiresReconciliation) {'));
+    check(results, 'repository', '禁止恢复仅对 ok settlement 对账的旧条件', !has(sqlMutationDeleteSource, 'mutationResult.ok && !changesMatchesRequest'));
+    check(results, 'repository', '任何需要对账但查询未确认的结果必须 fail-closed', has(sqlMutationDeleteSource, 'const partialUnknown = requiresReconciliation && queryResult?.ok !== true;'));
+    check(results, 'repository', 'SQL 快路径导入共享 mutation settlement normalizer', has(contents.repository, "from './mutation-settlement.js';"));
+    check(results, 'repository', 'SQL 快路径调用共享 mutation settlement normalizer', has(contents.repository, 'normalizeSqlMutationSettlement(rawResult)'));
+    check(results, 'repository', 'repository 不得重新内联私有 SQL mutation normalizer', !has(contents.repository, 'function normalizeSqlDeleteMutationResult('));
+    check(results, 'mutationSettlement', '共享 normalizer 识别 ok:false 与 success:false', has(contents.mutationSettlement, "'ok' in result && result.ok === false") && has(contents.mutationSettlement, "'success' in result && result.success === false"));
+    check(results, 'mutationSettlement', '共享 normalizer 必须要求正式 errors 数组', has(contents.mutationSettlement, "!('errors' in result) || !Array.isArray(result.errors)"));
+    check(results, 'mutationSettlement', '共享 normalizer 的 changes 必须是非负整数', has(contents.mutationSettlement, 'Number.isInteger(result.changes)') && has(contents.mutationSettlement, 'result.changes < 0'));
     check(results, 'repository', '早退分支统一构造批量删除 diagnostics', has(contents.repository, 'function buildDeleteBatchDiagnostics({') && has(contents.repository, 'diagnostics: buildDeleteBatchDiagnostics({ tableName: safeTableName'));
     check(results, 'repository', '禁止 executeSqlBatch 主路径', !has(contents.repository, 'executeSqlBatch'));
     check(results, 'repository', '禁止 executeSql 自动分流主路径', !has(contents.repository, 'executeSql('));
 
-    const { normalizeDeleteRowIndexes, buildDeleteBatchDiagnostics, normalizeSqlDeleteMutationResult } = evaluateNamedFunctions(contents.repository, ['normalizeDeleteRowIndexes', 'buildDeleteBatchDiagnostics', 'normalizeSqlDeleteMutationResult']);
+    const { normalizeDeleteRowIndexes, buildDeleteBatchDiagnostics } = evaluateNamedFunctions(contents.repository, ['normalizeDeleteRowIndexes', 'buildDeleteBatchDiagnostics']);
+    assert(JSON.stringify(normalizeDeleteRowIndexes([1, '3', 3, 0, -1, 2.5, 'bad'])) === JSON.stringify([3, 1, 0]), 'normalizeDeleteRowIndexes 必须转换数字字符串、过滤非法索引、去重并降序排列');
     assertDeleteDiagnostics(buildDeleteBatchDiagnostics({ tableName: 'messages', deleteStrategy: 'none', fallbackReason: 'empty_selection', requestedRowIndexes: [1, 3, 3] }), { tableName: 'messages', deleteStrategy: 'none', fallbackReason: 'empty_selection', requestedRowIndexes: [3, 1] }, 'buildDeleteBatchDiagnostics');
-    assert(normalizeSqlDeleteMutationResult({ ok: false, code: 'mutation_failed', message: 'boom' }).ok === false, 'normalizeSqlDeleteMutationResult 必须保留 ok:false 失败语义');
 
     check(results, 'architectureGuide', 'Theater 文档说明 scene 不拼 SQL', has(contents.architectureGuide, '小剧场 scene 只收集删除计划，不拼 SQL。'));
     check(results, 'architectureGuide', 'Theater 文档说明不做跨表 SQL/事务删除', has(contents.architectureGuide, '当前不做跨表单条 SQL，不承诺跨表事务原子性。'));
-    check(results, 'theaterDelete', '小剧场仍按表调用 deleteTableRowsBatch', has(contents.theaterDelete, 'const result = await deleteTableRowsBatch(plan.tableName, plan.rowIndexes, {'));
+    check(results, 'theaterDelete', '小剧场仍按表等待 deleteTableRowsBatch 真实完成', has(contents.theaterDelete, 'const result = await deleteTableRowsBatch(plan.tableName, plan.rowIndexes);'));
+    check(results, 'theaterDelete', '小剧场不再传递旧 refreshProjection 选项', !has(contents.theaterDelete, 'refreshProjection'));
     check(results, 'rowDelete', '通用表格仍通过 deletePhoneSheetRows 进入仓库层', has(contents.rowDelete, 'const result = await deletePhoneSheetRows(sheetKey, requestedRowIndexes, {'));
 
     const failed = results.filter(item => !item.ok);

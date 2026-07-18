@@ -46,6 +46,7 @@ import {
 import { navigateBack } from '../phone-core/routing.js';
 import { bindPhoneScrollGuards } from '../phone-core/scroll-guards.js';
 import { getPhoneSettings, savePhoneSetting } from '../settings.js';
+import { createContentPresetWorkshopService } from '../content-presets/workshop-service.js';
 import { createScrollPreserver } from './ui/settings-scroll-binding.js';
 import { showToast } from './ui/toast.js';
 import {
@@ -101,6 +102,7 @@ import { createPageRuntimeManager } from './page-runtime.js';
 export function renderSettings(container) {
     /** @type {import('../../types').SettingsAppState} */
     const state = createSettingsAppState();
+    const contentPresetWorkshop = createContentPresetWorkshopService({ getTableData });
 
     const intent = consumePendingSettingsIntent();
     applyStatePatch(state, projectIntentToStatePatch(intent));
@@ -319,6 +321,9 @@ export function renderSettings(container) {
         promptEditor: {
             getPhoneAiInstructionPreset,
             savePhoneAiInstructionPreset,
+        },
+        contentPresetWorkshop: {
+            ...contentPresetWorkshop,
         },
     };
 

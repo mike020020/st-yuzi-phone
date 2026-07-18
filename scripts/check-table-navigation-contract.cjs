@@ -135,7 +135,7 @@ async function main() {
 
     const genericRenderer = await __test__loadRouteRenderer('table:generic', 11, routeDeps);
     assert.equal(genericRenderer.routeType, 'table-generic-auto');
-    genericRenderer.render({ page: 'generic' });
+    await genericRenderer.render({ page: 'generic' });
     assert.deepEqual(rendered.pop(), {
         kind: 'viewer',
         args: [{ page: 'generic' }, 'generic', { forceGenericList: true, navigationSheetKey: 'generic' }],
@@ -143,7 +143,7 @@ async function main() {
 
     const specialRenderer = await __test__loadRouteRenderer('table:special', 12, routeDeps);
     assert.equal(specialRenderer.routeType, 'table-special');
-    specialRenderer.render({ page: 'special' });
+    await specialRenderer.render({ page: 'special' });
     assert.deepEqual(rendered.pop(), {
         kind: 'viewer',
         args: [{ page: 'special' }, 'special', { forceGenericList: false, navigationSheetKey: 'special' }],
@@ -151,7 +151,7 @@ async function main() {
 
     const theaterRenderer = await __test__loadRouteRenderer('table:theater', 13, routeDeps);
     assert.equal(theaterRenderer.routeType, 'table-theater');
-    theaterRenderer.render({ page: 'theater' });
+    await theaterRenderer.render({ page: 'theater' });
     assert.deepEqual(rendered.pop(), {
         kind: 'theater',
         args: [{ page: 'theater' }, 'square', { renderToken: 13, navigationSheetKey: 'theater' }],
@@ -159,21 +159,21 @@ async function main() {
 
     const appTheaterRenderer = await __test__loadRouteRenderer('app:theater', 14, routeDeps);
     assert.equal(appTheaterRenderer.routeType, 'theater-app-redirect');
-    appTheaterRenderer.render({ page: 'app-theater' });
+    await appTheaterRenderer.render({ page: 'app-theater' });
     assert.deepEqual(rendered.pop(), {
         kind: 'theater',
         args: [{ page: 'app-theater' }, 'square', { renderToken: 14, navigationSheetKey: 'theater' }],
     });
 
     const forcedGenericRenderer = await __test__loadRouteRenderer('table-generic:special', 15, routeDeps);
-    forcedGenericRenderer.render({ page: 'forced-generic' });
+    await forcedGenericRenderer.render({ page: 'forced-generic' });
     assert.deepEqual(rendered.pop(), {
         kind: 'viewer',
         args: [{ page: 'forced-generic' }, 'special', { forceGenericList: true }],
     });
 
     const explicitTheaterRenderer = await __test__loadRouteRenderer('theater:square', 16, routeDeps);
-    explicitTheaterRenderer.render({ page: 'explicit-theater' });
+    await explicitTheaterRenderer.render({ page: 'explicit-theater' });
     assert.deepEqual(rendered.pop(), {
         kind: 'theater',
         args: [{ page: 'explicit-theater' }, 'square', { renderToken: 16 }],

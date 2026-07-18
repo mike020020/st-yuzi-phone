@@ -6,6 +6,7 @@ const ROOT = process.cwd();
 const FILES = {
     index: 'index.js',
     appBootstrap: 'modules/bootstrap/app-bootstrap.js',
+    eventRegistry: 'modules/bootstrap/event-registry.js',
 };
 
 function read(relativePath) {
@@ -43,8 +44,13 @@ function main() {
     check(results, 'index', 'index 导入 togglePhoneBootstrapVisibility()', has(contents.index, 'togglePhoneBootstrapVisibility'));
     check(results, 'index', 'index 导入 setPhoneBootstrapEnabledState()', has(contents.index, 'setPhoneBootstrapEnabledState'));
     check(results, 'index', 'togglePhone() 继续委托 bootstrap visibility helper', has(contents.index, 'return togglePhoneBootstrapVisibility(show, {'));
-    check(results, 'index', 'setPhoneEnabledWithUI() 继续委托 bootstrap enabled-state helper', has(contents.index, 'return setPhoneBootstrapEnabledState(enabled, {'));
+    check(results, 'index', 'setPhoneEnabledWithUI() 启用时挂载 UI 并启动后台服务', has(contents.index, 'setPhoneBootstrapEnabledState(true, {') && has(contents.index, "startPhoneBackgroundServices('settings-enabled');"));
+    check(results, 'index', 'setPhoneEnabledWithUI() 禁用时先停止后台服务并销毁 runtime', has(contents.index, "stopPhoneBackgroundServices('settings-disabled');") && has(contents.index, 'destroyPhoneRuntime();') && has(contents.index, 'setPhoneBootstrapEnabledState(false, {'));
+    check(results, 'index', 'setPhoneEnabledWithUI() 禁用时取消可见主页刷新屏障', has(contents.index, "cancelPendingHomeRefresh('settings-disabled');"));
+    check(results, 'index', 'doInitialize() 使用 bootstrap settings 决定后台服务状态', has(contents.index, 'const { settings } = await initializePhoneBootstrapUi({') && has(contents.index, 'if (settings?.enabled !== false) {'));
     check(results, 'index', 'doInitialize() 继续委托 initializePhoneBootstrapUi()', has(contents.index, 'await initializePhoneBootstrapUi({'));
+    check(results, 'index', '初始化失败时停止后台服务，避免失败实例残留订阅', has(contents.index, "stopPhoneBackgroundServices('initialize-failed');"));
+    check(results, 'eventRegistry', '聊天切换无论手机是否可见都先通知后台服务', has(contents.eventRegistry, 'onBackgroundChatChanged?.(chatId);') && contents.eventRegistry.indexOf('onBackgroundChatChanged?.(chatId);') < contents.eventRegistry.indexOf("container.classList.contains('visible')"));
 
     const failed = results.filter((item) => !item.ok);
     if (failed.length > 0) {

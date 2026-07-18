@@ -125,6 +125,18 @@ function validateSettingsRendererDeps(deps = {}) {
         'getPhoneAiInstructionPreset',
         'savePhoneAiInstructionPreset',
     ]);
+    assertFunctionDeps('contentPresetWorkshop', deps.contentPresetWorkshop, [
+        'getSnapshot',
+        'subscribe',
+        'getViewModel',
+        'prepareImport',
+        'importPrepared',
+        'exportPreset',
+        'deletePreset',
+        'setActive',
+        'clearActive',
+        'clearAllActive',
+    ]);
 }
 
 /**

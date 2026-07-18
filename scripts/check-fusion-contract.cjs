@@ -100,7 +100,11 @@ function main() {
     check(results, 'interactions', 'interactions 不再保留危险覆盖备份 helper', !has(contents.interactions, 'createBackupDownloadLink'));
     check(results, 'interactions', 'interactions 不再保留 best-effort rollback 链路', !has(contents.interactions, 'bestEffortRollback'));
     check(results, 'interactions', 'interactions 不再保留危险读回比较 helper', !has(contents.interactions, 'compareSnapshotForReadback'));
-    check(results, 'interactions', 'interactions 导入成功后刷新数据库投影', has(contents.interactions, 'refreshDatabaseProjectionViaApi'));
+    check(results, 'interactions', 'interactions 导入成功后不再二次刷新数据库投影', !has(contents.interactions, 'refreshDatabaseProjectionViaApi'));
+    check(results, 'interactions', 'interactions 不再保留二次刷新结果分支', !has(contents.interactions, 'refreshResult'));
+    check(results, 'interactions', 'interactions 不再输出重复刷新成功或失败提示', !has(contents.interactions, '数据库投影已刷新') && !has(contents.interactions, '刷新数据库投影失败'));
+    check(results, 'interactions', 'interactions 优先使用底层导入成功消息', has(contents.interactions, 'importResult?.message'));
+    check(results, 'interactions', 'interactions 保留 scope/presetName 成功文案兜底', has(contents.interactions, 'getTemplateImportSuccessText'));
     check(results, 'interactions', 'interactions 导入前执行最终模板校验', has(contents.interactions, 'validateFusionTemplate'));
     check(results, 'interactions', '当前数据库空数据有明确错误提示', has(contents.interactions, '当前数据库表格为空'));
     check(results, 'interactions', '内置来源标签同步为小剧场+纪要表', has(contents.interactions, '内置小剧场+纪要表'));

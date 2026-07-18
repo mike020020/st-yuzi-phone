@@ -38,8 +38,13 @@ function main() {
 
     const previousRemovalBlock = functionBlock('schedulePreviousPageRemoval');
     assert.ok(
-        previousRemovalBlock.includes('if (!oldContent.isConnected) return;'),
-        'previous page removal should only depend on the old page still being connected',
+        previousRemovalBlock.includes('if (!oldContent.isConnected) {')
+            && previousRemovalBlock.includes('removeRoutePage(oldContent);'),
+        'previous page removal should dispose route-page lifecycle even when the page is already disconnected',
+    );
+    assert.ok(
+        (previousRemovalBlock.match(/removeRoutePage\(oldContent\);/g) || []).length === 2,
+        'previous page removal should use lifecycle-aware removal in both connected and disconnected paths',
     );
     assert.ok(
         !previousRemovalBlock.includes('isActiveRouteRender(renderToken)'),
@@ -59,6 +64,10 @@ function main() {
         commitBlock.includes('schedulePreviousPageRemoval(oldContent, exitClass);'),
         'commit should schedule previous page removal without a render token',
     );
+    assert.ok(
+        commitBlock.includes('removeRoutePage(page);'),
+        'a stale direct commit should dispose its uncommitted route page',
+    );
 
     const scheduleBlock = functionBlock('scheduleRouteCommit');
     const skipLogIndex = scheduleBlock.indexOf("action: 'commit.schedule.skip'");
@@ -67,11 +76,16 @@ function main() {
         scheduleBlock.slice(Math.max(0, skipLogIndex - 120), skipLogIndex).includes('logger.debug({'),
         'scheduled commit skip should be logged at debug level because stale delayed commits are expected',
     );
+    assert.ok(
+        scheduleBlock.includes('removeRoutePage(page);'),
+        'a stale scheduled commit should dispose its uncommitted route page',
+    );
 
     console.log('[route-renderer-page-cleanup-check] passed');
     console.log(`- OK | ${ROUTE_RENDERER} keeps oldContent aligned with latest direct .phone-page`);
     console.log(`- OK | ${ROUTE_RENDERER} removes stale .phone-page siblings on commit`);
     console.log(`- OK | ${ROUTE_RENDERER} does not cancel previous-page removal with stale render tokens`);
+    console.log(`- OK | ${ROUTE_RENDERER} disposes route-page lifecycle on every removal path`);
 }
 
 main();

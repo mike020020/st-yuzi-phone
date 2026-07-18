@@ -97,7 +97,8 @@ async function importViewerModules() {
     const runtimeModule = await import(toModuleUrl('modules/table-viewer/runtime.js'));
     const genericRuntimeModule = await import(toModuleUrl('modules/table-viewer/generic-runtime.js'));
     const specialRuntimeModule = await import(toModuleUrl('modules/table-viewer/special/runtime.js'));
-    return { runtimeModule, genericRuntimeModule, specialRuntimeModule };
+    const callbacksModule = await import(toModuleUrl('modules/phone-core/callbacks.js'));
+    return { runtimeModule, genericRuntimeModule, specialRuntimeModule, callbacksModule };
 }
 
 async function testViewerRuntimeStartSession(runtimeModule) {
@@ -112,7 +113,11 @@ async function testViewerRuntimeStartSession(runtimeModule) {
         rerenderViewer: () => {},
         runtimeDeps: {
             getModalById: () => null,
-            setCurrentViewingSheet: (sheetKey) => order.push(`sheet:${sheetKey}`),
+            acquireCurrentViewingSheet: (sheetKey) => {
+                order.push(`acquire:${sheetKey}`);
+                return { sheetKey };
+            },
+            releaseCurrentViewingSheet: owner => order.push(`release:${owner.sheetKey}`),
             resetDataVersion: () => order.push('reset'),
             bindTemplateDraftPreviewForViewer: (host, sheetKey) => {
                 order.push(`draft:${sheetKey}`);
@@ -127,7 +132,7 @@ async function testViewerRuntimeStartSession(runtimeModule) {
     assert.ok(runtime);
     assert.equal(runtime.startViewerSession(), true);
     assert.deepEqual(order.slice(0, 4), [
-        'sheet:sheet_runtime',
+        'acquire:sheet_runtime',
         'reset',
         'draft:sheet_runtime',
         'observe:body',
@@ -136,7 +141,19 @@ async function testViewerRuntimeStartSession(runtimeModule) {
     runtime.dispose();
     assert.ok(order.includes('draft-cleanup'));
     assert.ok(order.includes('observer-disconnect'));
-    assert.ok(order.includes('sheet:null'));
+    assert.ok(order.includes('release:sheet_runtime'));
+}
+
+async function testViewingSheetLeaseRace(callbacksModule) {
+    callbacksModule.setCurrentViewingSheet(null);
+    const ownerA = callbacksModule.acquireCurrentViewingSheet('sheet_a');
+    const ownerB = callbacksModule.acquireCurrentViewingSheet('sheet_b');
+    assert.equal(callbacksModule.getCurrentViewingSheet(), 'sheet_b');
+    assert.equal(callbacksModule.releaseCurrentViewingSheet(ownerA), false);
+    assert.equal(callbacksModule.getCurrentViewingSheet(), 'sheet_b', 'A 晚释放不得清空 B 的 viewing sheet');
+    assert.equal(callbacksModule.releaseCurrentViewingSheet(ownerB), true);
+    assert.equal(callbacksModule.getCurrentViewingSheet(), null);
+    assert.equal(callbacksModule.releaseCurrentViewingSheet(ownerA), false, 'A 再次晚释放仍不得改变状态');
 }
 
 async function testViewerRuntimeSuppressDepth(runtimeModule) {
@@ -227,15 +244,17 @@ async function testSpecialRuntimeStartPath(specialRuntimeModule) {
 
 async function main() {
     installDomGlobals();
-    const { runtimeModule, genericRuntimeModule, specialRuntimeModule } = await importViewerModules();
+    const { runtimeModule, genericRuntimeModule, specialRuntimeModule, callbacksModule } = await importViewerModules();
 
     await testViewerRuntimeStartSession(runtimeModule);
+    await testViewingSheetLeaseRace(callbacksModule);
     await testViewerRuntimeSuppressDepth(runtimeModule);
     await testGenericRuntimeStartOrder(genericRuntimeModule);
     await testSpecialRuntimeStartPath(specialRuntimeModule);
 
     console.log('[viewer-runtime-behavior-check] 检查通过');
     console.log('- OK | startViewerSession() 保持 viewing sheet / reset / draft / observer 启动顺序');
+    console.log('- OK | A→B→A 晚释放不会清空新 viewer 的 currentViewingSheetKey');
     console.log('- OK | setSuppressExternalTableUpdate() 使用计数语义并防止多余 false 下溢');
     console.log('- OK | generic-runtime.start() 保持 bind -> render 顺序');
     console.log('- OK | special-runtime 保持 create -> start 路径与 viewerEventManager owner 传递');

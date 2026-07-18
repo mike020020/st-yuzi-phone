@@ -1,10 +1,12 @@
 import {
     DEFAULT_API_TIMEOUT,
     callApiWithTimeout,
+    callMutationApiToSettlement,
     getDB,
     hasDbApiMethod,
     isDbBooleanSuccess,
 } from '../db-bridge.js';
+import { enqueueTableMutation } from './mutation-queue.js';
 
 const OPERATIONS = Object.freeze({
     exportSnapshot: 'exportDatabaseSnapshot',
@@ -78,7 +80,97 @@ function normalizeTemplateImportOptions(options = {}) {
     return presetName ? { scope, presetName } : { scope };
 }
 
-async function callRepositoryApi(operation, methodName, invoke, timeout) {
+function getNonEmptyMessage(value) {
+    return typeof value === 'string' && value.trim() ? value : '';
+}
+
+function normalizeTemplateImportApiResult(result, importOptions) {
+    const operation = OPERATIONS.importTemplate;
+    const fallbackScope = importOptions.scope;
+
+    if (result === null) {
+        return buildResult({
+            ok: false,
+            operation,
+            code: 'mutation_result_null',
+            message: '导入模板失败：importTemplateFromData 返回 null',
+            scope: fallbackScope,
+        });
+    }
+
+    if (result === false) {
+        return buildResult({
+            ok: false,
+            operation,
+            code: 'import_rejected',
+            message: '导入模板失败：importTemplateFromData 未确认成功',
+            data: { result },
+            scope: fallbackScope,
+        });
+    }
+
+    if (result === true) {
+        return buildResult({
+            ok: true,
+            operation,
+            code: 'ok',
+            message: '',
+            data: { result, options: importOptions },
+            scope: fallbackScope,
+        });
+    }
+
+    if (!isPlainObject(result)) {
+        return buildResult({
+            ok: false,
+            operation,
+            code: 'mutation_result_invalid',
+            message: '导入模板失败：importTemplateFromData 返回值无效',
+            data: {
+                result,
+                responseType: Array.isArray(result) ? 'array' : typeof result,
+            },
+            scope: fallbackScope,
+        });
+    }
+
+    const scope = result.scope === 'chat' || result.scope === 'global'
+        ? result.scope
+        : fallbackScope;
+    if (result.success === false) {
+        return buildResult({
+            ok: false,
+            operation,
+            code: 'import_rejected',
+            message: getNonEmptyMessage(result.message)
+                || '导入模板失败：importTemplateFromData 未确认成功',
+            data: { result },
+            scope,
+        });
+    }
+
+    if (result.success !== true) {
+        return buildResult({
+            ok: false,
+            operation,
+            code: 'mutation_result_invalid',
+            message: '导入模板失败：importTemplateFromData 返回对象未提供 success=true',
+            data: { result },
+            scope,
+        });
+    }
+
+    return buildResult({
+        ok: true,
+        operation,
+        code: 'ok',
+        message: getNonEmptyMessage(result.message),
+        data: { result, options: importOptions },
+        scope,
+    });
+}
+
+async function callReadRepositoryApi(operation, methodName, invoke, timeout) {
     const apiPack = getApiForOperation(operation, methodName);
     if (!apiPack.ok) return apiPack;
 
@@ -90,6 +182,27 @@ async function callRepositoryApi(operation, methodName, invoke, timeout) {
     return { ok: true, apiResult: result };
 }
 
+async function callMutationRepositoryApi(operation, methodName, invoke) {
+    const apiPack = getApiForOperation(operation, methodName);
+    if (!apiPack.ok) return apiPack;
+
+    try {
+        const result = await callMutationApiToSettlement(
+            () => invoke(apiPack.api),
+            `import-export-repository.${methodName}`,
+        );
+        return { ok: true, apiResult: result };
+    } catch (error) {
+        return buildResult({
+            ok: false,
+            operation,
+            code: 'mutation_rejected',
+            message: `数据库写入调用失败：${methodName}`,
+            error,
+        });
+    }
+}
+
 
 function normalizeTimeout(options = {}) {
     const timeout = Number(isPlainObject(options) ? options.timeout : undefined);
@@ -98,7 +211,7 @@ function normalizeTimeout(options = {}) {
 
 export async function exportDatabaseSnapshotViaApi(options = {}) {
     const operation = OPERATIONS.exportSnapshot;
-    const call = await callRepositoryApi(
+    const call = await callReadRepositoryApi(
         operation,
         'exportTableAsJson',
         (api) => api.exportTableAsJson(),
@@ -145,81 +258,65 @@ export async function importTemplateFromDataViaApi(templateData, options = {}) {
         });
     }
 
-    const importOptions = normalizeTemplateImportOptions(options);
-    const call = await callRepositoryApi(
-        operation,
-        'importTemplateFromData',
-        (api) => api.importTemplateFromData(templateData, importOptions),
-        normalizeTimeout(options),
-    );
-    if (!call.ok) return { ...call, scope: importOptions.scope };
-
-    const result = call.apiResult;
-    if (result === null) {
-        return buildResult({
-            ok: false,
+    return enqueueTableMutation('importTemplateFromDataViaApi', async () => {
+        const importOptions = normalizeTemplateImportOptions(options);
+        const call = await callMutationRepositoryApi(
             operation,
-            code: 'api_call_failed',
-            message: '导入模板失败：API 调用可能超时、异常或返回 null',
-            scope: importOptions.scope,
-        });
-    }
-    if (result === false) {
-        return buildResult({
-            ok: false,
-            operation,
-            code: 'import_rejected',
-            message: '导入模板失败：importTemplateFromData 未确认成功',
-            data: { result },
-            scope: importOptions.scope,
-        });
-    }
+            'importTemplateFromData',
+            (api) => api.importTemplateFromData(templateData, importOptions),
+        );
+        if (!call.ok) return { ...call, scope: importOptions.scope };
 
-    return buildResult({
-        ok: true,
-        operation,
-        code: 'ok',
-        message: '模板已导入数据库预设',
-        data: { result, options: importOptions },
-        scope: importOptions.scope,
+        return normalizeTemplateImportApiResult(call.apiResult, importOptions);
     });
 }
 
 
 export async function refreshDatabaseProjectionViaApi(options = {}) {
     const operation = OPERATIONS.refreshProjection;
-    const call = await callRepositoryApi(
-        operation,
-        'refreshDataAndWorldbook',
-        (api) => api.refreshDataAndWorldbook(),
-        normalizeTimeout(options),
-    );
-    if (!call.ok) return call;
+    return enqueueTableMutation('refreshDatabaseProjectionViaApi', async () => {
+        void options;
+        const call = await callMutationRepositoryApi(
+            operation,
+            'refreshDataAndWorldbook',
+            (api) => api.refreshDataAndWorldbook(),
+        );
+        if (!call.ok) return call;
 
-    const result = call.apiResult;
-    if (result === null) {
+        const result = call.apiResult;
+        if (result === null) {
+            return buildResult({
+                ok: false,
+                operation,
+                code: 'mutation_result_null',
+                message: '刷新数据库投影失败：refreshDataAndWorldbook 返回 null',
+            });
+        }
+        if (result === false) {
+            return buildResult({
+                ok: false,
+                operation,
+                code: 'refresh_rejected',
+                message: '刷新数据库投影失败：refreshDataAndWorldbook 未确认成功',
+                data: { result },
+            });
+        }
+        if (!isDbBooleanSuccess(result)) {
+            return buildResult({
+                ok: false,
+                operation,
+                code: 'mutation_result_invalid',
+                message: '刷新数据库投影失败：refreshDataAndWorldbook 返回值无效',
+                data: { result },
+            });
+        }
+
         return buildResult({
-            ok: false,
+            ok: true,
             operation,
-            code: 'api_call_failed',
-            message: '刷新数据库投影失败：API 调用可能超时、异常或返回 null',
-        });
-    }
-    if (!isDbBooleanSuccess(result)) {
-        return buildResult({
-            ok: false,
-            operation,
-            code: 'refresh_rejected',
-            message: '刷新数据库投影失败：refreshDataAndWorldbook 未确认成功',
+            code: 'ok',
+            message: '数据库投影已刷新',
             data: { result },
         });
-    }
-
-    return buildResult({
-        ok: true,
-        operation,
-        code: 'ok',
-        message: '数据库投影已刷新',
-        data: { result },
     });
 }

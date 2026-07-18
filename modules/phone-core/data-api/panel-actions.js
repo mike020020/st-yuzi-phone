@@ -1,6 +1,7 @@
 import { Logger } from '../../error-handler.js';
-import { getDB, sleep, withTimeout } from '../db-bridge.js';
+import { callMutationApiToSettlement, getDB, sleep, withTimeout } from '../db-bridge.js';
 import { openDatabaseUi, openDatabaseVisualizerUi } from './database-ui-bridge.js';
+import { enqueueTableMutation } from './mutation-queue.js';
 
 const logger = Logger.withScope({ scope: 'phone-core/data-api/panel-actions', feature: 'db-api' });
 
@@ -35,35 +36,36 @@ async function warmDatabaseSettingsRuntimeBeforeManualUpdate(api) {
 }
 
 export async function triggerManualUpdate() {
-    const api = getDB();
-    if (api && typeof api.manualUpdate === 'function') {
-        try {
+    return enqueueTableMutation('triggerManualUpdate', async () => {
+        const api = getDB();
+        if (api && typeof api.manualUpdate === 'function') {
             await warmDatabaseSettingsRuntimeBeforeManualUpdate(api);
-            return await api.manualUpdate();
-        } catch (error) {
-            logger.warn({
-                action: 'manual-update.api',
-                message: 'manualUpdate 调用失败',
-                error,
-            });
+            try {
+                const result = await callMutationApiToSettlement(
+                    () => api.manualUpdate(),
+                    'triggerManualUpdate.manualUpdate',
+                );
+                return result === true;
+            } catch (error) {
+                logger.warn({
+                    action: 'manual-update.api',
+                    message: 'manualUpdate 调用失败',
+                    error,
+                });
+                return false;
+            }
         }
-    }
 
-    try {
-        const topDoc = (window.parent || window).document;
-        const button = topDoc.querySelector('[id$="-manual-update-card"]');
-        if (button instanceof HTMLElement) {
-            button.click();
-            return true;
-        }
-    } catch (error) {
         logger.warn({
-            action: 'manual-update.fallback',
-            message: '按钮点击方式也失败',
-            error,
+            action: 'manual-update.method-unavailable',
+            message: '数据库 manualUpdate API 不可用',
+            context: {
+                apiAvailable: Boolean(api),
+                methodName: 'manualUpdate',
+            },
         });
-    }
-    return false;
+        return false;
+    });
 }
 
 export async function openVisualizerWithStatus(options = {}) {

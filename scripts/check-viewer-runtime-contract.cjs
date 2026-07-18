@@ -40,7 +40,8 @@ function main() {
     check(results, 'viewerRuntime', 'viewer-runtime 暴露 bindExternalTableUpdate()', has(contents.viewerRuntime, 'const bindExternalTableUpdate = (handler) => {'));
     check(results, 'viewerRuntime', 'viewer-runtime 暴露 bindDraftPreview()', has(contents.viewerRuntime, 'const bindDraftPreview = () => {'));
     check(results, 'viewerRuntime', 'viewer-runtime 暴露 startViewerSession()', has(contents.viewerRuntime, 'const startViewerSession = (options = {}) => {'));
-    check(results, 'viewerRuntime', 'viewer-runtime startViewerSession() 继续设置 currentViewingSheet', has(contents.viewerRuntime, 'resolvedRuntimeDeps.setCurrentViewingSheet(sheetKey);'));
+    check(results, 'viewerRuntime', 'viewer-runtime startViewerSession() 取得 currentViewingSheet owner', has(contents.viewerRuntime, 'resolvedRuntimeDeps.acquireCurrentViewingSheet(sheetKey);'));
+    check(results, 'viewerRuntime', 'viewer-runtime dispose() 只释放自身 currentViewingSheet owner', has(contents.viewerRuntime, 'resolvedRuntimeDeps.releaseCurrentViewingSheet(viewingSheetOwner);'));
     check(results, 'viewerRuntime', 'viewer-runtime startViewerSession() 继续重置数据版本', has(contents.viewerRuntime, 'resolvedRuntimeDeps.resetDataVersion();'));
     check(results, 'viewerRuntime', 'viewer-runtime 继续托管 cleanupObserver', has(contents.viewerRuntime, 'let cleanupObserver = null;'));
     check(results, 'viewerRuntime', 'viewer-runtime observeContainerRemoval() 通过 runtime scope 的 observeDisconnection() 收口', has(contents.viewerRuntime, 'cleanupObserver = viewerRuntimeScope.observeDisconnection(container, () => {')

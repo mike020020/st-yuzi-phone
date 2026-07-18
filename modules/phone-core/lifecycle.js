@@ -11,14 +11,6 @@ import { initPhoneShellResize } from '../window/resize.js';
 import { unregisterTableFillStartListener, unregisterTableUpdateListener, initSmartRefreshListener } from './callbacks.js';
 import { debugCheckAPI } from './data-api.js';
 import {
-    startChronicleTodayRelationInjection,
-    stopChronicleTodayRelationInjection,
-} from './derived-fields/chronicle-today-relation.js';
-import {
-    startSmallCalendarDerivedFieldsInjection,
-    stopSmallCalendarDerivedFieldsInjection,
-} from './derived-fields/small-calendar-derived-fields.js';
-import {
     startTableUpdateReviewService,
     stopTableUpdateReviewService,
 } from '../table-update-review/service.js';
@@ -120,8 +112,6 @@ function initializePhoneRuntimeBindings(state = getPhoneCoreState()) {
     ensureRouteRenderSubscription(state);
     scheduleIdleApiDebugTask(state);
     initSmartRefreshListener();
-    startChronicleTodayRelationInjection();
-    startSmallCalendarDerivedFieldsInjection();
     startTableUpdateReviewService();
     scheduleShellWindowInteractions(state);
 
@@ -173,8 +163,6 @@ function deactivatePhoneRuntimeState(state = getPhoneCoreState()) {
 function cleanupPhoneRuntimeBindings(state = getPhoneCoreState()) {
     clearIdleApiDebugTask(state);
     clearRouteRenderSubscription(state);
-    stopSmallCalendarDerivedFieldsInjection();
-    stopChronicleTodayRelationInjection();
     stopTableUpdateReviewService();
     unregisterTableUpdateListener();
     unregisterTableFillStartListener();

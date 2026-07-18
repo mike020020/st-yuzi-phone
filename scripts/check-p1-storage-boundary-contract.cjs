@@ -13,6 +13,7 @@ const ALLOWED_STORAGE_FILES = new Set([
 const ALLOWED_INDEXED_DB_FILES = new Set([
     'modules/cache-manager.js',
     'modules/settings-app/services/appearance-settings/appearance-pack-repository.js',
+    'modules/content-presets/repository.js',
 ]);
 
 const REQUIRED_SETTING_FILES = {
@@ -36,6 +37,7 @@ const REQUIRED_STORAGE_MANAGER_FILES = {
 };
 
 const REQUIRED_APPEARANCE_PACK_REPOSITORY = 'modules/settings-app/services/appearance-settings/appearance-pack-repository.js';
+const REQUIRED_CONTENT_PRESET_REPOSITORY = 'modules/content-presets/repository.js';
 
 function read(relativePath) {
     return fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
@@ -118,7 +120,7 @@ function main() {
         check(
             results,
             item.relativePath,
-            '裸 indexedDB.open() 只能出现在 cache-manager 或专用外观包 repository',
+            '裸 indexedDB.open() 只能出现在 cache-manager 或明确的专用 repository',
             ALLOWED_INDEXED_DB_FILES.has(item.relativePath),
             `${item.matches.length} references`
         );
@@ -180,6 +182,18 @@ function main() {
         && has(appearancePackRepository, 'indexedDB.open(DB_NAME, DB_VERSION)')
         && !has(appearancePackRepository, 'savePhoneSetting(')
         && !has(appearancePackRepository, 'savePhoneSettingsPatch('));
+    const contentPresetRepository = read(REQUIRED_CONTENT_PRESET_REPOSITORY);
+    check(results, REQUIRED_CONTENT_PRESET_REPOSITORY, '玉子预设仓库使用独立数据库、双 store 与 presetId index',
+        has(contentPresetRepository, 'CONTENT_PRESET_DB_NAME')
+        && has(contentPresetRepository, 'CONTENT_PRESET_STORES.presets')
+        && has(contentPresetRepository, 'CONTENT_PRESET_STORES.activeByTable')
+        && has(contentPresetRepository, 'CONTENT_PRESET_BINDING_INDEX'));
+    check(results, REQUIRED_CONTENT_PRESET_REPOSITORY, '玉子预设仓库不写 settings/localStorage/sessionStorage 且不混用其他 DB',
+        !has(contentPresetRepository, 'savePhoneSetting(')
+        && !has(contentPresetRepository, 'savePhoneSettingsPatch(')
+        && !/\b(?:localStorage|sessionStorage)\b/.test(contentPresetRepository)
+        && !has(contentPresetRepository, 'yuzi-phone-cache')
+        && !has(contentPresetRepository, 'yuzi-phone-appearance-packs'));
     check(results, REQUIRED_APPEARANCE_PACK_REPOSITORY, '外观包仓库定义数量、单包和总容量限制', has(appearancePackRepository, 'MAX_PACK_COUNT = 20') && has(appearancePackRepository, 'MAX_SINGLE_PACK_BYTES = 20 * 1024 * 1024') && has(appearancePackRepository, 'MAX_TOTAL_PACK_BYTES = 100 * 1024 * 1024'));
     check(results, REQUIRED_CACHE_FILES.backgroundService, '背景图片原始设置走 settings', has(backgroundService, "savePhoneSetting('backgroundImage', dataUrl);"));
     check(results, REQUIRED_CACHE_FILES.backgroundService, '背景图片大对象预览走 cache-manager', has(backgroundService, 'cacheSet(CACHE_STORES.images, cachedKey, dataUrl'));

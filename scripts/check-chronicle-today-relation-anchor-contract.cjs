@@ -5,6 +5,7 @@ const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..');
 const SOURCE_PATH = path.join(ROOT, 'modules', 'phone-core', 'derived-fields', 'chronicle-today-relation.js');
+const DERIVED_FIELD_SERVICE_PATH = path.join(ROOT, 'modules', 'phone-core', 'derived-fields', 'derived-field-service.js');
 const SQL_BUILDER_PATH = path.join(ROOT, 'modules', 'phone-core', 'derived-fields', 'chronicle-today-relation-sql.js');
 const DATA_API_PATH = path.join(ROOT, 'modules', 'phone-core', 'data-api.js');
 
@@ -22,6 +23,7 @@ function assertNotIncludes(source, needle, message) {
 
 async function main() {
     const source = read(SOURCE_PATH);
+    const derivedFieldService = read(DERIVED_FIELD_SERVICE_PATH);
     const builder = read(SQL_BUILDER_PATH);
     const dataApi = read(DATA_API_PATH);
     const sourceModule = await import(pathToFileURL(SOURCE_PATH).href);
@@ -32,9 +34,11 @@ async function main() {
     assertIncludes(source, 'buildChronicleTodayRelationSignatureSql', '派生器必须使用 signature SQL builder');
     assertIncludes(source, 'buildChronicleTodayRelationUpdateSql', '派生器必须使用 UPDATE SQL builder');
     assertIncludes(source, 'buildChronicleTodayRelationSchemaGateSql', '派生器必须在 signature/update 前执行完整 schema gate');
-    assertIncludes(source, 'MAX_SIGNATURE_RETRY = 1', '派生器必须使用一次有界 signature 重试');
-    assertIncludes(source, 'runtime.lastInputSignature', '派生器必须保留输入签名缓存');
-    assertIncludes(source, 'runtime.lastInvalidWarningSignature', '派生器必须对 invalid time_span warning 去重');
+    assertIncludes(source, 'maxSignatureRetry: 1', '纪要适配器必须配置一次有界 signature 重试');
+    assertIncludes(derivedFieldService, 'const DEFAULT_MAX_SIGNATURE_RETRY = 1', '共享派生服务必须保留一次有界 signature 重试默认值');
+    assertIncludes(derivedFieldService, 'for (let attempt = 0; attempt <= maxSignatureRetry; attempt += 1)', '共享派生服务必须按配置执行有界 signature 重试');
+    assertIncludes(derivedFieldService, 'runtime.lastInputSignature', '共享派生服务必须保留输入签名缓存');
+    assertIncludes(derivedFieldService, 'runtime.lastInvalidWarningSignature', '共享派生服务必须对 invalid warning 去重');
     assertIncludes(source, "from '../data-api.js'", '派生器必须只通过 data-api facade 调 repository');
 
     assertIncludes(dataApi, 'querySqlViaApi', 'data-api facade 必须导出 querySqlViaApi');

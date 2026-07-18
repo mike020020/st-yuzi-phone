@@ -1,6 +1,7 @@
 import { Logger } from '../error-handler.js';
 
 export const DEFAULT_API_TIMEOUT = 5000;
+export const DEFAULT_MUTATION_WATCHDOG_MS = 30000;
 const logger = Logger.withScope({ scope: 'phone-core/db-bridge', feature: 'db-api' });
 
 export function getDB() {
@@ -86,6 +87,56 @@ export async function callApiWithTimeout(apiCall, timeout = DEFAULT_API_TIMEOUT,
             finish(null);
         }
     });
+}
+
+/**
+ * Invoke a mutating database API and wait for its real settlement.
+ *
+ * The watchdog is diagnostic only. A mutation cannot be treated as timed out
+ * while its underlying Promise may still be changing SQLite/chat/worldbook
+ * state, because doing so would release the shared mutation queue too early.
+ *
+ * @template T
+ * @param {() => T | Promise<T>} apiCall
+ * @param {string} apiName
+ * @param {{ watchdogMs?: number }} options
+ * @returns {Promise<T>}
+ */
+export async function callMutationApiToSettlement(apiCall, apiName = 'API', options = {}) {
+    const safeApiName = String(apiName || 'API').trim() || 'API';
+    const configuredWatchdogMs = Number(options?.watchdogMs);
+    const watchdogMs = Number.isFinite(configuredWatchdogMs) && configuredWatchdogMs > 0
+        ? configuredWatchdogMs
+        : DEFAULT_MUTATION_WATCHDOG_MS;
+    let invoked = false;
+    let watchdogLogged = false;
+
+    const watchdogTimer = setTimeout(() => {
+        if (watchdogLogged) return;
+        watchdogLogged = true;
+        logger.warn({
+            action: `${safeApiName}.mutation_pending_long`,
+            message: '数据库写入仍在等待底层 API 完成',
+            context: { apiName: safeApiName, watchdogMs },
+        });
+    }, watchdogMs);
+    watchdogTimer?.unref?.();
+
+    try {
+        const result = apiCall();
+        invoked = true;
+        return isThenable(result) ? await Promise.resolve(result) : result;
+    } catch (error) {
+        logger.warn({
+            action: `${safeApiName}.${invoked ? 'mutation_reject' : 'mutation_exception'}`,
+            message: invoked ? '数据库写入 API 调用失败' : '数据库写入 API 调用异常',
+            context: { apiName: safeApiName },
+            error,
+        });
+        throw error;
+    } finally {
+        clearTimeout(watchdogTimer);
+    }
 }
 
 export function withTimeout(taskPromise, timeoutMs = 4000, timeoutMessage = '请求超时') {
