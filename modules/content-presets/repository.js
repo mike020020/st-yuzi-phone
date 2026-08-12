@@ -1,6 +1,8 @@
 import {
     CONTENT_PRESET_BINDING_INDEX, CONTENT_PRESET_DB_NAME, CONTENT_PRESET_DB_VERSION, CONTENT_PRESET_STORES,
 } from './constants.js';
+import { isTrustedContentPresetRecord } from './format.js';
+import { normalizePackagePath } from './paths.js';
 
 let dbPromise = null;
 
@@ -99,24 +101,50 @@ function requestResult(request) {
 
 export async function listPresetMetadata() {
     const db = await openContentPresetRepository();
-    return runTransaction(db, [CONTENT_PRESET_STORES.presets], 'readonly', tx => requestResult(tx.objectStore(CONTENT_PRESET_STORES.presets).getAll()).then(records => records.map(record => ({ id: record.id, name: record.name, version: record.version, author: record.author, itemCount: record.items?.length || 0, issues: record.issues || [], importedAt: record.importedAt }))));
+    return runTransaction(db, [CONTENT_PRESET_STORES.presets], 'readonly', tx => requestResult(tx.objectStore(CONTENT_PRESET_STORES.presets).getAll())
+        .then(records => records.filter(isTrustedContentPresetRecord)
+            .map(record => ({ id: record.id, name: record.name, version: record.version, author: record.author, itemCount: record.items.length, issues: record.issues || [], importedAt: record.importedAt }))));
 }
 
 export async function listPresetRecords() {
     const db = await openContentPresetRepository();
-    return runTransaction(db, [CONTENT_PRESET_STORES.presets], 'readonly', tx => requestResult(tx.objectStore(CONTENT_PRESET_STORES.presets).getAll()));
+    return runTransaction(db, [CONTENT_PRESET_STORES.presets], 'readonly', tx => requestResult(tx.objectStore(CONTENT_PRESET_STORES.presets).getAll())
+        .then(records => records.filter(isTrustedContentPresetRecord)));
 }
 
 export async function getPresetRecord(id) {
     const db = await openContentPresetRepository();
-    return runTransaction(db, [CONTENT_PRESET_STORES.presets], 'readonly', tx => requestResult(tx.objectStore(CONTENT_PRESET_STORES.presets).get(String(id))));
+    return runTransaction(db, [CONTENT_PRESET_STORES.presets], 'readonly', tx => requestResult(tx.objectStore(CONTENT_PRESET_STORES.presets).get(String(id)))
+        .then(record => isTrustedContentPresetRecord(record) ? record : null));
 }
 
 export async function loadActiveBindings() {
     const db = await openContentPresetRepository();
-    const records = await runTransaction(db, [CONTENT_PRESET_STORES.activeByTable], 'readonly', tx => requestResult(tx.objectStore(CONTENT_PRESET_STORES.activeByTable).getAll()));
-    return new Map(records.map(record => [record.sheetKey, record]));
+    return runTransaction(db, [CONTENT_PRESET_STORES.presets, CONTENT_PRESET_STORES.activeByTable], 'readonly', async (tx) => {
+        const [presets, bindings] = await Promise.all([
+            requestResult(tx.objectStore(CONTENT_PRESET_STORES.presets).getAll()),
+            requestResult(tx.objectStore(CONTENT_PRESET_STORES.activeByTable).getAll()),
+        ]);
+        const validItems = new Map(presets.filter(isTrustedContentPresetRecord).map((preset) => [
+            String(preset?.id ?? '').trim(),
+            new Set((Array.isArray(preset?.items) ? preset.items : [])
+                .filter(item => item?.activatable && text(item?.entry?.mount) && item?.entry?.mount === text(item.entry.mount))
+                .map(item => String(item.id ?? '').trim())
+                .filter(Boolean)),
+        ]).filter(([presetId]) => presetId));
+        return new Map(bindings.map((binding) => ({
+            sheetKey: String(binding?.sheetKey ?? '').trim(),
+            presetId: String(binding?.presetId ?? '').trim(),
+            itemId: String(binding?.itemId ?? '').trim(),
+        })).filter(binding => binding.sheetKey
+            && binding.presetId
+            && binding.itemId
+            && validItems.get(binding.presetId)?.has(binding.itemId))
+            .map(binding => [binding.sheetKey, binding]));
+    });
 }
+
+function text(value) { return String(value ?? '').trim(); }
 
 function writeValidatedBinding(tx, record) {
     const presetStore = tx.objectStore(CONTENT_PRESET_STORES.presets);
@@ -128,8 +156,12 @@ function writeValidatedBinding(tx, record) {
         request.onsuccess = () => {
             try {
                 const preset = request.result;
+                if (!isTrustedContentPresetRecord(preset)) {
+                    reject(new Error('绑定引用的预设不符合 v2 Runtime API 合同'));
+                    return;
+                }
                 const item = preset?.items?.find(entry => entry.id === record.itemId);
-                if (!item?.activatable) { reject(new Error('绑定引用的预设项不存在或不可运行')); return; }
+                if (!item?.activatable || !text(item.entry?.mount)) { reject(new Error('绑定引用的预设项不存在或不可运行')); return; }
                 bindingStore.put(record);
                 resolve(record);
             } catch (error) {
@@ -194,12 +226,41 @@ function removePresetBindings(tx, presetId) {
 }
 
 export async function replacePresetRecord(record) {
-    if (!record?.id) throw new Error('预设记录缺少 id');
+    if (!isTrustedContentPresetRecord(record)) throw new Error('预设记录不符合 v2 Runtime API 合同');
     const db = await openContentPresetRepository();
     return runTransaction(db, [CONTENT_PRESET_STORES.presets, CONTENT_PRESET_STORES.activeByTable], 'readwrite', (tx) => {
         tx.objectStore(CONTENT_PRESET_STORES.presets).put(record);
         return removePresetBindings(tx, record.id).then(affectedSheetKeys => ({ record, affectedSheetKeys }));
     });
+}
+
+export async function updatePresetFiles(presetId, patch = {}) {
+    const id = String(presetId ?? '').trim();
+    if (!id) throw new Error('预设 ID 不能为空');
+    const removePaths = [...new Set((Array.isArray(patch.removePaths) ? patch.removePaths : []).map(normalizePackagePath))];
+    const file = patch.file == null ? null : { ...patch.file, path: normalizePackagePath(patch.file.path) };
+    const db = await openContentPresetRepository();
+    return runTransaction(db, [CONTENT_PRESET_STORES.presets], 'readwrite', (tx) => new Promise((resolve, reject) => {
+        const store = tx.objectStore(CONTENT_PRESET_STORES.presets);
+        let request;
+        try { request = store.get(id); } catch (error) { reject(error); return; }
+        request.onerror = () => reject(request.error || new Error('读取预设失败'));
+        request.onsuccess = () => {
+            try {
+                const current = request.result;
+                if (!isTrustedContentPresetRecord(current)) throw new Error(`预设不存在或记录无效：${id}`);
+                const files = { ...current.files };
+                for (const path of removePaths) delete files[path];
+                if (file) files[file.path] = file;
+                const record = { ...current, files };
+                if (!isTrustedContentPresetRecord(record)) throw new Error('更新后的预设记录不符合 v2 Runtime API 合同');
+                store.put(record);
+                resolve(record);
+            } catch (error) {
+                reject(error);
+            }
+        };
+    }));
 }
 
 export async function deletePresetRecord(presetId) {

@@ -12,9 +12,6 @@ const FILES = {
     lockRepository: 'modules/phone-core/data-api/lock-repository.js',
     dataApiFacade: 'modules/phone-core/data-api.js',
     rowDeleteController: 'modules/table-viewer/row-delete-controller.js',
-    configRepository: 'modules/phone-core/data-api/config-repository.js',
-    presetRepository: 'modules/phone-core/data-api/preset-repository.js',
-    aiRuntime: 'modules/phone-core/chat-support/ai-runtime.js',
 };
 
 function read(relativePath) {
@@ -29,18 +26,29 @@ function check(results, fileKey, description, ok) {
     results.push({ file: FILES[fileKey], description, ok });
 }
 
-function countMatches(content, regex) {
-    return Array.from(content.matchAll(regex)).length;
-}
-
 function main() {
     const contents = Object.fromEntries(
         Object.entries(FILES).map(([key, relativePath]) => [key, read(relativePath)])
     );
 
     const results = [];
+    results.push({
+        file: 'modules/phone-core/chat-support/ai-runtime.js',
+        description: '旧消息记录表 AI runtime 已删除，QQ 使用独立运行时',
+        ok: !fs.existsSync(path.join(ROOT, 'modules/phone-core/chat-support/ai-runtime.js')),
+    });
+    for (const relativePath of [
+        'modules/phone-core/data-api/config-repository.js',
+        'modules/phone-core/data-api/preset-repository.js',
+    ]) {
+        results.push({
+            file: relativePath,
+            description: '旧数据库设置仓库已删除',
+            ok: !fs.existsSync(path.join(ROOT, relativePath)),
+        });
+    }
 
-    check(results, 'contextBridge', 'integration context bridge 暴露 getSillyTavernContext()', has(contents.contextBridge, 'export function getSillyTavernContext()'));
+    check(results, 'contextBridge', 'integration context bridge 暴露 getSillyTavernContext()', has(contents.contextBridge, 'export function getSillyTavernContext('));
     check(results, 'settingsContext', 'settings context 复用 integration context bridge', has(contents.settingsContext, "from '../integration/context-bridge.js';"));
     check(results, 'settingsContext', 'settings context 不再直接访问 window.SillyTavern', !has(contents.settingsContext, 'window.SillyTavern'));
     check(results, 'settingsContext', 'settings context 不再直接调用 SillyTavern.getContext()', !has(contents.settingsContext, 'SillyTavern.getContext'));
@@ -67,10 +75,6 @@ function main() {
     check(results, 'rowDeleteController', 'row delete controller 不再定义本地 getRuntimeApi()', !has(contents.rowDeleteController, 'function getRuntimeApi'));
     check(results, 'rowDeleteController', 'row delete controller 不再直接调用 getTableLockState()', !has(contents.rowDeleteController, 'api.getTableLockState'));
     check(results, 'rowDeleteController', 'row delete controller 不再直接调用 setTableLockState()', !has(contents.rowDeleteController, 'api.setTableLockState'));
-
-    check(results, 'configRepository', 'config repository 使用严格布尔判定', countMatches(contents.configRepository, /isDbBooleanSuccess\(/g) >= 3);
-    check(results, 'presetRepository', 'preset repository 使用严格布尔判定', countMatches(contents.presetRepository, /isDbBooleanSuccess\(/g) >= 3);
-    check(results, 'aiRuntime', 'AI runtime 加载 API 预设使用严格布尔判定', has(contents.aiRuntime, 'isDbBooleanSuccess(api.loadApiPreset(requestedPresetName))'));
 
     const failed = results.filter(item => !item.ok);
     if (failed.length > 0) {

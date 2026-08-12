@@ -1,4 +1,4 @@
-import { CONTENT_PRESET_FORMAT, CONTENT_PRESET_FORMAT_VERSION } from './constants.js';
+import { CONTENT_PRESET_API_VERSION, CONTENT_PRESET_FORMAT, CONTENT_PRESET_FORMAT_VERSION } from './constants.js';
 import { parseContentPresetBundle } from './format.js';
 import { normalizeContentPresetBundle } from './normalize.js';
 
@@ -8,6 +8,9 @@ export function importContentPreset(input) {
 
 function sortedObject(value) {
     return Object.fromEntries(Object.keys(value || {}).sort().map(key => [key, value[key]]));
+}
+function exportFile(file) {
+    return { mimeType: file.mimeType, encoding: file.encoding, content: file.content };
 }
 
 export function exportContentPreset(record) {
@@ -25,8 +28,9 @@ export function exportContentPreset(record) {
     return {
         format: CONTENT_PRESET_FORMAT,
         formatVersion: CONTENT_PRESET_FORMAT_VERSION,
+        apiVersion: CONTENT_PRESET_API_VERSION,
         manifest,
-        files: sortedObject(record.files),
+        files: Object.fromEntries(Object.entries(sortedObject(record.files)).map(([path, file]) => [path, exportFile(file)])),
     };
 }
 

@@ -6,18 +6,18 @@ const ROOT = process.cwd();
 const FILES = {
     routing: 'modules/phone-core/routing.js',
     debugTools: 'modules/phone-core/data-api/debug-tools.js',
-    panelActions: 'modules/phone-core/data-api/panel-actions.js',
-    presetRepository: 'modules/phone-core/data-api/preset-repository.js',
     tableRepository: 'modules/phone-core/data-api/table-repository.js',
     mutationQueue: 'modules/phone-core/data-api/mutation-queue.js',
     lockRepository: 'modules/phone-core/data-api/lock-repository.js',
-    aiInstructionStore: 'modules/phone-core/chat-support/ai-instruction-store.js',
     scrollGuards: 'modules/phone-core/scroll-guards.js',
 };
 
 const REMOVED_FILES = {
     legacyTemplateStore: 'modules/phone-core/chat-support/template-store.js',
+    aiInstructionStore: 'modules/phone-core/chat-support/ai-instruction-store.js',
     notifications: 'modules/phone-core/notifications.js',
+    configRepository: 'modules/phone-core/data-api/config-repository.js',
+    presetRepository: 'modules/phone-core/data-api/preset-repository.js',
 };
 
 function read(relativePath) {
@@ -44,21 +44,14 @@ function main() {
     const results = [];
 
     check(results, 'notifications', '顶部通知 watcher 模块已删除，不再要求旧通知轮询日志契约', !exists(REMOVED_FILES.notifications));
+    check(results, 'configRepository', '旧数据库配置仓库已删除，不再要求配置兼容日志契约', !exists(REMOVED_FILES.configRepository));
+    check(results, 'presetRepository', '旧数据库预设仓库已删除，不再要求预设兼容日志契约', !exists(REMOVED_FILES.presetRepository));
 
     check(results, 'routing', 'routing 使用 scoped logger', has(contents.routing, "const logger = Logger.withScope({ scope: 'phone-core/routing', feature: 'route' });"));
     check(results, 'routing', 'routing route callback 失败使用结构化日志', has(contents.routing, "action: 'change.emit'"));
 
     check(results, 'debugTools', 'debug-tools 使用 scoped logger', has(contents.debugTools, "const logger = Logger.withScope({ scope: 'phone-core/data-api/debug-tools', feature: 'db-api' });"));
     check(results, 'debugTools', 'debug-tools 使用结构化调试快照日志', has(contents.debugTools, "action: 'api.debug'"));
-
-    check(results, 'panelActions', 'panel-actions 使用 scoped logger', has(contents.panelActions, "const logger = Logger.withScope({ scope: 'phone-core/data-api/panel-actions', feature: 'db-api' });"));
-    check(results, 'panelActions', 'panel-actions manualUpdate API 失败使用结构化日志', has(contents.panelActions, "action: 'manual-update.api'"));
-    check(results, 'panelActions', 'panel-actions manualUpdate API 缺失使用结构化日志', has(contents.panelActions, "action: 'manual-update.method-unavailable'"));
-    check(results, 'panelActions', 'panel-actions 不再保留无法等待 settlement 的 DOM fallback 日志', !has(contents.panelActions, "action: 'manual-update.fallback'"));
-
-    check(results, 'presetRepository', 'preset-repository 使用 scoped logger', has(contents.presetRepository, "const logger = Logger.withScope({ scope: 'phone-core/data-api/preset-repository', feature: 'db-api' });"));
-    check(results, 'presetRepository', 'preset-repository 使用结构化 preset 日志', has(contents.presetRepository, "action: 'api-presets.get'"));
-    check(results, 'presetRepository', 'preset-repository 使用结构化 load 日志', has(contents.presetRepository, "action: 'api-preset.load'"));
 
     check(results, 'tableRepository', 'table-repository 使用 scoped logger', has(contents.tableRepository, "const logger = Logger.withScope({ scope: 'phone-core/data-api/table-repository', feature: 'db-api' });"));
     check(results, 'tableRepository', 'table-repository getTableData 使用结构化日志', has(contents.tableRepository, "action: 'table-data.get'"));
@@ -75,9 +68,7 @@ function main() {
     check(results, 'lockRepository', 'lock-repository toggle col 使用结构化日志', has(contents.lockRepository, "action: 'lock.col.toggle'"));
 
     check(results, 'legacyTemplateStore', 'legacy template-store 已删除，不再要求旧 CRUD 结构化日志契约', !exists(REMOVED_FILES.legacyTemplateStore));
-    check(results, 'aiInstructionStore', 'ai-instruction-store 使用 scoped logger', has(contents.aiInstructionStore, "const logger = Logger.withScope({ scope: 'phone-core/chat-support/ai-instruction-store', feature: 'chat-support' });"));
-    check(results, 'aiInstructionStore', 'ai-instruction-store 导入失败使用结构化日志', has(contents.aiInstructionStore, "action: 'preset.import'"));
-    check(results, 'aiInstructionStore', 'ai-instruction-store 保存失败使用结构化日志', has(contents.aiInstructionStore, "action: 'preset.save'"));
+    check(results, 'aiInstructionStore', '旧 AI 指令存储已删除，QQ 不再复用 chat-support 日志链', !exists(REMOVED_FILES.aiInstructionStore));
 
     check(results, 'scrollGuards', 'scroll-guards 使用 scoped logger', has(contents.scrollGuards, "const logger = Logger.withScope({ scope: 'phone-core/scroll-guards', feature: 'scroll-guards' });"));
     check(results, 'scrollGuards', 'scroll-guards 声明 ScrollDebug channel 常量', has(contents.scrollGuards, "const SCROLL_DEBUG_CHANNEL = 'ScrollDebug';"));

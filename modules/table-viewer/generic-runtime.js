@@ -12,8 +12,8 @@ import {
 import { navigateBack } from '../phone-core/routing.js';
 import {
     getSheetDataByKey,
-    deletePhoneSheetRows,
-} from '../phone-core/chat-support.js';
+    deleteSheetRows,
+} from '../phone-core/table-support.js';
 import { createTableViewerState } from './state.js';
 import { createTableViewerScrollPreserver } from './list-scroll-binding.js';
 import { createRowDeleteController } from './row-delete-controller.js';
@@ -116,7 +116,7 @@ export function createGenericTableViewerRuntime(container, context, hooks = {}) 
     });
     const state = createTableViewerState(sheetKey);
     let enteredReviewDetail = false;
-    const reviewNavigationIntent = consumePendingTableReviewNavigationIntent(sheetKey);
+    const reviewNavigationIntent = consumePendingTableReviewNavigationIntent(sheetKey, hooks.reviewNavigationAttemptId);
     if (reviewNavigationIntent) {
         const { rowIndex } = resolveReviewIntentTargetRowIndex(reviewNavigationIntent, {
             rows,
@@ -224,7 +224,7 @@ export function createGenericTableViewerRuntime(container, context, hooks = {}) 
         getLiveTableName,
         syncRowsFromSheet,
         isTableRowLocked,
-        deletePhoneSheetRows,
+        deleteSheetRows,
         showInlineToast,
         viewerRuntime,
     });

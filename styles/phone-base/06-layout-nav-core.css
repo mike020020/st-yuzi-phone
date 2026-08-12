@@ -12,60 +12,231 @@
 
 /* --- Nav Bar --- */
 .phone-nav-bar {
-    display: flex;
-    align-items: center;
-    padding: clamp(38px, 8.2%, 50px) 10px 10px;
-    min-height: 40px;
-    background: var(--yuzi-phone-bg-overlay, rgba(0, 0, 0, 0.4));
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--yuzi-phone-border-subtle, rgba(255, 255, 255, 0.08));
+    position: relative;
     z-index: 10;
+    display: grid;
+    grid-template-columns:
+        var(--yuzi-phone-nav-side-slot-width)
+        minmax(0, 1fr)
+        var(--yuzi-phone-nav-side-slot-width);
+    align-items: center;
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: calc(var(--yuzi-phone-app-nav-top-padding) + var(--yuzi-phone-nav-content-height));
+    padding: var(--yuzi-phone-app-nav-top-padding) 0 0;
+    background: var(--yuzi-phone-nav-background, rgba(0, 0, 0, 0.4));
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--yuzi-phone-nav-border-color, rgba(255, 255, 255, 0.08));
     flex-shrink: 0;
-    position: relative;
-    --yuzi-phone-nav-side-safe-width: clamp(72px, 22vw, 92px);
 }
-.phone-nav-back {
+
+.phone-nav-bar.is-embedded {
+    min-height: var(--yuzi-phone-nav-content-height);
+    padding-block-start: 0;
+}
+
+.phone-nav-leading,
+.phone-nav-center,
+.phone-nav-trailing {
     display: flex;
     align-items: center;
-    gap: 2px;
-    background: none;
-    border: none;
-    color: var(--yuzi-phone-color-accent-secondary, rgba(100, 180, 255, 0.9));
-    font-size: 13px;
-    cursor: pointer;
-    padding: 4px 6px;
-    border-radius: var(--yuzi-phone-radius-sm, 6px);
-    transition: background 0.15s;
+    box-sizing: border-box;
+    min-width: 0;
+    height: var(--yuzi-phone-nav-content-height);
 }
-.phone-nav-back:hover {
-    background: var(--yuzi-phone-bg-surface-hover, rgba(255, 255, 255, 0.06));
+
+.phone-nav-leading {
+    grid-column: 1;
+    justify-content: flex-start;
+    padding-inline-start: var(--yuzi-phone-nav-padding-inline-start);
 }
-.phone-nav-back svg {
-    width: 16px;
-    height: 16px;
+
+.phone-nav-center {
+    grid-column: 2;
+    justify-content: center;
+    overflow: hidden;
 }
-.phone-nav-bar > :not(.phone-nav-title) {
-    position: relative;
-    z-index: 1;
+
+.phone-nav-trailing {
+    grid-column: 3;
+    justify-content: flex-end;
+    padding-inline-end: var(--yuzi-phone-nav-padding-inline-end);
+}
+
+.phone-nav-bar.has-secondary-actions {
+    grid-template-rows: var(--yuzi-phone-nav-content-height) auto;
+    row-gap: var(--yuzi-phone-nav-secondary-actions-gap);
+    padding-block-end: var(--yuzi-phone-nav-secondary-actions-padding-block-end);
+}
+
+.phone-nav-bar.has-secondary-actions > :is(.phone-nav-leading, .phone-nav-center) {
+    grid-row: 1;
+}
+
+.phone-nav-bar.has-secondary-actions > .phone-nav-trailing {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+    width: 100%;
+    height: auto;
+    min-height: var(--yuzi-phone-nav-control-size);
+    padding-inline: var(--yuzi-phone-nav-secondary-actions-padding-inline);
+}
+
+.phone-nav-bar.has-inline-actions {
+    --yuzi-phone-nav-side-slot-width: var(--yuzi-phone-nav-inline-actions-side-slot-width);
+}
+
+.phone-nav-inline-actions {
+    display: inline-flex;
     flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--yuzi-phone-nav-inline-actions-gap);
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
 }
-.phone-nav-bar > :not(.phone-nav-title):last-child {
-    margin-left: auto;
+
+.phone-nav-secondary-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--yuzi-phone-nav-secondary-actions-gap);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
 }
-.phone-nav-title {
-    position: absolute;
-    left: var(--yuzi-phone-nav-side-safe-width, 72px);
-    right: var(--yuzi-phone-nav-side-safe-width, 72px);
+
+.phone-nav-icon-button,
+.phone-nav-back,
+.phone-nav-switch-button {
+    display: inline-flex;
+    flex: 0 0 var(--yuzi-phone-nav-control-size);
+    align-items: center;
+    justify-content: center;
+    width: var(--yuzi-phone-nav-control-size);
+    min-width: var(--yuzi-phone-nav-control-size);
+    height: var(--yuzi-phone-nav-control-size);
+    min-height: var(--yuzi-phone-nav-control-size);
     margin: 0;
-    padding: 0 10px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--yuzi-phone-nav-control-radius);
+    color: var(--yuzi-phone-nav-action-color, rgba(100, 180, 255, 0.94));
+    background: transparent;
+    font: inherit;
+    line-height: 0;
+    appearance: none;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.phone-nav-leading > :is(.phone-nav-icon-button, .phone-nav-back) {
+    justify-content: flex-start;
+}
+
+.phone-nav-trailing > :is(.phone-nav-icon-button, .phone-nav-back) {
+    justify-content: flex-end;
+}
+
+.phone-nav-icon-button:hover,
+.phone-nav-back:hover,
+.phone-nav-switch-button:hover {
+    background: var(--yuzi-phone-nav-control-hover-background, rgba(255, 255, 255, 0.06));
+}
+
+.phone-nav-icon-button:focus-visible,
+.phone-nav-back:focus-visible,
+.phone-nav-switch-button:focus-visible {
+    outline: var(--yuzi-phone-nav-focus-ring-width) solid var(--yuzi-phone-nav-focus-ring-color);
+    outline-offset: 1px;
+}
+
+.phone-nav-icon-button:is(:disabled, [aria-disabled="true"]),
+.phone-nav-back:is(:disabled, [aria-disabled="true"]),
+.phone-nav-switch-button:is(:disabled, [aria-disabled="true"]) {
+    opacity: var(--yuzi-phone-nav-disabled-opacity);
+    cursor: default;
+}
+
+.phone-nav-icon-button :is(svg, img),
+.phone-nav-back :is(svg, img),
+.phone-nav-switch-button :is(svg, img) {
+    display: block;
+    width: var(--yuzi-phone-nav-icon-size);
+    height: var(--yuzi-phone-nav-icon-size);
+    flex: 0 0 var(--yuzi-phone-nav-icon-size);
+    pointer-events: none;
+}
+
+.phone-nav-back > span {
+    display: none;
+}
+
+.phone-nav-title-switcher {
+    display: inline-grid;
+    grid-template-columns:
+        var(--yuzi-phone-nav-control-size)
+        minmax(0, max-content)
+        var(--yuzi-phone-nav-control-size);
+    align-items: center;
+    gap: var(--yuzi-phone-nav-title-gap);
+    width: max-content;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.phone-nav-title-switcher.is-title-only {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+}
+
+.phone-nav-switch-spacer {
+    display: block;
+    width: var(--yuzi-phone-nav-control-size);
+    height: var(--yuzi-phone-nav-control-size);
+}
+
+.phone-nav-title {
+    position: static;
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0 var(--yuzi-phone-nav-title-padding-inline);
+    box-sizing: border-box;
     text-align: center;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--yuzi-phone-color-text-secondary, rgba(255, 255, 255, 0.9));
+    font-size: var(--yuzi-phone-nav-title-font-size);
+    line-height: var(--yuzi-phone-nav-title-line-height);
+    font-weight: var(--yuzi-phone-nav-title-font-weight);
+    letter-spacing: 0;
+    color: var(--yuzi-phone-nav-title-color, rgba(255, 255, 255, 0.9));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     pointer-events: none;
+}
+
+/* Legacy templates remain usable while consumers migrate to the three-slot builder. */
+.phone-nav-bar > .phone-nav-back {
+    grid-column: 1;
+    justify-self: start;
+    margin-inline-start: var(--yuzi-phone-nav-padding-inline-start);
+}
+
+.phone-nav-bar > :is(.phone-nav-title, .phone-nav-title-switcher) {
+    grid-column: 2;
+    align-self: center;
+}
+
+.phone-nav-bar > :not(.phone-nav-leading):not(.phone-nav-center):not(.phone-nav-trailing):not(.phone-nav-back):not(.phone-nav-title):not(.phone-nav-title-switcher):last-child {
+    grid-column: 3;
+    justify-self: end;
+    margin-inline-end: var(--yuzi-phone-nav-padding-inline-end);
 }
 
 /* --- App Body (scrollable) --- */

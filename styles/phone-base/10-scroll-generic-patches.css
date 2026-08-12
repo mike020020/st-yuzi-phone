@@ -29,8 +29,7 @@
 }
 
 /* 内容区滚动：这是唯一应该滚动的地方 */
-#yuzi-phone-standalone .phone-app-body,
-#yuzi-phone-standalone .phone-app-grid {
+#yuzi-phone-standalone .phone-app-body {
     flex: 1 !important;
     min-height: 0 !important;
     overflow-y: auto !important;
@@ -628,4 +627,3 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
-

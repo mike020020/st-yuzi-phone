@@ -95,6 +95,7 @@ export function getAvailableTheaterScenes(rawData) {
         .filter(resolved => resolved.available)
         .map(resolved => ({
             ...resolved.scene,
+            primarySheetKey: resolved.primaryTable?.sheetKey || '',
             rowCount: resolved.rowCount,
             childSheetKeys: [...resolved.childSheetKeys],
         }));

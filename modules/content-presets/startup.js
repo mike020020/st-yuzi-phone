@@ -1,31 +1,68 @@
 import { getPhoneCoreState } from '../phone-core/state.js';
+import { isContentPresetFullPageRuntimeEnabled } from './activation-gate.js';
 import { commitContentPresetIndex, markContentPresetIndexUnavailable } from './index-state.js';
 import { listPresetMetadata, loadActiveBindings } from './repository.js';
 import { convergeCurrentContentPresetRoute } from './route-convergence.js';
 
-let startupPromise = null;
+const DEFAULT_STARTUP_DEPS = Object.freeze({
+    commitContentPresetIndex,
+    convergeCurrentContentPresetRoute,
+    getPhoneCoreState,
+    isContentPresetFullPageRuntimeEnabled,
+    listPresetMetadata,
+    loadActiveBindings,
+    markContentPresetIndexUnavailable,
+});
 
-export function initializeContentPresetIndex() {
-    if (startupPromise) return startupPromise;
-    const state = getPhoneCoreState();
-    const initialRoute = String(state.currentRoute || '');
-    const initialRenderToken = state.routeRenderToken;
-    startupPromise = Promise.all([listPresetMetadata(), loadActiveBindings()])
-        .then(async ([metadata, activeByTable]) => {
-            const snapshot = commitContentPresetIndex({
-                status: 'ready',
-                error: null,
-                metadata: new Map(metadata.map(entry => [entry.id, entry])),
-                activeByTable,
-            });
+function createContentPresetIndexInitializer(overrides = {}) {
+    const runtimeDeps = { ...DEFAULT_STARTUP_DEPS, ...overrides };
+    let startupPromise = null;
+
+    return function initializeContentPresetIndexWithDeps() {
+        if (!runtimeDeps.isContentPresetFullPageRuntimeEnabled()) return Promise.resolve(null);
+        if (startupPromise) return startupPromise;
+        const state = runtimeDeps.getPhoneCoreState();
+        const initialRoute = String(state.currentRoute || '');
+        const initialRenderToken = state.routeRenderToken;
+        startupPromise = (async () => {
+            let activeByTable;
+            let snapshot;
+            try {
+                const [metadata, bindings] = await Promise.all([
+                    runtimeDeps.listPresetMetadata(),
+                    runtimeDeps.loadActiveBindings(),
+                ]);
+                activeByTable = bindings;
+                snapshot = runtimeDeps.commitContentPresetIndex({
+                    status: 'ready',
+                    error: null,
+                    metadata: new Map(metadata.map(entry => [entry.id, entry])),
+                    activeByTable,
+                });
+            } catch (error) {
+                runtimeDeps.markContentPresetIndexUnavailable(error);
+                return null;
+            }
+
             if (String(state.currentRoute || '') === initialRoute && state.routeRenderToken === initialRenderToken) {
-                await convergeCurrentContentPresetRoute([...activeByTable.keys()]);
+                try {
+                    await runtimeDeps.convergeCurrentContentPresetRoute([...activeByTable.keys()]);
+                } catch {
+                    // 索引已经提交成功；当前路由收敛失败不得污染数据面的 ready 状态。
+                }
             }
             return snapshot;
-        })
-        .catch((error) => {
-            markContentPresetIndexUnavailable(error);
-            return null;
-        });
-    return startupPromise;
+        })();
+        return startupPromise;
+    };
+}
+
+const initializeContentPresetIndexImpl = createContentPresetIndexInitializer();
+
+export function initializeContentPresetIndex() {
+    return initializeContentPresetIndexImpl();
+}
+
+export function __test__createContentPresetIndexInitializer(overrides = {}) {
+    return createContentPresetIndexInitializer(overrides);
 }

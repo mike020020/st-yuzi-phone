@@ -26,6 +26,8 @@ function createInitialState() {
         isDestroying: false,
         statusClockTimerId: null,
         shellInteractionTimerId: null,
+        shellAppControls: null,
+        shellAppControlsRouteCleanup: null,
         routeRenderRegistered: false,
         routeRenderCleanup: null,
         routeRenderToken: 0,
@@ -54,6 +56,8 @@ export function resetPhoneCoreState() {
     state.isDestroying = next.isDestroying;
     state.statusClockTimerId = next.statusClockTimerId;
     state.shellInteractionTimerId = next.shellInteractionTimerId;
+    state.shellAppControls = next.shellAppControls;
+    state.shellAppControlsRouteCleanup = next.shellAppControlsRouteCleanup;
     state.routeRenderRegistered = next.routeRenderRegistered;
     state.routeRenderCleanup = next.routeRenderCleanup;
     state.routeRenderToken = next.routeRenderToken;

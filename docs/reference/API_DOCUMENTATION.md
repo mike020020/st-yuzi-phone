@@ -24,6 +24,8 @@ if (window.AutoCardUpdaterAPI) {
 - [设置与更新 API](#设置与更新-api)
 - [世界书操作 API](#世界书操作-api)
 - [TXT导入链路 API](#txt导入链路-api)
+- [外部导入 Headless API](#外部导入-headless-api)
+- [Agent 世界书 API](#agent-世界书-api)
 - [表格锁定 API](#表格锁定-api)
 - [回调注册 API](#回调注册-api)
 - [更新配置参数 API](#更新配置参数-api)
@@ -109,6 +111,29 @@ if (success) {
 
 ---
 
+### `injectPlotPresetToCurrentChat(presetName)`
+
+仅将指定剧情预设注入当前聊天，不修改全局当前剧情预设。
+
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| presetName | string | 是 | 要注入到当前聊天的预设名称；传空字符串表示当前聊天跟随全局剧情预设 |
+
+**返回值**: `boolean` - 注入是否成功
+
+**说明**:
+- 成功后会保存当前聊天的剧情预设绑定状态。
+- 不会修改全局 `lastUsedPresetName`，适合外部插件只影响当前聊天的场景。
+- 如果传入不存在的预设名称，返回 `false`。
+
+**示例**:
+```javascript
+const success = window.AutoCardUpdaterAPI.injectPlotPresetToCurrentChat("战斗场景");
+```
+
+---
+
 ### `getPlotPresetDetails(presetName)`
 
 获取指定预设的详细信息。
@@ -174,21 +199,44 @@ console.log("表格数据:", JSON.stringify(tableData, null, 2));
 
 ---
 
-### `importTableAsJson(jsonString)`
+### `importTableAsJson(jsonString, options?)`
 
-导入并覆盖当前表格数据。
+导入并覆盖当前表格数据。默认作为外部 JSON 导入，会写入当前聊天持久化；如果用于删除楼层后的备份恢复，应传入运行时恢复模式，避免制造新的持久化事件。
 
 **参数**:
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | jsonString | string | 是 | JSON 格式的表格数据字符串 |
+| options | object | 否 | 导入选项；`{ persist: false }` 或 `{ mode: 'restore' }` 表示只恢复运行时，不写入聊天持久化 |
 
 **返回值**: `Promise<boolean>` - 导入是否成功
 
 **示例**:
 ```javascript
 const jsonData = '{"mate": {...}, "sheet_0": {...}}';
+// 外部 JSON 导入：写入聊天持久化
 const success = await window.AutoCardUpdaterAPI.importTableAsJson(jsonData);
+
+// 删除楼层/备份恢复：只恢复运行时，不新增 data_replace/checkpoint/log
+const restored = await window.AutoCardUpdaterAPI.importTableAsJson(jsonData, { persist: false });
+```
+
+---
+
+### `restoreTableAsJson(jsonString)`
+
+删除楼层/备份恢复专用：只把 JSON 表格数据恢复到当前运行时，不写入聊天持久化，不推进自动更新楼层标记。
+
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| jsonString | string | 是 | JSON 格式的表格数据字符串 |
+
+**返回值**: `Promise<boolean>` - 恢复是否成功
+
+**示例**:
+```javascript
+const restored = await window.AutoCardUpdaterAPI.restoreTableAsJson(jsonData);
 ```
 
 ---
@@ -209,8 +257,8 @@ const success = await window.AutoCardUpdaterAPI.importTableAsJson(jsonData);
 | 参数名| 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | tableName | string | 是 | 表格名称 |
-| rowIndex | number | 是 | 行索引（0为表头，1为第一行数据） |
-| colIdentifier | string \| number | 是 | | 列标识（列名或列索引） |
+| rowIndex | number \| string | 是 | 行索引（0为表头，1为第一行数据；数字字符串会被规范化） |
+| colIdentifier | string \| number | 是 | 列标识（列名或列索引） |
 | value | any | 是 | 新的单元格值 |
 
 **返回值**: `Promise<boolean>` - 成功返回true，失败返回false
@@ -218,6 +266,8 @@ const success = await window.AutoCardUpdaterAPI.importTableAsJson(jsonData);
 **说明**:
 - 使用列名时，会自动查找对应的列索引
 - 更新后会自动保存到聊天历史
+- 支持对象参数形式：`updateCell({ tableName, rowIndex, colIdentifier, value, skipNotify })`
+- `skipNotify: true` 或 `silent: true` 会跳过外部表格更新回调通知，适合批量写入时避免前端回调风暴；不会跳过数据写入
 - 如果表格不存在或参数无效，返回false
 
 **示例**:
@@ -227,6 +277,15 @@ const success = await window.AutoCardUpdaterAPI.updateCell('主角信息', 1, '�
 
 // 使用列索引更新（假设第3列是自由点数）
 const success2 = await window.AutoCardUpdaterAPI.updateCell('主角信息', 1, 3, 5);
+
+// 批量写入时可使用静默模式，避免每次写入都触发表格更新回调
+await window.AutoCardUpdaterAPI.updateCell({
+    tableName: '主角信息',
+    rowIndex: 1,
+    colIdentifier: '自由点数',
+    value: 6,
+    skipNotify: true
+});
 ```
 
 ---
@@ -239,7 +298,7 @@ const success2 = await window.AutoCardUpdaterAPI.updateCell('主角信息', 1, 3
 | 参数名| 类型 | 必填 | 说明 |
 | -------- | ------ | ------ | ------ |
 | tableName | string | 是 | 表格名称 |
-| rowIndex | number | 是 | 行索引（1为第一行数据） |
+| rowIndex | number \| string | 是 | 行索引（1为第一行数据；数字字符串会被规范化） |
 | data | object | 是 | 列名-值映射对象 |
 
 **返回值**: `Promise<boolean>` - 成功返回true，失败返回false
@@ -247,6 +306,9 @@ const success2 = await window.AutoCardUpdaterAPI.updateCell('主角信息', 1, 3
 **说明**:
 - data对象中的键值对应于表格的列名和单元格值
 - 只更新data中指定的列，其他列保持不变
+- 支持对象参数形式：`updateRow({ tableName, rowIndex, data, skipNotify })`
+- `skipNotify: true` 或 `silent: true` 会跳过外部表格更新回调通知，适合批量写入时避免前端回调风暴；不会跳过数据写入
+- `data.isImportMode: true` 或对象参数 `isImportMode: true` 会跳过聊天保存和纪要向量同步，保留旧版导入模式兼容
 - **表的最新楼层保存**：更新后会自动查找该表数据最后一次出现的楼层，并保存到该楼层
 - **世界书刷新**：保存后会自动触发世界书重新写入，确保前端能读取到最新数据
 - 如果找不到该表的楼层（新表格），会保存到最新AI楼层
@@ -261,6 +323,14 @@ const success = await window.AutoCardUpdaterAPI.updateRow('主角信息', 1, {
     '感知': 16,
     '魅力': 10,
     '自由点数': 2
+});
+
+// 批量写入时使用对象参数静默回调通知
+await window.AutoCardUpdaterAPI.updateRow({
+    tableName: '主角信息',
+    rowIndex: 1,
+    data: { '自由点数': 1 },
+    skipNotify: true
 });
 ```
 
@@ -281,6 +351,8 @@ const success = await window.AutoCardUpdaterAPI.updateRow('主角信息', 1, {
 **说明**:
 - 新行会插入到表头之后（索引为行数）
 - 插入后会自动保存到聊天历史
+- 支持对象参数形式：`insertRow({ tableName, data, skipNotify })`
+- `skipNotify: true` 或 `silent: true` 会跳过外部表格更新回调通知，适合批量写入时避免前端回调风暴；不会跳过数据写入
 
 **示例**:
 ```javascript
@@ -294,6 +366,13 @@ const rowIndex = await window.AutoCardUpdaterAPI.insertRow('背包物品', {
 if (rowIndex !== -1) {
     console.log("新行索引:", rowIndex);
 }
+
+// 批量插入时使用静默模式
+await window.AutoCardUpdaterAPI.insertRow({
+    tableName: '背包物品',
+    data: { '物品名称': '绷带', '数量': 2 },
+    skipNotify: true
+});
 ```
 
 ---
@@ -306,17 +385,26 @@ if (rowIndex !== -1) {
 | 参数名| 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | tableName | string | 是 | 表格名称 |
-| rowIndex | number | 是 | 要删除的行索引（1为第一行数据） |
+| rowIndex | number \| string | 是 | 要删除的行索引（1为第一行数据；数字字符串会被规范化） |
 
 **返回值**: `Promise<boolean>` - 成功返回true，失败返回false
 
 **说明**:
 - 不能删除表头（rowIndex=0）
 - 删除后会自动保存到聊天历史
+- 支持对象参数形式：`deleteRow({ tableName, rowIndex, skipNotify })`
+- `skipNotify: true` 或 `silent: true` 会跳过外部表格更新回调通知，适合批量写入时避免前端回调风暴；不会跳过数据写入
 
 **示例**:
 ```javascript
 const success = await window.AutoCardUpdaterAPI.deleteRow('背包物品', 3);
+
+// 批量删除时使用静默模式
+await window.AutoCardUpdaterAPI.deleteRow({
+    tableName: '背包物品',
+    rowIndex: 3,
+    skipNotify: true
+});
 ```
 
 ---
@@ -336,6 +424,113 @@ const success = await window.AutoCardUpdaterAPI.deleteRow('背包物品', 3);
 **返回值**: `Promise<boolean>`
 
 ---
+
+### `scanSeedPollution()`
+
+seed 双池污染只读诊断（阶段 F）。扫描 global preset、当前聊天 template scope、
+chat guide seedRows、runtime/V2 当前数据四个来源，报告同表同 UNIQUE 值重复、
+content 与 seedRows 双池重复、模板数据与 runtime 数据不一致。
+
+**性质**: 纯只读。不写存储、不修改聊天数据、不触发迁移。
+
+**返回值**: `Promise<SeedPollutionScanResult_ACU>`（同步函数经 async 包装）
+
+```typescript
+interface SeedPollutionScanResult_ACU {
+    diagnostics: SeedPollutionDiagnostic_ACU[];
+    scanned: {
+        globalPresets: number; // 已扫描的 global preset 模板数
+        chatScope: number;     // 已扫描的 chat_override scope 数（0 或 1）
+        guideSheets: number;   // 已扫描的 guide sheet 数
+        runtimeSheets: number; // 已扫描的 runtime 当前数据 sheet 数
+    };
+}
+
+interface SeedPollutionDiagnostic_ACU {
+    severity: 'error' | 'warning' | 'info';
+    code:
+        | 'content_seed_duplicate'   // content 数据行与 seedRows 双池存在相同 UNIQUE 业务键
+        | 'content_runtime_mismatch' // 模板/guide 数据与 runtime 当前数据行不一致
+        | 'guide_seed_pending'       // guide 声明 seedRows 但 runtime 未物化（待定/延迟状态）
+        | 'guide_seed_duplicate'     // guide seedRows 与 runtime 数据存在相同 UNIQUE 业务键
+        | 'seed_row_id_conflict'     // seedRows 池内 row_id 重复或与既有数据冲突
+        | 'info_no_issue';           // 该 sheet 未发现问题
+    source: 'global_preset' | 'chat_scope' | 'guide' | 'runtime' | 'template';
+    sheetKey: string;
+    sheetName: string;
+    businessKeyColumns: string[]; // 由 DDL 解析出的 UNIQUE 业务键列
+    conflictingKeys: string[];    // 冲突的具体业务键值
+    message: string;
+}
+```
+
+**扫描范围**:
+- chat_scope：当前聊天 `chat_override` 模板快照中的 content/seedRows
+- global_preset：global 预设模板库（可枚举时全量，退化时仅已知常用名）
+- guide：当前隔离键下 chat guide 的 seedRows 字段
+- runtime：`currentJsonTableData_ACU` 当前数据视图的 content/seedRows 双池
+
+---
+### `prepareSeedMigration()`
+
+seed 双池污染显式迁移（阶段 F2-F4）——准备阶段。读取当前聊天 guide，
+计算每张表的 seedRows 清理动作（与 runtime/模板 content 同业务键的 seed 视为重复），
+并导出备份快照。**只读**，不写任何存储。
+
+**性质**: 手动触发；不自动运行；global preset 只诊断不迁移。
+
+**参数**: `{ isolationKey?: string }`（缺省用当前隔离键）
+
+**返回值**: `Promise<{ status: 'plan_ready' | 'no_issue'; ... }>`
+
+```typescript
+type PrepareSeedMigrationResult_ACU =
+  | { status: 'plan_ready'; plan: SeedMigrationPlan_ACU }
+  | { status: 'no_issue'; isolationKey: string; message: string };
+```
+
+**语义（已确认）**:
+- 冲突默认 template-wins：模板 content 优先，重复的 seedRows 清理掉；
+- 已物化的 guide seed（与 runtime 同业务键）只清理残留 seed，保留 runtime 数据；
+- 每次迁移生成备份（guide container / scoped config / 聊天快照），commit 后可回滚；
+- 版本开关：`settings_ACU.seedMigrationEnabled` 默认开启；显式置 `false` 时进入纯诊断观察模式，prepare/commit/rollback 全部拒绝执行（fail-closed）。
+
+---
+
+### `commitSeedMigration(planId, options)`
+
+seed 双池污染显式迁移——提交阶段。校验计划有效与作用域未变后，
+在事务内写入修正后的 guide、宿主保存，并在 SQLite 模式下 reload 后置校验。
+
+**参数**: `planId: string`，`options: { confirm?: boolean }`（计划含清理动作时必须 `confirm: true`）
+
+**返回值**: `Promise<SeedMigrationCommitResult_ACU>`
+
+```typescript
+interface SeedMigrationCommitResult_ACU {
+    status: 'committed' | 'commit_failed_rolled_back' | 'committed_postcondition_failed';
+    planId: string;
+    error?: string;
+    appliedActions?: SeedMigrationAction_ACU[];
+}
+```
+
+**失败语义**: 宿主保存失败即回滚内存聊天并返回 `commit_failed_rolled_back`；
+提交后 reload 失败返回 `committed_postcondition_failed`（数据已提交，需人工核查）。
+
+---
+
+### `rollbackSeedMigration(planId)`
+
+seed 双池污染显式迁移——回滚阶段。从计划备份恢复 guide container、scoped config
+与聊天快照，重新 hydrate 并验证。仅对尚未失效的计划可用。
+
+**参数**: `planId: string`
+
+**返回值**: `Promise<SeedMigrationCommitResult_ACU>`（`error: 'rollback_applied'` 表示回滚已执行）
+
+---
+
 
 ## 设置与更新 API
 
@@ -361,6 +556,36 @@ await window.AutoCardUpdaterAPI.openSettings();
 **示例**:
 ```javascript
 window.AutoCardUpdaterAPI.openVisualizer();
+```
+
+---
+
+## 新 UI v2 API
+
+所有新 UI v2 方法通过全局对象 `window.AutoCardUpdaterV2API` 访问。
+
+### `open()`
+
+打开 SP·数据库 VII 新 UI 主界面。
+
+**返回值**: `Promise<boolean>`
+
+**示例**:
+```javascript
+await window.AutoCardUpdaterV2API.open();
+```
+
+---
+
+### `openVisualizer()`
+
+打开新 UI v2 内的数据库可视化表格编辑器。
+
+**返回值**: `Promise<boolean>`
+
+**示例**:
+```javascript
+await window.AutoCardUpdaterV2API.openVisualizer();
 ```
 
 ---
@@ -472,11 +697,69 @@ await window.AutoCardUpdaterAPI.refreshDataAndWorldbook();
 
 ---
 
-### `injectImportedSelected()`
+### `importTxtTextAndSplit(text, options)`
 
-注入选中的导入内容。
+Headless TXT 文本拆分入口。该方法不打开文件选择器，不依赖导入界面，适合外部脚本或自动化流程直接传入文本并写入导入暂存区。
 
-**返回值**: `Promise<boolean>`
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| text | string | 是 | 需要拆分的 TXT 原文。空文本会返回 `success:false`。 |
+| options.splitSize | number \| string | 否 | 每段目标长度；字符串会按数字解析。 |
+| options.clearPrevious | boolean | 否 | 是否先清空已有导入暂存，默认沿用 core 行为。 |
+
+**返回值**: `Promise<Object>` - 结构化结果。成功时包含 `success:true` 与拆分/暂存统计；失败时返回 `{ success:false, error:string }`。
+
+**示例**:
+```javascript
+const result = await window.AutoCardUpdaterAPI.importTxtTextAndSplit(longText, {
+    splitSize: 1200,
+    clearPrevious: true,
+});
+if (!result.success) throw new Error(result.error);
+```
+
+---
+
+### `injectImportedSelected(options)`
+
+Headless 注入选中的导入内容。该方法复用导入注入 core，不打开 UI，不触发 DOM/toast 流程。
+
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| options.targetWorldbook | string | 否 | 目标世界书名称；缺省时使用当前配置的目标世界书。 |
+| options.selectedSheetKeys | Array<string> | 否 | 需要注入的表/分组 key；缺省时使用暂存区当前选择。 |
+| options.maxRetries | number \| string | 否 | 单项注入最大重试次数；字符串会按数字解析。 |
+| options.requestOptions | Object | 否 | 透传给底层 AI/请求流程的选项。 |
+
+**返回值**: `Promise<Object>` - 结构化注入结果。失败时返回 `{ success:false, error:string }`。
+
+**示例**:
+```javascript
+const inject = await window.AutoCardUpdaterAPI.injectImportedSelected({
+    targetWorldbook: '主世界书',
+    selectedSheetKeys: ['人物', '地点'],
+    maxRetries: 2,
+});
+if (!inject.success) throw new Error(inject.error);
+```
+
+---
+
+## 外部导入 Headless API
+
+`importTxtTextAndSplit(text, options)` 与 `injectImportedSelected(options)` 是 TXT 导入链路的 headless 入口。它们面向脚本调用，不打开文件选择器，不依赖导入面板状态，不直接操作 DOM。
+
+典型流程：
+
+```javascript
+const split = await window.AutoCardUpdaterAPI.importTxtTextAndSplit(text, { clearPrevious: true });
+if (!split.success) throw new Error(split.error);
+
+const injected = await window.AutoCardUpdaterAPI.injectImportedSelected({ targetWorldbook: '主世界书' });
+if (!injected.success) throw new Error(injected.error);
+```
 
 ---
 
@@ -525,6 +808,31 @@ await window.AutoCardUpdaterAPI.refreshDataAndWorldbook();
 
 ---
 
+### 导入清理 API 语义对照
+
+| API | 主要作用 | 是否删除世界书条目 | 是否清理本地导入缓存 | 推荐场景 |
+|-----|----------|--------------------|----------------------|----------|
+| `deleteImportedEntries()` | 兼容旧调用入口，按既有流程删除导入条目 | 是 | 否 | 旧脚本兼容，保留原行为 |
+| `clearImportedEntries(clearAll)` | 清除导入条目缓存，保留旧 API 语义 | 可能涉及旧流程条目 | 是 | 旧 UI 或旧脚本清理导入状态 |
+| `clearImportedLorebookEntries(options)` | 删除指定世界书中外部导入最终注入生成的条目 | 是，仅删除外部导入注入条目 | 否 | 明确撤回已注入到世界书的外部导入内容 |
+| `clearImportCache(clearAll)` | 清除本地导入缓存和状态 | 否 | 是 | 只重置导入暂存状态，不碰世界书 |
+
+---
+
+### `clearImportedLorebookEntries(options)`
+
+删除外部导入注入到指定世界书中的条目。该 API 只删除 comment 命中外部导入标记的世界书条目，不清理导入暂存缓存；开启数据隔离时，只删除当前隔离标识下的外部导入条目，不会删除其他隔离标识的条目；需要清理缓存时继续使用 `clearImportedEntries(clearAll)` 或 `clearImportCache(clearAll)`。
+
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| options | object | 是 | 删除选项 |
+| options.targetWorldbook | string | 是 | 目标世界书名称，会自动去除首尾空白 |
+
+**返回值**: `Promise<Object>` - 成功时返回 `{ success:true, deletedCount:number, targetWorldbook:string }`；失败时返回 `{ success:false, error:string }`。
+
+---
+
 ### `clearImportCache(clearAll)`
 
 清除导入缓存（localStorage）。
@@ -535,6 +843,126 @@ await window.AutoCardUpdaterAPI.refreshDataAndWorldbook();
 | clearAll | boolean | 否 | 是否清除全部，默认 `true` |
 
 **返回值**: `Promise<boolean>`
+
+---
+
+## Agent 世界书 API
+
+Agent 世界书 API 通过世界书状态条目作为单事实源，提供控制模式、Skill 化、Skill 元数据维护与批量清理能力。
+
+### `getAgentWorldbookControl()`
+
+读取 Agent 世界书控制状态。
+
+**返回值**: `Promise<Object>` - 成功时返回 `{ success:true, control, source, bookName, entryUid, duplicateCount, writableBookName }`；失败时返回 `{ success:false, error:string }`。
+
+---
+
+### `setAgentWorldbookMode(mode, options)`
+
+设置 Agent 世界书模式，并按选项执行接管或恢复。
+
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| mode | `'disabled' \| 'passive' \| 'agent'` | 是 | `disabled` 关闭并默认恢复；`passive` 只写控制状态；`agent` 启用并默认接管世界书绿灯。 |
+| options.runTakeover | boolean | 否 | `mode='agent'` 时是否执行接管，默认执行。 |
+| options.restoreOnDisable | boolean | 否 | `mode='disabled'` 时是否恢复受控条目，默认恢复。 |
+
+**返回值**: `Promise<Object>` - 包含 `success`、`mode`、`control`、`write`，以及可选 `takeover` 或 `restore`。
+
+---
+
+### `runAgentWorldbookSkillify(options)`
+
+对当前剧情世界书选择范围执行 Skill 化。若本次有更新且 `runTakeover !== false`，会同步执行世界书接管并刷新快照。
+
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| options.runTakeover | boolean | 否 | Skill 化后是否同步接管，默认执行。 |
+| options.presetName | string | 否 | 使用的 API 预设名称。 |
+| options.maxConcurrency | number | 否 | 并发处理数量。 |
+| options.overwriteManual | boolean | 否 | 是否覆盖人工维护的 Skill 元数据。 |
+
+**返回值**: `Promise<Object>` - 成功时至少包含 `{ success:true, skillify }`；同步接管时还可能包含 `takeover` 与 `snapshot`。
+
+---
+
+### `skillifyWorldbookEntries(options)`
+
+计划名 API。可对指定世界书执行 Skill 化；未传 `options.bookNames` 时，回退为当前剧情世界书选择范围，与 `runAgentWorldbookSkillify(options)` 行为一致。
+
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| options.bookNames | Array<string> \| string | 否 | 指定要处理的世界书名称。字符串支持逗号、中文逗号或换行分隔。未传或解析为空时使用当前剧情世界书选择。 |
+| options.selectedEntries | Array<{ bookName:string; uid:number\|string }> | 否 | 精确限定要处理的世界书条目。 |
+| options.runTakeover | boolean | 否 | Skill 化后是否同步接管，默认执行。 |
+| options.presetName | string | 否 | 使用的 API 预设名称。 |
+| options.maxConcurrency | number | 否 | 并发处理数量。 |
+| options.maxAiRetries | number | 否 | 单条目 AI 最大重试次数。 |
+| options.maxEntries | number | 否 | 本次最多处理候选条目数。 |
+| options.overwriteManual | boolean | 否 | 是否覆盖人工维护的 Skill 元数据。 |
+
+**返回值**: `Promise<Object>` - 成功时至少包含 `{ success:true, skillify }`；同步接管时还可能包含 `takeover` 与 `snapshot`。
+
+**示例**:
+```javascript
+const result = await window.AutoCardUpdaterAPI.skillifyWorldbookEntries({
+    bookNames: ['主世界书'],
+    selectedEntries: [{ bookName: '主世界书', uid: 12 }],
+    runTakeover: true,
+});
+if (!result.success) throw new Error(result.error);
+```
+
+---
+
+### `saveAgentWorldbookSkillMeta(bookName, uid, metaDraft, updatedBy)`
+
+保存指定世界书条目的 Skill 元数据。
+
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| bookName | string | 是 | 世界书名称。 |
+| uid | number \| string | 是 | 世界书条目 UID。 |
+| metaDraft | Object | 是 | 要写入的 Skill 元数据草稿。 |
+| updatedBy | `'manual' \| 'agent-skillify'` | 否 | 更新来源，默认 `manual`。 |
+
+**返回值**: `Promise<Object>` - 成功时返回 `{ success:true, result }`；失败时返回 `{ success:false, error:string }`。
+
+**兼容别名**: `saveWorldbookEntrySkillMeta(bookName, uid, metaDraft, options)` 与本方法等价；`options` 可为 updatedBy 字符串或 `{ updatedBy }`。
+
+---
+
+### `deleteAgentWorldbookSkillMeta(bookName, uid)`
+
+删除指定世界书条目的 Skill 元数据块。
+
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| bookName | string | 是 | 世界书名称。 |
+| uid | number \| string | 是 | 世界书条目 UID。 |
+
+**返回值**: `Promise<Object>` - 成功时返回 `{ success:true, result }`。
+
+**兼容别名**: `deleteWorldbookEntrySkillMeta(bookName, uid)` 与本方法等价。
+
+---
+
+### `clearAgentWorldbookSkillMetas(bookNames)`
+
+批量清理指定世界书中的 Agent Skill 元数据块。
+
+**参数**:
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| bookNames | Array<string> | 否 | 需要清理的世界书名称列表；缺省为空数组。 |
+
+**返回值**: `Promise<Object>` - 返回 `{ success, error?, result }`，其中 `result` 包含 `total`、`cleared`、`skipped`、`failed` 与 `errors`。
 
 ---
 
@@ -672,8 +1100,22 @@ await api.switchTemplatePreset('任务模板', { scope: 'chat' });
 | options | Object | 否 | 可选配置 |
 | options.scope | `'global' \| 'chat'` | 否 | 导入作用域，默认 `global`。传入 `chat` 时仅写入当前聊天模板快照 |
 | options.presetName | string | 否 | 模板名。优先级最高；`scope='global'` 时会尝试保存到全局模板预设库；`scope='chat'` 时作为当前聊天模板快照的标记名 |
+| options.dataMode | `'replace' \| 'merge' \| 'seed'` | 否 | 模板携带数据的导入语义。默认按上下文推导：模板无数据 → `seed`；模板带数据且目标 runtime 为空（首次填表）→ `replace`；模板带数据且已有 runtime 数据 → `seed`（不静默覆盖） |
+| options.conflictPolicy | `'keep-current' \| 'template-wins' \| 'reject'` | 否 | merge 冲突策略。默认 `keep-current`（保留当前运行时数据，不覆盖） |
 
-**返回值**: `Promise<{success: boolean, message: string, scope?: string, presetName?: string}>` - 导入结果
+**返回值**: `Promise<{success: boolean, message: string, scope?: string, presetName?: string, dataMode?: string, conflictPolicy?: string, runtimeReady?: boolean}>` - 导入结果
+
+**dataMode 语义**:
+- `replace`：模板数据作为目标表初始快照整体写入（仅当目标 runtime 为空或调用方显式声明时安全）。
+- `merge`：按 DDL UNIQUE/主键业务键与既有行匹配；无唯一业务键的表会 fail-closed 阻止合并（改用 `replace`/`seed` 或为 DDL 添加 UNIQUE 约束）。
+- `seed`：模板数据只进入 seedRows 作为初始化种子，不直接覆盖既有数据；与系统物化 seedRows 共用同一身份空间，避免重复 INSERT。
+
+**返回值字段说明**:
+- `dataMode`：实际生效的导入语义（调用方未显式指定时由兼容层推导并回填）。
+- `conflictPolicy`：实际生效的冲突策略（默认 `keep-current`）。
+- `runtimeReady`：聊天导入后 runtime（SQLite/V2 checkpoint）是否已同步；`false` 表示模板已保存但 runtime 重建失败，需检查 `warning`。
+- `deduplication`：跨 content/seedRows 完全重复去重审计（content 优先）。数组元素为 `{ sheetKey, sheetName, removedCount, rowIds }`，仅在有去重发生时非空；无去重时为空数组。
+- `saved`：是否已持久化。
 
 **命名补充说明**:
 - 如果调用方没有显式传入 `options.presetName`：
@@ -686,6 +1128,14 @@ await api.switchTemplatePreset('任务模板', { scope: 'chat' });
 - 必须包含 `mate` 对象且 `mate.type` 为 `"chatSheets"`
 - 必须包含至少一个 `sheet_*` 键
 - 每个 sheet 必须包含 `name`, `content`, `sourceData` 字段
+- 模板可携带数据行（`content` 首行之后的行，或 `seedRows`），携带的数据按 `dataMode` 语义处理
+
+**跨池完全重复自动去重（导入候选）**:
+- 同一张表内，`content` 数据行与 `seedRows` 行的规范化 `row_id` 相同、且完整行逐列完全相同（`row_id` 按既有 trim 规则比较，其余列严格相等，不做业务字段 trim/大小写折叠/null-空串互换）时，自动删除 `seedRows` 中的重复副本（content 优先），使导入在预检阶段即可继续，不再被误判为跨池身份冲突。
+- 同 `row_id` 但任一业务字段不同、或同池内重复 `row_id`、或行宽/结构非法，仍按 fail-closed 阻断（`cross_pool_row_id_collision` / 结构错误）。
+- 去重只作用于导入候选的深拷贝，不修改调用方输入对象；操作幂等，失败不触碰任何持久化状态。
+- `replace`：去重后的候选作为完整初始快照，不把已删除的重复 seedRows 再次物化；`merge`：去重只清理模板候选内部副本，模板与 runtime 的业务键冲突仍按 `conflictPolicy` 处理；`seed`：去重只清理模板内部重复种子，剩余 seedRows 仍作为待初始化数据，不提前写入 runtime。
+- 导入结果可通过 `deduplication` 字段追踪：每表列出被删除的 `row_id` 列表与删除数量（无去重时不产生该字段）。
 
 **示例**:
 ```javascript
@@ -700,16 +1150,28 @@ const template = {
 
 const globalResult = await window.AutoCardUpdaterAPI.importTemplateFromData(template, {
     scope: 'global',
-    presetName: '标准模板'
+    presetName: '标准模板',
+    dataMode: 'seed' // 全局导入默认只保存预设，携带数据仅作 seed 语义
 });
 
 const chatResult = await window.AutoCardUpdaterAPI.importTemplateFromData(template, {
     scope: 'chat',
-    presetName: '任务专用模板'
+    presetName: '任务专用模板',
+    dataMode: 'replace', // 首次填表：模板数据作为初始快照
 });
 
 console.log(globalResult.message);
 console.log(chatResult.message);
+```
+
+**merge 示例**（按业务键合并，冲突默认保留当前数据）:
+```javascript
+const mergeResult = await window.AutoCardUpdaterAPI.importTemplateFromData(template, {
+    scope: 'chat',
+    dataMode: 'merge',
+    conflictPolicy: 'keep-current' // 或 'template-wins' / 'reject'
+});
+console.log(mergeResult.dataMode, mergeResult.conflictPolicy, mergeResult.runtimeReady);
 ```
 
 ---
@@ -809,6 +1271,33 @@ console.log(jsonString);
 ```
 
 ---
+
+## 原生 SQL 标识符解析
+
+`executeSqlQuery`、`querySql` 和 `queryTableRows` 只在 SQLite 模式且当前 runtime 完整进入 `ready` 后发布到 `AutoCardUpdaterAPI`。原生模式、启动初始化、聊天切换及数据库重载期间，这三个属性为 `undefined`；外部调用方必须在每次查询前检查函数是否存在，并在暂不可用时稍后重试。
+
+这些方法以及 `executeSql` 的只读分支会在 SQLite 执行前，将已知表的用户可见标识符重绑定为运行时物理标识符；查询返回值契约不变，解析或执行失败仍返回 `null`。
+
+### 表名
+
+只读 SQL 可以使用同一张表的运行时物理表名、原始 `CREATE TABLE` 表名、sheet 显示名、sheetKey 或 uid。若一个别名对应多张表，系统会移除该别名而不是猜测目标。
+
+### 列名与安全边界
+
+显式 DDL 的原始列名就是物理列名。fallback DDL 下，显示列名确定映射到运行时列名；原始 DDL 列名只有能与表头唯一对应时才映射，存在歧义或多个原始列竞争同一运行时列时保持原文，绝不按列序猜测。列名在单表查询、或可由 `tableAlias.column` 唯一归属的 JOIN 中会被重绑定；多表裸列存在歧义时保持原文。字符串字面量、`--`/`/* */` 注释、CTE 名、派生表别名以及显式或隐式的 SELECT 输出别名不会作为物理对象改写。`PRAGMA` 参数原样透传。
+
+### `queryTableRows(options)` 的别名契约
+
+`options.tableName`、`options.table` 或 `options.sheetKey` 支持物理表名、原始 DDL 表名、显示名、sheetKey 与 uid；`columns`、`where` 和 `orderBy` 的列名支持显示名、物理列名及无歧义的 fallback 原始 DDL 列名。表或列别名存在冲突时，方法返回 `null`，不会按表/列出现顺序选取目标。该方法仍使用绑定参数传递条件值，`limit`/`offset` 与排序方向白名单的既有约束不变。
+
+### 失败诊断
+
+已发布的只读 API 在解析或执行失败时仍返回 `null`。可调用 `getLastSqlApiError()` 获取最近一次只读失败的 `{ method, code, message, at }`；`code` 区分别名冲突、表不存在、列未解析、只读违规和其他 SQL 错误。运行时尚未发布时不会调用查询函数，因此也不会新增一次 `runtime_not_ready` 错误。只有本次 SQL 实际引用的表或列别名冲突才会归类为 `alias_conflict`；无关 schema 冲突不会掩盖实际的缺表或缺列错误。同步读取仅使用 runtime 已发布的 schema 快照；provider 发布前会验证 schema，未就绪 runtime 不会被读取路径懒初始化。
+
+`executeSqlMutation`、`executeSqlBatch` 以及 `executeSql` 的写入分支，也会在执行前重绑定能够唯一解析的表标识符。写入仍必须遵守既有写事务、目标表推断和参数约束；别名冲突时必须 fail-closed 返回失败，不能猜测目标表。
+
+---
+
 
 ## 其他功能 API
 
@@ -1237,174 +1726,23 @@ window.AutoCardUpdaterAPI.clearManualSelectedTables();
 
 ## API 预设管理 API
 
-### `getApiPresets()`
+> **安全收敛公告（v1.7）**：本章节所列全部方法已从公开 API 中弃用。
+> 公开层不再允许外部读取、写入、删除或切换 API 预设（含 apiKey / apiConfig / tavernProfile 等敏感字段）。
+> 请改用 [AI 调用 API](#ai-调用-api) 中的 `callAI(messages, options)` 受限代理接口发起 AI 请求，
+> 并在 `options.presetName` 中指定要使用的预设名称。
+> 预设的管理（创建、编辑、删除）请通过数据库插件内部设置面板操作。
 
-获取所有 API 预设列表。
+### `getApiPresets()` [已弃用]
 
-**返回值**: `Array<Object>` - API 预设数组的深拷贝
+**状态**: 已弃用，始终返回空数组 `[]`。
 
-**返回结构**:
-```javascript
-[
-    {
-        name: '预设名称',
-        apiMode: 'custom',        // API 模式
-        apiConfig: {              // API 配置
-            customApiUrl: 'https://...',
-            customApiKey: '...',
-            customApiModel: 'gpt-4'
-        },
-        tavernProfile: ''         // Tavern Profile 名称
-    }
-]
-```
+**替代方案**: 使用 `callAI(messages, { presetName })` 发起 AI 请求。
 
-**示例**:
-```javascript
-const presets = window.AutoCardUpdaterAPI.getApiPresets();
-console.log('可用预设:', presets.map(p => p.name));
-```
+### `getTableApiPreset()` / `setTableApiPreset()` / `getPlotApiPreset()` / `setPlotApiPreset()` / `saveApiPreset()` / `loadApiPreset()` / `deleteApiPreset()` [已弃用]
 
----
+**状态**: 已弃用，始终返回 `false`（setter/loader/deleter）或 `''`（getter）。
 
-### `getTableApiPreset()`
-
-获取当前选中的填表 API 预设名称。
-
-**返回值**: `string` - 预设名称，如果使用当前配置则返回空字符串
-
-**示例**:
-```javascript
-const preset = window.AutoCardUpdaterAPI.getTableApiPreset();
-console.log('当前填表预设:', preset || '使用当前配置');
-```
-
----
-
-### `setTableApiPreset(presetName)`
-
-设置填表 API 预设。
-
-**参数**:
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| presetName | string | 是 | 预设名称，空字符串表示使用当前配置 |
-
-**返回值**: `boolean` - 设置是否成功
-
-**示例**:
-```javascript
-// 切换到指定预设
-window.AutoCardUpdaterAPI.setTableApiPreset('战斗场景API');
-
-// 恢复使用当前配置
-window.AutoCardUpdaterAPI.setTableApiPreset('');
-```
-
----
-
-### `getPlotApiPreset()`
-
-获取当前选中的剧情推进 API 预设名称。
-
-**返回值**: `string` - 预设名称，如果使用当前配置则返回空字符串
-
-**示例**:
-```javascript
-const preset = window.AutoCardUpdaterAPI.getPlotApiPreset();
-console.log('当前剧情推进预设:', preset || '使用当前配置');
-```
-
----
-
-### `setPlotApiPreset(presetName)`
-
-设置剧情推进 API 预设。
-
-**参数**:
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| presetName | string | 是 | 预设名称，空字符串表示使用当前配置 |
-
-**返回值**: `boolean` - 设置是否成功
-
-**示例**:
-```javascript
-window.AutoCardUpdaterAPI.setPlotApiPreset('日常对话API');
-```
-
----
-
-### `saveApiPreset(presetData)`
-
-保存或更新 API 预设。
-
-**参数**:
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| presetData | Object | 是 | 预设数据 |
-| presetData.name | string | 是 | 预设名称 |
-| presetData.apiMode | string | 否 | API 模式（如 'custom', 'proxy' 等） |
-| presetData.apiConfig | Object | 否 | API 配置对象 |
-| presetData.tavernProfile | string | 否 | Tavern Profile 名称 |
-
-**返回值**: `boolean` - 保存是否成功
-
-**示例**:
-```javascript
-const success = window.AutoCardUpdaterAPI.saveApiPreset({
-    name: '测试预设',
-    apiMode: 'custom',
-    apiConfig: {
-        customApiUrl: 'https://api.example.com/v1',
-        customApiKey: 'sk-xxx',
-        customApiModel: 'gpt-4o'
-    },
-    tavernProfile: ''
-});
-```
-
----
-
-### `loadApiPreset(presetName)`
-
-加载 API 预设（应用到当前配置）。
-
-**参数**:
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| presetName | string | 是 | 预设名称 |
-
-**返回值**: `boolean` - 加载是否成功
-
-**示例**:
-```javascript
-const success = window.AutoCardUpdaterAPI.loadApiPreset('测试预设');
-if (success) {
-    console.log('预设已应用到当前配置');
-}
-```
-
----
-
-### `deleteApiPreset(presetName)`
-
-删除 API 预设。
-
-**参数**:
-| 参数名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| presetName | string | 是 | 预设名称 |
-
-**返回值**: `boolean` - 删除是否成功
-
-**说明**:
-- 如果删除的预设正在被使用（填表或剧情推进），相关引用会被自动清除
-
-**示例**:
-```javascript
-window.AutoCardUpdaterAPI.deleteApiPreset('测试预设');
-```
+**替代方案**: 通过插件内部设置面板管理预设；通过 `callAI(messages, { presetName, max_tokens })` 发起 AI 请求。
 
 ---
 
@@ -1412,29 +1750,31 @@ window.AutoCardUpdaterAPI.deleteApiPreset('测试预设');
 
 ### `callAI(messages, options)`
 
-调用 AI 生成内容，使用数据库当前配置的 API。
+通过数据库插件内部配置发起受限 AI 代理请求。外部不可读取或覆盖 API 密钥、URL、请求头等敏感配置。
 
 **参数**:
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | messages | Array | 是 | 消息数组，格式: `[{role: 'system'\|'user'\|'assistant', content: '...'}]` |
-| options.max_tokens | number | 否 | 最大 token 数，默认使用数据库配置或 4096 |
+| options.presetName | string | 否 | 指定要使用的 API 预设名称；不传则使用当前配置 |
+| options.max_tokens / options.maxTokens | number \| string | 否 | 最大 token 数，默认使用预设配置或 4096；数字字符串会被规范化 |
 
 **返回值**: `Promise<string|null>` - AI 返回的文本内容，失败返回 `null`
 
+**安全约束（v1.7）**:
+- `options` 中仅允许 `presetName`、`max_tokens`、`maxTokens` 三个字段。
+- 严禁传入以下字段，否则请求会被拒绝并返回 `null`：
+  `apiConfig`、`apiKey`、`url`、`requestHeaders`、`bodyParams`、`excludeBodyParams`、
+  `tavernProfile`、`model`、`temperature`、`stream`。
+- 外部无法通过 `callAI` 读取或修改任何 API 预设/配置内容。
+
 **说明**:
-- 使用数据库插件中配置的 API 设置（API URL、模型、密钥等）
-- 支持两种 API 模式：
-  - **酒馆 Profile 模式** (`apiMode === 'tavern'`)：使用酒馆的 Connection Manager
-  - **自定义 API 模式** (`apiMode === 'custom'`)：
-    - 如果启用 `useMainApi`，使用酒馆主 API（`TavernHelper.generateRaw`）
-    - 否则使用独立配置的 API（流式传输）
-- 前端插件可以通过此方法直接调用 AI，无需自行配置 API
+- 请求由数据库插件内部根据 `presetName`（或当前配置）选择 API 模式与凭据，外部仅提供消息和可选的 token 上限。
+- 错误与日志中不会出现 API 密钥、完整请求头或自定义 URL 等敏感信息。
 
 **使用场景**:
-- 前端插件需要调用 AI 生成内容（如地图生成、剧情分析等）
-- 避免在前端重复配置 API 信息
-- 统一使用数据库插件的 API 配置
+- 第三方插件需要调用 AI 生成内容（如地图生成、剧情分析等），但不应接触用户的 API 凭据。
+- 统一使用数据库插件的 API 配置，避免在各插件中重复配置和泄露密钥。
 
 **示例**:
 ```javascript
@@ -1444,16 +1784,25 @@ if (window.AutoCardUpdaterAPI && typeof window.AutoCardUpdaterAPI.callAI === 'fu
         { role: 'system', content: '你是一个有帮助的助手。' },
         { role: 'user', content: '请生成一个奇幻场景的描述。' }
     ];
-    
-    const response = await window.AutoCardUpdaterAPI.callAI(messages, { max_tokens: 2000 });
-    
+
+    // 使用指定预设
+    const response = await window.AutoCardUpdaterAPI.callAI(messages, { presetName: '我的GPT预设', max_tokens: 2000 });
+
+    // 使用当前配置（不传 presetName）
+    const response2 = await window.AutoCardUpdaterAPI.callAI(messages, { maxTokens: '2000' });
+
     if (response) {
         console.log('AI 响应:', response);
     } else {
         console.error('AI 调用失败');
     }
+
+    // 以下调用会被拒绝并返回 null：
+    // const blocked = await window.AutoCardUpdaterAPI.callAI(messages, { apiKey: 'sk-xxx' });
+    // const blocked2 = await window.AutoCardUpdaterAPI.callAI(messages, { model: 'gpt-5' });
 }
 ```
+
 
 ---
 
@@ -1510,6 +1859,8 @@ const analysis = await window.AutoCardUpdaterAPI.callAI(messages);
 7. **数据隔离**: 切换预设后，`$6` 占位符会自动回溯查找匹配当前预设名称标签的历史数据，实现不同预设间的剧情规划隔离。
 
 8. **模板作用域**: `importTemplate()`、`exportTemplate()`、`resetTemplate()`、`switchTemplatePreset()`、`importTemplateFromData()` 都支持 `options.scope`。`global` 作用于当前 profile 的全局模板；`chat` 仅作用于当前聊天模板快照，不会改动全局模板库。
+9. **安全收敛 (v1.7)**: API 预设管理全部弃用，外部不可再通过 `getApiPresets` 等接口读取 apiKey / apiConfig 等敏感字段。请改用 `callAI(messages, { presetName, max_tokens })` 受限代理接口发起 AI 请求，外部仅提供消息和 token 上限，插件内部负责解析配置并代发请求。
+
 
 ---
 
@@ -1523,3 +1874,5 @@ const analysis = await window.AutoCardUpdaterAPI.callAI(messages);
 | 1.3 | 新增更新配置参数 API：`getUpdateConfigParams()`, `setUpdateConfigParams()`；新增手动更新表选择 API：`getManualSelectedTables()`, `setManualSelectedTables()`, `clearManualSelectedTables()`；新增 API 预设管理 API：`getApiPresets()`, `getTableApiPreset()`, `setTableApiPreset()`, `getPlotApiPreset()`, `setPlotApiPreset()`, `saveApiPreset()`, `loadApiPreset()`, `deleteApiPreset()` |
 | 1.4 | 新增 AI 调用 API：`callAI(messages, options)` 使用数据库配置的 API 调用 AI；`getStoryContext(maxTurns)` 获取最近剧情上下文 |
 | 1.5 | 补充模板双作用域相关文档：`importTemplate(options)`、`exportTemplate(options)`、`resetTemplate(options)`、`getTemplatePresetNames()`、`switchTemplatePreset()`、`injectTemplatePresetToCurrentChat()`、`importTemplateFromData(templateData, options)` |
+| 1.6 | 新增外部导入 Headless API 与 Agent 世界书 API 文档：`importTxtTextAndSplit(text, options)`、结构化 `injectImportedSelected(options)`、`getAgentWorldbookControl()`、`setAgentWorldbookMode(mode, options)`、`runAgentWorldbookSkillify(options)` 及兼容别名 |
+| 1.7 | **安全收敛**：弃用全部 API 预设管理公开接口（`getApiPresets / saveApiPreset / loadApiPreset / deleteApiPreset / getTableApiPreset / setTableApiPreset / getPlotApiPreset / setPlotApiPreset`）；`callAI` 升级为受限代理接口，仅允许 `presetName + max_tokens`，禁止外部传入 `apiConfig / apiKey / url / requestHeaders / bodyParams / model / temperature / stream` 等敏感字段 |

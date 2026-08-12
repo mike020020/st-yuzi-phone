@@ -450,7 +450,6 @@ async function main() {
     setApi(null);
     const repository = await import(moduleUrl('modules/phone-core/data-api/table-repository.js'));
     const importExport = await import(moduleUrl('modules/phone-core/data-api/import-export-repository.js'));
-    const panelActions = await import(moduleUrl('modules/phone-core/data-api/panel-actions.js'));
     const queue = await import(moduleUrl('modules/phone-core/data-api/mutation-queue.js'));
 
     const firstMutation = createDeferred();
@@ -548,51 +547,6 @@ async function main() {
     const [, refreshResult] = await Promise.all([queuedWrite, queuedRefresh]);
     assert.equal(refreshResult.ok, true);
     assert.equal(explicitRefreshCalls, 1);
-
-    const slowManualUpdate = createDeferred();
-    let manualUpdateCalls = 0;
-    setApi({
-        manualUpdate() {
-            manualUpdateCalls += 1;
-            return slowManualUpdate.promise;
-        },
-    });
-    const manualUpdatePromise = panelActions.triggerManualUpdate();
-    let manualUpdateSettled = false;
-    manualUpdatePromise.finally(() => { manualUpdateSettled = true; });
-    await wait(15);
-    assert.equal(manualUpdateCalls, 1);
-    assert.equal(manualUpdateSettled, false, '慢 manualUpdate 不得被本地超时提前结束');
-    assert.equal(queue.getPendingTableMutationCount(), 1, '慢 manualUpdate settle 前必须保留共享队列占用');
-    slowManualUpdate.resolve(true);
-    assert.equal(await manualUpdatePromise, true);
-    assert.equal(queue.getPendingTableMutationCount(), 0);
-
-    let queryCalls = 0;
-    let clickCalls = 0;
-    const previousHTMLElement = global.HTMLElement;
-    class ManualUpdateButton {
-        click() {
-            clickCalls += 1;
-        }
-    }
-    global.HTMLElement = ManualUpdateButton;
-    setApi({});
-    global.window.parent.document = {
-        querySelector() {
-            queryCalls += 1;
-            return new ManualUpdateButton();
-        },
-    };
-    assert.equal(await panelActions.triggerManualUpdate(), false, 'manualUpdate API 缺失时必须 fail-closed');
-    assert.equal(queryCalls, 0, 'manualUpdate API 缺失时不得查询 DOM fallback');
-    assert.equal(clickCalls, 0, 'manualUpdate API 缺失时不得点击不可等待的 DOM 按钮');
-    assert.equal(queue.getPendingTableMutationCount(), 0);
-    if (previousHTMLElement === undefined) {
-        delete global.HTMLElement;
-    } else {
-        global.HTMLElement = previousHTMLElement;
-    }
 
     console.log('[table-mutation-settlement-behavior-check] 检查通过');
 }

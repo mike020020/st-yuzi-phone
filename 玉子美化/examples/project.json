@@ -1,18 +1,43 @@
 {
-  "tablesFile": "tables.json",
+  "tablesFile": "tables/generated/tables.json",
   "manifest": {
     "id": "yuzi-example-character-table",
     "name": "角色表示例",
     "version": "1.0.0",
     "author": "Yuzi",
-    "items": [{
-      "id": "character-table",
-      "name": "角色表",
-      "target": { "tableName": "角色表", "fields": ["姓名", "状态"] },
-      "entry": { "html": "page.html", "css": "page.css", "js": "page.js", "scriptMode": "classic" },
-      "assets": []
-    }]
+    "items": [
+      {
+        "id": "character-table",
+        "name": "角色表",
+        "target": {
+          "tableName": "角色表",
+          "fields": [
+            "姓名",
+            "状态"
+          ]
+        },
+        "entry": {
+          "html": "page.html",
+          "css": "page.css",
+          "mount": "page.js"
+        },
+        "assets": []
+      }
+    ]
   },
-  "files": { "page.html": "page.html", "page.css": "page.css", "page.js": "page.js" },
-  "mimeTypes": { "page.html": "text/html", "page.css": "text/css", "page.js": "text/javascript" }
+  "files": {
+    "page.html": "page.html",
+    "page.css": "page.css",
+    "page.js": "page.js"
+  },
+  "mimeTypes": {
+    "page.html": "text/html",
+    "page.css": "text/css",
+    "page.js": "text/javascript"
+  },
+  "encodings": {
+    "page.js": "text",
+    "page.html": "text",
+    "page.css": "text"
+  }
 }

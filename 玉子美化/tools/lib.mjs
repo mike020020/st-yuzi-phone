@@ -2,9 +2,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import * as esbuild from 'esbuild';
+import { assertSchema, validateSchema } from './schema-validator.mjs';
 
 export const FORMAT = 'yuzi-beautify-preset';
-export const VERSION = 1;
+export const VERSION = 2;
+export const API_VERSION = 1;
 export const readJson = async file => JSON.parse(await fs.readFile(file, 'utf8'));
 export const writeJson = async (file, value) => { await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`, 'utf8'); };
 export const hash = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -14,10 +17,64 @@ const compareCodeUnits = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 const SCHEME_PATTERN = /^[a-z][a-z\d+.-]*:/i;
 const DRIVE_PATTERN = /^[a-z]:/i;
 
+function rejectUnknownKeys(value, allowedKeys, prefix, errors) {
+  if (!isObject(value)) return;
+  const allowed = new Set(allowedKeys);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) errors.push(`${prefix} 包含未知字段：${key}`);
+  }
+}
+
+function isPathInside(rootReal, fileReal) {
+  const relative = path.relative(rootReal, fileReal);
+  return Boolean(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
+function stripNonCode(source) {
+  let result = '';
+  let index = 0;
+  let quote = '';
+  while (index < source.length) {
+    const char = source[index];
+    const next = source[index + 1];
+    if (quote) {
+      if (char === '\\') { result += '  '; index += 2; continue; }
+      if (char === quote) quote = '';
+      result += char === '\n' ? '\n' : ' ';
+      index += 1;
+      continue;
+    }
+    if (char === '/' && next === '/') {
+      const end = source.indexOf('\n', index);
+      result += ' '.repeat((end < 0 ? source.length : end) - index);
+      index = end < 0 ? source.length : end;
+      continue;
+    }
+    if (char === '/' && next === '*') {
+      const end = source.indexOf('*/', index + 2);
+      const comment = source.slice(index, end < 0 ? source.length : end + 2);
+      result += comment.replace(/[^\n]/g, ' ');
+      index = end < 0 ? source.length : end + 2;
+      continue;
+    }
+    if (char === '\'' || char === '"' || char === '`') quote = char;
+    result += char;
+    index += 1;
+  }
+  return result;
+}
+
+function hasMountExport(file) {
+  if (!file || file.encoding !== 'text' || !/^(?:text|application)\/javascript$/i.test(String(file.mimeType || '').trim())) return false;
+  const source = stripNonCode(String(file.content ?? ''));
+  return /^\s*export\s+(?:async\s+)?function\s+mount\s*\(\s*context\s*\)/m.test(source);
+}
+
 export const normalizeMatchText = value => String(value ?? '').normalize('NFKC').trim();
 
 export function normalizePackagePath(value) {
-  const raw = String(value ?? '').trim();
+  if (typeof value !== 'string' || value !== value.trim()) throw new Error('包路径必须是无首尾空白的字符串');
+  const raw = value;
   if (!raw) throw new Error('包路径不能为空');
   if (/[\\?#\0-\x1f\x7f]/.test(raw)) throw new Error(`包路径包含非法字符：${raw}`);
   if (raw.startsWith('/') || DRIVE_PATTERN.test(raw) || SCHEME_PATTERN.test(raw)) throw new Error(`包路径必须是相对路径：${raw}`);
@@ -55,7 +112,6 @@ export function normalizeTables(input) {
 }
 
 export function matchesItemToTable(item, table) {
-  if (table?.isMessage || normalizeMatchText(table?.specialType).toLowerCase() === 'message' || isMessageTableName(table?.tableName)) return false;
   if (normalizeMatchText(item?.target?.tableName) !== normalizeMatchText(table?.tableName)) return false;
   const actualFields = new Set((table?.headers || []).map(normalizeMatchText).filter(Boolean));
   return (item?.target?.fields || []).map(normalizeMatchText).every(field => actualFields.has(field));
@@ -74,12 +130,16 @@ function validateFields(fields, prefix, errors) {
 }
 
 export function validateBundle(bundle, { strict = true, tables = null } = {}) {
-  const errors = [];
+  const structural = validateSchema('bundle', bundle);
+  const errors = structural.errors.map(error => `Bundle Schema：${error}`);
   if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) errors.push('Bundle 必须是对象');
+  rejectUnknownKeys(bundle, ['format', 'formatVersion', 'apiVersion', 'manifest', 'files'], 'Bundle', errors);
   if (bundle?.format !== FORMAT) errors.push(`format 必须为 ${FORMAT}`);
-  if (Number(bundle?.formatVersion) !== VERSION) errors.push(`formatVersion 必须为 ${VERSION}`);
+  if (bundle?.formatVersion !== VERSION) errors.push(`formatVersion 必须为 ${VERSION}`);
+  if (bundle?.apiVersion !== API_VERSION) errors.push(`apiVersion 必须为 ${API_VERSION}`);
   if (!isObject(bundle?.manifest)) errors.push('manifest 必须是对象');
   if (!isObject(bundle?.files)) errors.push('files 必须是对象');
+  rejectUnknownKeys(bundle?.manifest, ['id', 'name', 'version', 'author', 'items'], 'manifest', errors);
   const files = isObject(bundle?.files) ? bundle.files : {};
   const normalizedFiles = new Set();
   for (const [filePath, file] of Object.entries(files)) {
@@ -88,6 +148,7 @@ export function validateBundle(bundle, { strict = true, tables = null } = {}) {
     if (normalizedFiles.has(normalized)) errors.push(`包路径规范化后重复：${normalized}`);
     normalizedFiles.add(normalized);
     if (!isObject(file)) { errors.push(`files.${filePath} 必须是对象`); continue; }
+    rejectUnknownKeys(file, ['mimeType', 'encoding', 'content'], `files.${filePath}`, errors);
     if (!String(file.mimeType || '').trim()) errors.push(`files.${filePath}.mimeType 缺失`);
     if (!['text', 'base64'].includes(file.encoding)) errors.push(`files.${filePath}.encoding 无效`);
     if (typeof file.content !== 'string') errors.push(`files.${filePath}.content 必须是字符串`);
@@ -101,18 +162,26 @@ export function validateBundle(bundle, { strict = true, tables = null } = {}) {
   const ids = new Set();
   for (const [index, item] of items.entries()) {
     const prefix = `items[${index}]`;
+    if (!isObject(item)) { errors.push(`${prefix} 必须是对象`); continue; }
+    rejectUnknownKeys(item, ['id', 'name', 'target', 'entry', 'assets'], prefix, errors);
+    rejectUnknownKeys(item.target, ['tableName', 'fields'], `${prefix}.target`, errors);
+    rejectUnknownKeys(item.entry, ['html', 'css', 'mount'], `${prefix}.entry`, errors);
     const id = String(item?.id || '').trim();
     if (!id) errors.push(`${prefix}.id 缺失`); else if (ids.has(id)) errors.push(`${prefix}.id 重复`); else ids.add(id);
     if (!String(item?.target?.tableName || '').trim()) errors.push(`${prefix}.target.tableName 缺失`);
     validateFields(item?.target?.fields, `${prefix}.target.fields`, errors);
-    const entries = ['html', 'css', 'js'].filter(key => item?.entry?.[key]);
-    if (strict && entries.length === 0) errors.push(`${prefix} 至少需要 html/css/js 入口`);
+    if (hasOwn(item?.entry, 'js') || hasOwn(item?.entry, 'scriptMode') || hasOwn(item, 'scriptMode')) errors.push(`${prefix} 不接受 legacy entry.js/scriptMode`);
+    const entries = ['html', 'css', 'mount'].filter(key => item?.entry?.[key]);
+    if (!item?.entry?.mount) errors.push(`${prefix}.entry.mount 缺失`);
     for (const key of entries) {
       let entryPath;
       try { entryPath = normalizePackagePath(item.entry[key]); } catch (error) { errors.push(`${prefix}.entry.${key}: ${error.message}`); continue; }
+      const file = files[entryPath];
       if (!hasOwn(files, entryPath)) errors.push(`${prefix}.entry.${key} 文件不存在`);
+      if (key === 'mount' && file && !hasMountExport(file)) errors.push(`${prefix}.entry.mount 必须导出 mount(context)`);
+      if (key === 'html' && file && (file.encoding !== 'text' || String(file.mimeType).toLowerCase() !== 'text/html')) errors.push(`${prefix}.entry.html 必须是 text/html 文本`);
+      if (key === 'css' && file && (file.encoding !== 'text' || String(file.mimeType).toLowerCase() !== 'text/css')) errors.push(`${prefix}.entry.css 必须是 text/css 文本`);
     }
-    if (item?.entry?.scriptMode && !['classic', 'module'].includes(item.entry.scriptMode)) errors.push(`${prefix}.entry.scriptMode 无效`);
     if (item?.assets !== undefined && !Array.isArray(item.assets)) errors.push(`${prefix}.assets 必须是数组`);
     const assets = Array.isArray(item?.assets) ? item.assets : [];
     const assetPaths = new Set();
@@ -123,55 +192,532 @@ export function validateBundle(bundle, { strict = true, tables = null } = {}) {
       assetPaths.add(assetPath);
       if (!hasOwn(files, assetPath)) errors.push(`${prefix}.assets[${assetIndex}] 文件不存在`);
     }
-    if (strict && Array.isArray(tables) && !tables.some(table => matchesItemToTable(item, table))) errors.push(`${prefix} 未匹配任何真实非消息表`);
+    if (strict && Array.isArray(tables) && !tables.some(table => matchesItemToTable(item, table))) errors.push(`${prefix} 未匹配任何真实表`);
   }
   return { ok: errors.length === 0, errors };
 }
 
-async function resolveProjectFile(root, source, label) {
-  const raw = String(source ?? '').trim();
+export async function resolveProjectFile(root, source, label) {
+  if (typeof source !== 'string' || source !== source.trim()) throw new Error(`${label} 必须是无首尾空白的项目内相对路径`);
+  const raw = source;
   if (!raw || raw.includes('\\') || path.isAbsolute(raw) || DRIVE_PATTERN.test(raw) || SCHEME_PATTERN.test(raw) || raw.includes('\0')) throw new Error(`${label} 必须是项目内相对路径`);
   const rootReal = await fs.realpath(root);
   const candidate = path.resolve(rootReal, raw);
-  const lexicalRelative = path.relative(rootReal, candidate);
-  if (!lexicalRelative || lexicalRelative === '..' || lexicalRelative.startsWith(`..${path.sep}`) || path.isAbsolute(lexicalRelative)) throw new Error(`${label} 越出项目目录：${raw}`);
+  if (!isPathInside(rootReal, candidate)) throw new Error(`${label} 越出项目目录：${raw}`);
   const fileReal = await fs.realpath(candidate);
-  const relative = path.relative(rootReal, fileReal);
-  if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error(`${label} 越出项目目录：${raw}`);
+  if (!isPathInside(rootReal, fileReal)) throw new Error(`${label} 越出项目目录：${raw}`);
   const stat = await fs.stat(fileReal);
   if (!stat.isFile()) throw new Error(`${label} 不是普通文件：${raw}`);
   return fileReal;
 }
 
+export async function loadSourceProject(projectFile) {
+  const projectPath = projectFile instanceof URL ? fileURLToPath(projectFile) : path.resolve(String(projectFile));
+  const project = await readJson(projectPath);
+  assertSchema('project', project, 'project.json');
+  return { projectPath, root: path.dirname(projectPath), project };
+}
+
+export async function loadProjectTables(projectFile) {
+  const { projectPath, root, project } = await loadSourceProject(projectFile);
+  const tablesPath = await resolveProjectFile(root, project.tablesFile, 'tablesFile');
+  const tablesDocument = await readJson(tablesPath);
+  return { projectPath, root, project, tablesPath, tablesDocument, tables: normalizeTables(tablesDocument) };
+}
+
 function canonicalManifest(manifest = {}) {
   return {
+    ...manifest,
     id: manifest.id,
     name: manifest.name,
     version: manifest.version,
     author: manifest.author,
     items: (Array.isArray(manifest.items) ? manifest.items : []).map(item => ({
+      ...item,
       id: item.id,
       name: item.name,
-      target: { tableName: item.target?.tableName, fields: item.target?.fields },
-      entry: {
-        ...(item.entry?.html ? { html: item.entry.html } : {}),
-        ...(item.entry?.css ? { css: item.entry.css } : {}),
-        ...(item.entry?.js ? { js: item.entry.js } : {}),
-        ...(item.entry?.scriptMode ? { scriptMode: item.entry.scriptMode } : {}),
-      },
+      target: { ...item.target, tableName: item.target?.tableName, fields: item.target?.fields },
+      entry: { ...item.entry },
       assets: Array.isArray(item.assets) ? item.assets : [],
     })),
   };
 }
 
+async function bundleMountModule(sourcePath, root) {
+  const rootReal = await fs.realpath(root);
+  const javascriptLoaders = new Map([
+    ['.js', 'js'],
+    ['.mjs', 'js'],
+    ['.cjs', 'js'],
+  ]);
+  const containmentPlugin = {
+    name: 'yuzi-project-containment',
+    setup(build) {
+      build.onResolve({ filter: /.*/ }, (args) => {
+        if (!args.importer) return undefined;
+        if (args.path.startsWith('./') || args.path.startsWith('../')) return undefined;
+        throw new Error(`module dependency 必须是 package-local 相对 JavaScript 路径：${args.path}`);
+      });
+      build.onLoad({ filter: /.*/, namespace: 'file' }, async (args) => {
+        const fileReal = await fs.realpath(args.path);
+        if (!isPathInside(rootReal, fileReal)) {
+          throw new Error(`module dependency 越出项目目录：${fileReal}`);
+        }
+        const stat = await fs.stat(fileReal);
+        if (!stat.isFile()) throw new Error(`module dependency 不是普通文件：${fileReal}`);
+        const extension = path.extname(fileReal).toLowerCase();
+        const loader = javascriptLoaders.get(extension);
+        if (!loader) throw new Error(`module dependency 仅支持 JavaScript 文件：${fileReal}`);
+        return {
+          contents: await fs.readFile(fileReal),
+          loader,
+          resolveDir: path.dirname(fileReal),
+        };
+      });
+    },
+  };
+  const result = await esbuild.build({
+    absWorkingDir: rootReal,
+    entryPoints: [sourcePath],
+    outfile: path.join(root, '.yuzi-build', 'mount.js'),
+    bundle: true,
+    write: false,
+    format: 'esm',
+    platform: 'browser',
+    target: ['es2022'],
+    charset: 'utf8',
+    legalComments: 'none',
+    sourcemap: false,
+    minify: false,
+    logLevel: 'silent',
+    external: ['http://*', 'https://*'],
+    plugins: [containmentPlugin],
+  });
+  const javascriptOutputs = (result.outputFiles || []).filter(output => path.extname(output.path).toLowerCase() === '.js');
+  if (javascriptOutputs.length !== 1) throw new Error(`module mount 构建应产生一个 JavaScript 文件，实际 ${javascriptOutputs.length} 个`);
+  return normalizeBundledMountExport(javascriptOutputs[0].text);
+}
+
+function normalizeBundledMountExport(source) {
+  const exportBlockPattern = /\nexport\s*\{([\s\S]*?)\};\s*$/;
+  const exportBlock = String(source).match(exportBlockPattern);
+  if (!exportBlock) throw new Error('module mount 构建结果缺少导出块');
+  const mountExport = exportBlock[1].split(',').map(value => value.trim()).find(value => /(?:^|\s+as\s+)mount$/.test(value));
+  if (!mountExport) throw new Error('module mount 构建结果缺少 mount 导出');
+  const localName = mountExport.split(/\s+as\s+/)[0].trim();
+  const escapedName = localName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const declarationPattern = new RegExp(`(^|\\n)(\\s*)((?:async\\s+)?function\\s+)${escapedName}(\\s*\\(\\s*context\\s*\\))`);
+  const withoutExports = String(source).replace(exportBlockPattern, '\n');
+  if (!declarationPattern.test(withoutExports)) throw new Error('module mount 构建结果无法规范化为 export function mount(context)');
+  return withoutExports.replace(declarationPattern, (_match, lineStart, indent, prefix, signature) => `${lineStart}${indent}export ${prefix}mount${signature}`);
+}
+
+function splitReferenceSuffix(reference) {
+  const value = String(reference || '');
+  const index = value.search(/[?#]/);
+  return index < 0 ? [value, ''] : [value.slice(0, index), value.slice(index)];
+}
+
+function decodeCssEscapes(value) {
+  const source = String(value ?? '');
+  let output = '';
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (char !== '\\') {
+      output += char;
+      continue;
+    }
+    if (index + 1 >= source.length) {
+      output += '\uFFFD';
+      continue;
+    }
+    const next = source[index + 1];
+    if (next === '\n' || next === '\f') {
+      index += 1;
+      continue;
+    }
+    if (next === '\r') {
+      index += source[index + 2] === '\n' ? 2 : 1;
+      continue;
+    }
+    const hexMatch = source.slice(index + 1).match(/^[\da-f]{1,6}/i);
+    if (hexMatch) {
+      const codePoint = Number.parseInt(hexMatch[0], 16);
+      output += codePoint === 0 || codePoint > 0x10FFFF || (codePoint >= 0xD800 && codePoint <= 0xDFFF)
+        ? '\uFFFD'
+        : String.fromCodePoint(codePoint);
+      index += hexMatch[0].length;
+      if (source[index + 1] === '\r' && source[index + 2] === '\n') index += 2;
+      else if (/[\t\n\f\r ]/.test(source[index + 1] || '')) index += 1;
+      continue;
+    }
+    output += next;
+    index += 1;
+  }
+  return output;
+}
+
+function consumeCssEscape(source, index) {
+  if (source[index] !== '\\' || index + 1 >= source.length) return index + 1;
+  const next = source[index + 1];
+  if (next === '\r') return index + (source[index + 2] === '\n' ? 3 : 2);
+  if (next === '\n' || next === '\f') return index + 2;
+  const hexMatch = source.slice(index + 1).match(/^[\da-f]{1,6}/i);
+  if (!hexMatch) return index + 2;
+  let end = index + 1 + hexMatch[0].length;
+  if (source[end] === '\r' && source[end + 1] === '\n') end += 2;
+  else if (/[\t\n\f\r ]/.test(source[end] || '')) end += 1;
+  return end;
+}
+
+function isValidCssEscape(source, index) {
+  const next = source[index + 1];
+  return source[index] === '\\' && Boolean(next) && next !== '\n' && next !== '\r' && next !== '\f';
+}
+
+function isCssWhitespace(char) {
+  return Boolean(char) && /[\t\n\f\r ]/.test(char);
+}
+
+function isCssNameChar(char) {
+  return Boolean(char) && (/[-_a-z\d]/i.test(char) || char.codePointAt(0) >= 0x80);
+}
+
+function consumeCssName(source, index) {
+  let end = index;
+  while (end < source.length) {
+    if (isCssNameChar(source[end])) { end += 1; continue; }
+    if (isValidCssEscape(source, end)) { end = consumeCssEscape(source, end); continue; }
+    break;
+  }
+  return end;
+}
+
+function consumeCssString(source, start) {
+  const quote = source[start];
+  let index = start + 1;
+  while (index < source.length) {
+    const char = source[index];
+    if (char === quote) return index + 1;
+    if (char === '\n' || char === '\r' || char === '\f') return index;
+    if (char === '\\') {
+      if (index + 1 >= source.length) return source.length;
+      index = consumeCssEscape(source, index);
+      continue;
+    }
+    index += 1;
+  }
+  return source.length;
+}
+
+function consumeBadCssUrlRemnants(source, index) {
+  let end = index;
+  while (end < source.length) {
+    if (source[end] === ')') return end + 1;
+    if (isValidCssEscape(source, end)) {
+      end = consumeCssEscape(source, end);
+      continue;
+    }
+    end += 1;
+  }
+  return source.length;
+}
+
+function badCssUrl(source, index) {
+  return { type: 'bad', end: consumeBadCssUrlRemnants(source, index) };
+}
+
+function consumeCssUrl(source, openParenIndex) {
+  let index = openParenIndex + 1;
+  while (/[\t\n\f\r ]/.test(source[index] || '')) index += 1;
+  const quote = source[index];
+  if (quote === '\'' || quote === '"') {
+    const valueStart = index + 1;
+    index = valueStart;
+    while (index < source.length) {
+      const char = source[index];
+      if (char === quote) break;
+      if (char === '\n' || char === '\r' || char === '\f') return badCssUrl(source, index);
+      if (char === '\\') {
+        if (index + 1 >= source.length) return badCssUrl(source, index);
+        index = consumeCssEscape(source, index);
+        continue;
+      }
+      index += 1;
+    }
+    if (source[index] !== quote) return badCssUrl(source, index);
+    const rawReference = source.slice(valueStart, index);
+    index += 1;
+    while (/[\t\n\f\r ]/.test(source[index] || '')) index += 1;
+    return source[index] === ')'
+      ? { type: 'valid', end: index + 1, rawReference }
+      : badCssUrl(source, index);
+  }
+  const valueStart = index;
+  while (index < source.length) {
+    const char = source[index];
+    if (char === ')') return { type: 'valid', end: index + 1, rawReference: source.slice(valueStart, index).trimEnd() };
+    if (/[\t\n\f\r ]/.test(char)) {
+      const valueEnd = index;
+      while (/[\t\n\f\r ]/.test(source[index] || '')) index += 1;
+      return source[index] === ')'
+        ? { type: 'valid', end: index + 1, rawReference: source.slice(valueStart, valueEnd) }
+        : badCssUrl(source, index);
+    }
+    if (char === '\'' || char === '"' || char === '(' || char === '\u0000' || /[\u0001-\u0008\u000B\u000E-\u001F\u007F]/.test(char)) return badCssUrl(source, index);
+    if (char === '\\') {
+      if (!isValidCssEscape(source, index)) return badCssUrl(source, index);
+      index = consumeCssEscape(source, index);
+      continue;
+    }
+    index += 1;
+  }
+  return badCssUrl(source, index);
+}
+
+function isExternalReference(reference) {
+  const value = String(reference || '').trim();
+  return !value || value.startsWith('/') || value.startsWith('#') || SCHEME_PATTERN.test(value);
+}
+
+function resolveCssPackagePath(basePath, reference) {
+  const [pathPart] = splitReferenceSuffix(reference);
+  return normalizePackagePath(path.posix.normalize(path.posix.join(path.posix.dirname(basePath), pathPart)));
+}
+
+function transformCssUrls(css, transform) {
+  const source = String(css);
+  let output = '';
+  let index = 0;
+  while (index < source.length) {
+    if (source[index] === '/' && source[index + 1] === '*') {
+      const end = source.indexOf('*/', index + 2);
+      const next = end < 0 ? source.length : end + 2;
+      output += source.slice(index, next);
+      index = next;
+      continue;
+    }
+    if (source[index] === '\'' || source[index] === '"') {
+      const end = consumeCssString(source, index);
+      output += source.slice(index, end);
+      index = end;
+      continue;
+    }
+    if (isCssNameChar(source[index]) || isValidCssEscape(source, index)) {
+      const nameEnd = consumeCssName(source, index);
+      const functionName = decodeCssEscapes(source.slice(index, nameEnd));
+      if (functionName.toLowerCase() !== 'url' || source[nameEnd] !== '(') {
+        output += source.slice(index, nameEnd);
+        index = nameEnd;
+        continue;
+      }
+      const parsed = consumeCssUrl(source, nameEnd);
+      if (parsed.type === 'valid') {
+        const raw = source.slice(index, parsed.end);
+        output += transform(raw, parsed.rawReference);
+      } else {
+        output += source.slice(index, parsed.end);
+      }
+      index = parsed.end;
+      continue;
+    }
+    output += source[index];
+    index += 1;
+  }
+  return output;
+}
+
+function quoteCssUrl(reference) {
+  const escaped = String(reference).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r\n?|\n|\f/g, '\\A ');
+  return `url("${escaped}")`;
+}
+
+function rebaseImportedCssReferences(css, sourcePath, entryPath) {
+  return transformCssUrls(css, (match, rawReference) => {
+    const reference = decodeCssEscapes(rawReference);
+    if (isExternalReference(reference)) return match;
+    try {
+      const [pathPart, suffix] = splitReferenceSuffix(reference);
+      const targetPath = normalizePackagePath(path.posix.normalize(path.posix.join(path.posix.dirname(sourcePath), pathPart)));
+      let relative = path.posix.relative(path.posix.dirname(entryPath), targetPath);
+      if (!relative.startsWith('.')) relative = `./${relative}`;
+      return quoteCssUrl(`${relative}${suffix}`);
+    } catch {
+      return match;
+    }
+  });
+}
+
+function consumeBalancedFunction(value, name) {
+  const pattern = new RegExp(`^${name}\\s*\\(`, 'i');
+  const match = String(value).match(pattern);
+  if (!match) return null;
+  let depth = 1;
+  let quote = '';
+  let index = match[0].length;
+  for (; index < value.length; index += 1) {
+    const char = value[index];
+    if (quote) {
+      if (char === '\\') { index += 1; continue; }
+      if (char === quote) quote = '';
+      continue;
+    }
+    if (char === '\'' || char === '"') { quote = char; continue; }
+    if (char === '(') depth += 1;
+    if (char === ')') depth -= 1;
+    if (depth === 0) return { body: value.slice(match[0].length, index), rest: value.slice(index + 1).trim() };
+  }
+  throw new Error(`CSS @import ${name}() 括号未闭合`);
+}
+
+function wrapImportedCss(css, prelude) {
+  let rest = String(prelude || '').trim();
+  let layer = null;
+  let supports = null;
+  const layerFunction = consumeBalancedFunction(rest, 'layer');
+  if (layerFunction) {
+    layer = layerFunction.body.trim();
+    rest = layerFunction.rest;
+  } else if (/^layer(?:\s|$)/i.test(rest)) {
+    layer = '';
+    rest = rest.replace(/^layer(?:\s+|$)/i, '').trim();
+  }
+  const supportsFunction = consumeBalancedFunction(rest, 'supports');
+  if (supportsFunction) {
+    supports = supportsFunction.body.trim();
+    rest = supportsFunction.rest;
+  }
+  let result = css;
+  if (rest) result = `@media ${rest} {\n${result}\n}`;
+  if (supports !== null) {
+    const supportsCondition = /^(?:selector|font-tech|font-format)\s*\(/i.test(supports) ? supports : `(${supports})`;
+    result = `@supports ${supportsCondition} {\n${result}\n}`;
+  }
+  if (layer !== null) result = layer ? `@layer ${layer} {\n${result}\n}` : `@layer {\n${result}\n}`;
+  return result;
+}
+
+function normalizeCssTrivia(value) {
+  const source = String(value);
+  let output = '';
+  let quote = '';
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (quote) {
+      output += char;
+      if (char === '\\' && index + 1 < source.length) {
+        output += source[index + 1];
+        index += 1;
+      } else if (char === quote) {
+        quote = '';
+      }
+      continue;
+    }
+    if (char === '\'' || char === '"') {
+      quote = char;
+      output += char;
+      continue;
+    }
+    if (char === '/' && source[index + 1] === '*') {
+      const end = source.indexOf('*/', index + 2);
+      if (end < 0) throw new Error('CSS 注释未闭合');
+      output += ' ';
+      index = end + 1;
+      continue;
+    }
+    output += char;
+  }
+  return output;
+}
+
+function findTopLevelCssAtRuleEnd(source, start) {
+  let parentheses = 0;
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '\'' || char === '"') {
+      const end = consumeCssString(source, index);
+      index = Math.max(index, end - 1);
+      continue;
+    }
+    if (char === '/' && source[index + 1] === '*') {
+      const end = source.indexOf('*/', index + 2);
+      if (end < 0) return -1;
+      index = end + 1;
+      continue;
+    }
+    if (char === '(') parentheses += 1;
+    if (char === ')') parentheses = Math.max(0, parentheses - 1);
+    if (char === ';' && parentheses === 0) return index + 1;
+    if (char === '{' && parentheses === 0) return -1;
+  }
+  return -1;
+}
+
+function transformTopLevelCssImports(css, transform) {
+  const source = String(css);
+  let output = '';
+  let index = 0;
+  let braceDepth = 0;
+  while (index < source.length) {
+    if (source[index] === '/' && source[index + 1] === '*') {
+      const end = source.indexOf('*/', index + 2);
+      const next = end < 0 ? source.length : end + 2;
+      output += source.slice(index, next);
+      index = next;
+      continue;
+    }
+    if (source[index] === '\'' || source[index] === '"') {
+      const end = consumeCssString(source, index);
+      output += source.slice(index, end);
+      index = end;
+      continue;
+    }
+    if (source[index] === '{') braceDepth += 1;
+    if (source[index] === '}') braceDepth = Math.max(0, braceDepth - 1);
+    if (braceDepth === 0 && source[index] === '@') {
+      const nameEnd = consumeCssName(source, index + 1);
+      const atRuleName = decodeCssEscapes(source.slice(index + 1, nameEnd)).toLowerCase();
+      const boundary = source[nameEnd];
+      const hasImportPreludeBoundary = isCssWhitespace(boundary) || boundary === '"' || boundary === '\''
+        || (boundary === '/' && source[nameEnd + 1] === '*');
+      if (atRuleName === 'import' && hasImportPreludeBoundary) {
+        const end = findTopLevelCssAtRuleEnd(source, index);
+        if (end > index) {
+          const canonicalRule = `@import ${source.slice(nameEnd, end)}`;
+          output += transform(canonicalRule);
+          index = end;
+          continue;
+        }
+      }
+    }
+    output += source[index];
+    index += 1;
+  }
+  return output;
+}
+
+function inlineLocalCssImports(entryPath, files, currentPath = entryPath, stack = []) {
+  if (stack.includes(currentPath)) throw new Error(`CSS @import 循环：${[...stack, currentPath].join(' -> ')}`);
+  const file = files[currentPath];
+  if (!file || file.encoding !== 'text' || String(file.mimeType).toLowerCase() !== 'text/css') throw new Error(`CSS @import 文件不存在或不是 text/css：${currentPath}`);
+  return transformTopLevelCssImports(file.content, (match) => {
+    const normalizedRule = normalizeCssTrivia(match);
+    const parsed = normalizedRule.match(/^@import\s+(?:url\(\s*(?:(['"])(.*?)\1|([^\s)'";]+))\s*\)|(['"])(.*?)\4)\s*([^;]*);$/is);
+    if (!parsed) return match;
+    const [, _urlQuote, quotedUrl, bareUrl, _plainQuote, quotedPlain, media] = parsed;
+    const reference = decodeCssEscapes(quotedUrl ?? bareUrl ?? quotedPlain);
+    if (isExternalReference(reference)) return match;
+    const importedPath = resolveCssPackagePath(currentPath, reference);
+    const imported = inlineLocalCssImports(entryPath, files, importedPath, [...stack, currentPath]);
+    const rebased = rebaseImportedCssReferences(imported, importedPath, currentPath);
+    return wrapImportedCss(rebased, media);
+  });
+}
+
 export async function buildBundle(projectFile) {
-  const projectPath = projectFile instanceof URL ? fileURLToPath(projectFile) : path.resolve(String(projectFile));
-  const project = await readJson(projectPath);
-  const root = path.dirname(projectPath);
-  if (!String(project.tablesFile || '').trim()) throw new Error('project.tablesFile 缺失');
-  const tablesPath = await resolveProjectFile(root, project.tablesFile, 'tablesFile');
-  const tables = normalizeTables(await readJson(tablesPath));
+  const { project, root, tables } = await loadProjectTables(projectFile);
   const fileEntries = [];
+  const sourcePaths = new Map();
   const packagePaths = new Set();
   for (const [rawPackagePath, source] of Object.entries(project.files || {})) {
     const packagePath = normalizePackagePath(rawPackagePath);
@@ -180,14 +726,24 @@ export async function buildBundle(projectFile) {
     const encoding = project.encodings?.[rawPackagePath] || 'text';
     if (!['text', 'base64'].includes(encoding)) throw new Error(`${packagePath} encoding 无效`);
     const sourcePath = await resolveProjectFile(root, source, `files.${packagePath}`);
+    sourcePaths.set(packagePath, sourcePath);
     const bytes = await fs.readFile(sourcePath);
-    let content;
-    if (encoding === 'base64') content = bytes.toString('base64');
-    else content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    const content = encoding === 'base64' ? bytes.toString('base64') : new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     fileEntries.push([packagePath, { mimeType: project.mimeTypes?.[rawPackagePath] || 'application/octet-stream', encoding, content }]);
   }
-  const files = Object.fromEntries(fileEntries.sort(([a], [b]) => compareCodeUnits(a, b)));
-  const bundle = { format: FORMAT, formatVersion: VERSION, manifest: canonicalManifest(project.manifest), files };
+  const files = Object.fromEntries(fileEntries);
+  const manifest = canonicalManifest(project.manifest);
+  for (const mountPath of new Set(manifest.items.map(item => item.entry.mount).filter(Boolean))) {
+    const sourcePath = sourcePaths.get(mountPath);
+    if (!sourcePath) throw new Error(`entry.mount 未声明在 project.files：${mountPath}`);
+    files[mountPath] = { mimeType: 'text/javascript', encoding: 'text', content: await bundleMountModule(sourcePath, root) };
+  }
+  for (const cssPath of new Set(manifest.items.map(item => item.entry.css).filter(Boolean))) {
+    const inlined = inlineLocalCssImports(cssPath, files);
+    files[cssPath] = { ...files[cssPath], content: rebaseImportedCssReferences(inlined, cssPath, cssPath) };
+  }
+  const sortedFiles = Object.fromEntries(Object.entries(files).sort(([a], [b]) => compareCodeUnits(a, b)));
+  const bundle = { format: FORMAT, formatVersion: VERSION, apiVersion: API_VERSION, manifest, files: sortedFiles };
   const result = validateBundle(bundle, { strict: true, tables });
   if (!result.ok) throw new Error(result.errors.join('\n'));
   return bundle;

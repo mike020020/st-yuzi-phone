@@ -1,13 +1,34 @@
 {
   "name": "yuzi-beautify-workshop",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
+    "lint": "eslint tools/*.mjs tools/*.cjs tests/*.mjs",
+    "workflow:check": "node tools/verify-ai-workflow.mjs",
+    "project:new": "node tools/project-new.mjs",
+    "project:import-tables": "node tools/project-import-tables.mjs",
+    "project:add-item": "node tools/project-add-item.mjs",
+    "project:skip-table": "node tools/project-skip-table.mjs",
+    "project:status": "node tools/project-status.mjs",
+    "project:check": "node tools/project-check.mjs",
+    "preview": "node tools/preview-preset.mjs",
+    "tables:cli": "node tools/table-source.cjs",
+    "tables:check": "node tools/verify-tables.mjs",
+    "tables:test": "node tests/table-source-tests.mjs",
     "check": "node tools/check-preset.mjs examples/basic-preset.json examples/tables.json",
-    "test": "node tests/run-tests.mjs",
+    "test": "node tests/run-tests.mjs && node tests/workflow-validator-tests.mjs && node tests/schema-tests.mjs && node tests/project-workflow-tests.mjs && node tests/table-source-tests.mjs && node tests/preview-session-tests.mjs && node tests/preview-runtime-tests.mjs && node tests/reference-pages-tests.mjs && node tests/publish-gates-tests.mjs && node tests/independence-tests.mjs",
     "inspect": "node tools/inspect-tables.mjs examples/tables.json",
     "pack": "node tools/pack-preset.mjs examples/project.json output/basic-preset.json",
-    "readback": "node tools/readback-preset.mjs examples/project.json output/basic-preset.json"
+    "readback": "node tools/readback-preset.mjs examples/project.json output/basic-preset.json",
+    "verify": "npm run workflow:check && npm run lint && npm run tables:check && npm test && npm run check && npm run pack -- --dry-run --overwrite && npm run readback"
+  },
+  "devDependencies": {
+    "ajv": "^6.12.6",
+    "esbuild": "^0.25.0",
+    "eslint": "^8.57.1"
   }
 }

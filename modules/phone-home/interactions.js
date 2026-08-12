@@ -34,6 +34,13 @@ function scheduleRuntimeTimeout(runtime, callback, delay) {
     return window.setTimeout(callback, delay);
 }
 
+export function requestHomeAppNavigation(route, navigateTo) {
+    const safeRoute = String(route ?? '').trim();
+    if (!safeRoute || typeof navigateTo !== 'function') return false;
+    navigateTo(safeRoute);
+    return true;
+}
+
 export function bindHomeGridInteractions(grid, deps = {}) {
     const { navigateTo, runtime } = deps;
     if (!(grid instanceof HTMLElement)) return;
@@ -56,8 +63,8 @@ export function bindHomeGridInteractions(grid, deps = {}) {
         const appEl = target.closest('.phone-app-item');
         if (!(appEl instanceof HTMLElement) || !grid.contains(appEl)) return;
 
-        const sheetKey = String(appEl.dataset.sheetKey || '').trim();
-        if (!sheetKey) return;
+        const route = String(appEl.dataset.route || '').trim();
+        if (!route) return;
 
         const icon = appEl.querySelector('.phone-app-icon');
         if (icon instanceof HTMLElement) {
@@ -65,16 +72,9 @@ export function bindHomeGridInteractions(grid, deps = {}) {
             scheduleRuntimeTimeout(runtime, () => icon.classList.remove('phone-app-tap'), 180);
         }
 
-        // 系统 app（如变量管理器）使用 data-route 直接导航
-        const systemRoute = String(appEl.dataset.route || '').trim();
-
         scheduleRuntimeTimeout(runtime, () => {
             if (isRuntimeDisposed(runtime) || typeof navigateTo !== 'function') return;
-            if (systemRoute) {
-                navigateTo(systemRoute);
-            } else {
-                navigateTo(`app:${sheetKey}`);
-            }
+            requestHomeAppNavigation(route, navigateTo);
         }, 150);
     }, { passive: true });
 }

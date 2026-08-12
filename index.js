@@ -1,7 +1,7 @@
 // index.js
 /**
  * 玉子手机 - 独立扩展入口
- * @version 1.4.2
+ * @version 2.0.0
  * @description 集成 SillyTavern 事件系统、TavernHelper API、Slash 命令、错误处理等
  * @fix P0-001 修复 innerHTML XSS 风险
  * @fix P0-002 修复事件监听器内存泄漏
@@ -61,9 +61,18 @@ import {
 } from './modules/phone-core/background-services.js';
 import { getCurrentRoute } from './modules/phone-core/routing.js';
 import { requestHomePhoneRouteRender } from './modules/phone-core/route-runtime.js';
+import {
+    destroyQQV2Runtime,
+    handleQQV2CharacterMessageRendered,
+    handleQQV2ChatChanged,
+    handleQQV2ChatDeleted,
+    handleQQV2GroupChatDeleted,
+    handleQQV2WorldInfoActivated,
+    initializeQQV2Runtime,
+} from './modules/qq-v2/runtime/default-runtime.js';
 
 // 全局事件管理器 - 用于统一管理事件监听器的清理
-const EXTENSION_VERSION = '1.4.2';
+const EXTENSION_VERSION = '2.0.0';
 const globalEventManager = new EventManager();
 const logger = Logger.withScope({ scope: 'index' });
 const INSTANCE_KEY = '__YUZI_PHONE_INSTANCE__';
@@ -384,6 +393,11 @@ async function registerEventListeners() {
     await registerPhoneEventListeners({
         onBackgroundChatChanged: handlePhoneBackgroundChatChanged,
         onVisiblePhoneRefresh: scheduleVisibleHomeRefreshAfterTableUpdate,
+        onQQV2ChatChanged: handleQQV2ChatChanged,
+        onQQV2ChatDeleted: handleQQV2ChatDeleted,
+        onQQV2GroupChatDeleted: handleQQV2GroupChatDeleted,
+        onQQV2CharacterMessageRendered: handleQQV2CharacterMessageRendered,
+        onQQV2WorldInfoActivated: handleQQV2WorldInfoActivated,
     });
 }
 
@@ -449,6 +463,8 @@ async function doInitialize() {
         });
         return;
     }
+
+    await initializeQQV2Runtime();
 
     const { settings } = await initializePhoneBootstrapUi({
         migrateLegacyPhoneSettings,
@@ -522,6 +538,7 @@ async function doInitialize() {
         } catch (error) {
             setOwnedInstanceStatus('failed', { lastError: error?.message || String(error) });
             stopPhoneBackgroundServices('initialize-failed');
+            destroyQQV2Runtime();
             releaseSingletonGuard();
             handleError(error, '玉子手机初始化失败');
             // 重置初始化状态，允许重试
@@ -587,6 +604,7 @@ export function destroy() {
 
         // 2. 销毁手机运行时
         destroyPhoneRuntime();
+        destroyQQV2Runtime();
 
         // 3. 清理事件监听器
         cleanupIntegration();

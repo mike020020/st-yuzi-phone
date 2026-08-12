@@ -16,6 +16,8 @@ class FakePointerTarget {
         this.listeners = new Map();
         this.capturedPointerIds = [];
         this.releasedPointerIds = [];
+        this.children = [];
+        this.parentNode = null;
     }
 
     addEventListener(type, handler) {
@@ -35,6 +37,23 @@ class FakePointerTarget {
 
     releasePointerCapture(pointerId) {
         this.releasedPointerIds.push(pointerId);
+    }
+
+    appendChild(child) {
+        child.parentNode = this;
+        this.children.push(child);
+        return child;
+    }
+
+    removeChild(child) {
+        const index = this.children.indexOf(child);
+        if (index >= 0) this.children.splice(index, 1);
+        child.parentNode = null;
+        return child;
+    }
+
+    get firstChild() {
+        return this.children[0] || null;
     }
 }
 
@@ -99,9 +118,15 @@ function createFakeDocument(phoneEl) {
 }
 
 function createFakeWindow() {
+    const dispatchedEvents = [];
     return {
         innerWidth: 1280,
         innerHeight: 900,
+        dispatchedEvents,
+        dispatchEvent(event) {
+            dispatchedEvents.push(event);
+            return true;
+        },
         setTimeout: global.setTimeout,
         clearTimeout: global.clearTimeout,
         setInterval: global.setInterval,
@@ -169,7 +194,8 @@ async function importModules() {
     const runtimeModule = await import(toModuleUrl('modules/window/runtime.js'));
     const dragModule = await import(toModuleUrl('modules/window/drag.js'));
     const resizeModule = await import(toModuleUrl('modules/window/resize.js'));
-    return { runtimeModule, dragModule, resizeModule };
+    const temporaryLayerModule = await import(toModuleUrl('modules/phone-core/shell-temporary-layer-host.js'));
+    return { runtimeModule, dragModule, resizeModule, temporaryLayerModule };
 }
 
 async function testRuntimeReset(runtimeModule) {
@@ -222,7 +248,7 @@ async function testDragBehavior(runtimeModule, dragModule) {
     assert.equal(phoneEl.statusBar.dataset[runtimeModule.DRAG_BOUND_ATTR], undefined);
 }
 
-async function testResizeBehavior(runtimeModule, resizeModule) {
+async function testResizeBehavior(runtimeModule, resizeModule, temporaryLayerModule) {
     const phoneEl = new FakePhoneElement();
     global.document = createFakeDocument(phoneEl);
     global.window = createFakeWindow();
@@ -244,7 +270,14 @@ async function testResizeBehavior(runtimeModule, resizeModule) {
     assert.equal(runtimeStub.listeners.length, firstListenerCount);
 
     const down = createPointerEvent({ pointerId: 7, clientX: 100, clientY: 120, target: phoneEl.resizeHandle });
+    const temporaryLayerHost = new FakePointerTarget('temporaryLayerHost');
+    temporaryLayerModule.registerPhoneTemporaryLayerHost(temporaryLayerHost);
+    temporaryLayerModule.mountPhoneTemporaryLayer(new FakePointerTarget('temporaryLayer'));
+    assert.equal(temporaryLayerHost.children.length, 1);
     runtimeStub.listeners.find((item) => item.target === phoneEl.resizeHandle && item.type === 'pointerdown').handler(down);
+    assert.equal(temporaryLayerHost.children.length, 0, '开始缩放会立即关闭手机壳临时层');
+
+    assert.deepEqual(global.window.dispatchedEvents.map((event) => event.type), ['yuzi-phone-resize-start']);
 
     const move = createPointerEvent({ pointerId: 7, clientX: 180, clientY: 210, target: phoneEl.resizeHandle });
     runtimeStub.listeners.find((item) => item.target === phoneEl.resizeHandle && item.type === 'pointermove').handler(move);
@@ -266,15 +299,16 @@ async function testResizeBehavior(runtimeModule, resizeModule) {
     ]);
 
     runtimeStub.dispose();
+    temporaryLayerModule.resetPhoneTemporaryLayerHost();
     assert.equal(phoneEl.resizeHandle.dataset[runtimeModule.RESIZE_BOUND_ATTR], undefined);
 }
 
 async function main() {
-    const { runtimeModule, dragModule, resizeModule } = await importModules();
+    const { runtimeModule, dragModule, resizeModule, temporaryLayerModule } = await importModules();
 
     await testRuntimeReset(runtimeModule);
     await testDragBehavior(runtimeModule, dragModule);
-    await testResizeBehavior(runtimeModule, resizeModule);
+    await testResizeBehavior(runtimeModule, resizeModule, temporaryLayerModule);
 
     console.log('[window-behavior-check] 检查通过');
     console.log('- OK | destroyPhoneWindowInteractions() 会重建 runtime scope');

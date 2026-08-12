@@ -1,6 +1,16 @@
 const assert = require('assert/strict');
 const { pathToFileURL } = require('url');
 
+const EXPECTED_BUILTIN_SHEET_KEYS = Object.freeze([
+    'sheet_square_posts',
+    'sheet_forum_threads',
+    'sheet_livestream_rooms',
+    'sheet_small_calendar',
+    'sheet_npc_diary_entries',
+    'sheet_summary',
+]);
+const LEGACY_MESSAGE_RECORD_SHEET_KEY = 'sheet_IVu96w0X';
+
 async function importSourceModel() {
     const moduleUrl = pathToFileURL('modules/phone-fusion/source-model.js');
     return import(`${moduleUrl.href}?freshness=${Date.now()}`);
@@ -52,7 +62,10 @@ function getSheet(model, key) {
     assert.equal(builtin.name, '内置小剧场+纪要表');
     assert.equal(builtin.meta.sourcePath, 'tables/generated/小剧场2.1.json + tables/generated/纪要.json');
     assert.equal(typeof builtin.meta.sha256, 'string');
-    assert.ok(builtin.sheetCount >= 7);
+    const builtinSheetKeys = builtin.sheets.map((sheet) => sheet.key);
+    assert.deepEqual(builtinSheetKeys, EXPECTED_BUILTIN_SHEET_KEYS);
+    assert.equal(builtin.sheetCount, EXPECTED_BUILTIN_SHEET_KEYS.length);
+    assert.ok(!builtinSheetKeys.includes(LEGACY_MESSAGE_RECORD_SHEET_KEY));
     assert.equal(builtin.invalidSheetCount, 0);
     assert.ok(getSheet(builtin, 'sheet_summary'), 'builtin source model 必须包含 sheet_summary');
     assert.equal(getSheet(builtin, 'sheet_summary').name, '纪要表');

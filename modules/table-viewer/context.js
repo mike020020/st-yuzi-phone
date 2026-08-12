@@ -1,4 +1,5 @@
 import { getTableData } from '../phone-core/data-api.js';
+import { buildPhoneBackButton, buildPhoneNavBar, buildPhoneNavTitleSwitcher } from '../phone-core/navigation-ui.js';
 import { escapeHtml } from '../utils/dom-escape.js';
 
 export function resolveTableViewerContext(sheetKey) {
@@ -31,17 +32,18 @@ export function renderTableViewerLoadError(container, options = {}) {
         sheetKey = '',
         title = sheetKey,
         message = '无法加载表格数据',
-        backIconHtml = '',
         navigateBack,
         runtime = null,
     } = options;
 
+    const navHtml = buildPhoneNavBar({
+        leadingHtml: buildPhoneBackButton(),
+        centerHtml: buildPhoneNavTitleSwitcher({ title: String(title || sheetKey || '') }),
+    });
+
     container.innerHTML = `
         <div class="phone-app-page">
-            <div class="phone-nav-bar">
-                <button class="phone-nav-back">${backIconHtml}<span>返回</span></button>
-                <span class="phone-nav-title">${escapeHtml(String(title || sheetKey || ''))}</span>
-            </div>
+            ${navHtml}
             <div class="phone-app-body">
                 <div class="phone-empty-msg">${escapeHtml(String(message || '无法加载表格数据'))}</div>
             </div>

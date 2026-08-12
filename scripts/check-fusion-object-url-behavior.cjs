@@ -34,15 +34,16 @@ global.window = {
 
 const created = [];
 const revoked = [];
-global.URL = {
-    createObjectURL(blob) {
+const NativeURL = global.URL;
+global.URL = class URLMock extends NativeURL {
+    static createObjectURL(blob) {
         const url = `blob:test-${created.length + 1}`;
         created.push({ url, blob });
         return url;
-    },
-    revokeObjectURL(url) {
+    }
+    static revokeObjectURL(url) {
         revoked.push(url);
-    },
+    }
 };
 global.Blob = global.Blob || class Blob { constructor(parts, options) { this.parts = parts; this.options = options; } };
 

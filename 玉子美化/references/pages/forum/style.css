@@ -1,0 +1,59 @@
+.yb-forum-page {
+  --forum-ink: #26272b;
+  --forum-muted: rgba(38, 39, 43, 0.54);
+  --forum-blue: #526f8e;
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 12px;
+  color: var(--forum-ink);
+  background: radial-gradient(circle at 14% 2%, rgba(138, 164, 190, 0.17), transparent 30%), radial-gradient(circle at 88% 14%, rgba(232, 177, 189, 0.16), transparent 28%), linear-gradient(180deg, #f8f7f2, #efeee9);
+  font-family: ui-rounded, system-ui, sans-serif;
+}
+
+.yb-forum-page *,
+.yb-forum-page *::before,
+.yb-forum-page *::after { box-sizing: border-box; }
+.yb-forum-page button { font: inherit; }
+
+.yb-forum-page .yb-forum-page__runtime-bar { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; gap: 6px; align-items: center; padding: 8px; border: 1px solid rgba(82, 111, 142, 0.14); border-radius: 16px; background: rgba(255, 255, 255, 0.78); box-shadow: 0 9px 24px rgba(68, 75, 84, 0.07); }
+.yb-forum-page .yb-forum-page__runtime-bar strong { overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.yb-forum-page .yb-forum-page__runtime-bar button { padding: 6px 8px; border: 1px solid rgba(82, 111, 142, 0.2); border-radius: 999px; color: var(--forum-blue); background: rgba(255, 255, 255, 0.86); cursor: pointer; font-size: 12px; }
+.yb-forum-page .yb-forum-page__runtime-bar button:disabled { cursor: default; opacity: 0.4; }
+.yb-forum-page .yb-forum-page__action-status { min-height: 18px; margin: 6px 4px; color: var(--forum-muted); font-size: 12px; text-align: center; }
+.yb-forum-page .yb-forum-page__content { display: flex; flex-direction: column; gap: 14px; }
+
+.yb-forum-page .yb-forum-page__thread { overflow: hidden; border: 1px solid rgba(38, 39, 43, 0.06); border-radius: 20px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 12px 28px rgba(50, 55, 62, 0.1); }
+.yb-forum-page .yb-forum-page__cover { position: relative; display: flex; min-height: 106px; align-items: flex-end; justify-content: space-between; overflow: hidden; padding: 13px 15px; color: #fff; }
+.yb-forum-page .yb-forum-page__cover::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 78% 22%, rgba(255, 255, 255, 0.32), transparent 20%), linear-gradient(120deg, transparent 0 55%, rgba(255, 255, 255, 0.16) 56% 57%, transparent 58%); }
+.yb-forum-page .yb-forum-page__cover.tone-mist { background: linear-gradient(135deg, #b9c8d6, #809ab4); }
+.yb-forum-page .yb-forum-page__cover.tone-cream { background: linear-gradient(135deg, #f0d9a8, #ca9f66); }
+.yb-forum-page .yb-forum-page__cover.tone-sage { background: linear-gradient(135deg, #a8c8b0, #638f75); }
+.yb-forum-page .yb-forum-page__cover.tone-rose { background: linear-gradient(135deg, #e8b1bd, #be6e82); }
+.yb-forum-page .yb-forum-page__cover-mark { position: relative; font-size: 27px; opacity: 0.82; }
+.yb-forum-page .yb-forum-page__cover-board { position: relative; max-width: 72%; overflow: hidden; font-size: 12px; font-weight: 750; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); white-space: nowrap; }
+.yb-forum-page .yb-forum-page__thread-content { padding: 14px; }
+.yb-forum-page .yb-forum-page__board { display: inline-flex; padding: 3px 9px; border-radius: 999px; color: var(--forum-blue); background: #eef2f7; font-size: 11px; }
+.yb-forum-page .yb-forum-page__title { margin: 9px 0 5px; font-size: 18px; line-height: 1.42; overflow-wrap: anywhere; }
+.yb-forum-page .yb-forum-page__body { margin: 0; color: rgba(38, 39, 43, 0.82); font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.yb-forum-page .yb-forum-page__topics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.yb-forum-page .yb-forum-page__topic { padding: 3px 9px; border-radius: 999px; color: #4b6584; background: #eef2f7; font-size: 11.5px; }
+.yb-forum-page .yb-forum-page__author-row { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin-top: 12px; color: var(--forum-muted); font-size: 11.5px; }
+.yb-forum-page .yb-forum-page__author { color: rgba(38, 39, 43, 0.8); font-size: 12.5px; }
+.yb-forum-page .yb-forum-page__tag { padding: 2px 7px; border-radius: 999px; background: rgba(38, 39, 43, 0.05); }
+.yb-forum-page .yb-forum-page__time { margin-left: auto; font-style: normal; }
+.yb-forum-page .yb-forum-page__stats { margin-top: 7px; color: var(--forum-muted); font-size: 11.5px; }
+.yb-forum-page .yb-forum-page__reply-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 13px; padding-top: 11px; border-top: 1px solid rgba(82, 111, 142, 0.12); color: var(--forum-blue); font-size: 12px; }
+.yb-forum-page .yb-forum-page__reply-toggle { padding: 4px 10px; border: 1px solid rgba(82, 111, 142, 0.18); border-radius: 999px; color: var(--forum-blue); background: #f6f8fb; cursor: pointer; font-size: 11px; }
+.yb-forum-page .yb-forum-page__replies { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; padding: 9px; border-radius: 14px; background: #f5f7fa; }
+.yb-forum-page .yb-forum-page__replies[hidden] { display: none; }
+.yb-forum-page .yb-forum-page__reply { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 9px; padding: 9px 10px; border-left: 2px solid #b9c8d6; border-radius: 10px; background: #fff; }
+.yb-forum-page .yb-forum-page__floor { padding-top: 2px; color: var(--forum-blue); font-size: 10px; font-weight: 800; letter-spacing: 0.05em; }
+.yb-forum-page .yb-forum-page__reply-author { color: rgba(38, 39, 43, 0.82); font-size: 12px; }
+.yb-forum-page .yb-forum-page__reply-body { margin: 3px 0 0; color: rgba(38, 39, 43, 0.76); font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.yb-forum-page .yb-forum-page__empty { padding: 26px; border: 1px dashed rgba(82, 111, 142, 0.28); border-radius: 20px; color: var(--forum-muted); background: rgba(255, 255, 255, 0.72); text-align: center; }
+
+@media (max-width: 380px) {
+  .yb-forum-page .yb-forum-page__runtime-bar { grid-template-columns: repeat(4, auto); }
+  .yb-forum-page .yb-forum-page__runtime-bar strong { grid-column: 1 / -1; grid-row: 1; }
+  .yb-forum-page .yb-forum-page__time { width: 100%; margin-left: 0; }
+}

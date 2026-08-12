@@ -1,0 +1,410 @@
+{
+  "schemaVersion": 2,
+  "stagePrompts": [
+    "prompts/0-总览与启动.md",
+    "prompts/1-建项导表与全表盘点.md",
+    "prompts/2-逐表需求与字段合同.md",
+    "prompts/3-逐表设计与实现.md",
+    "prompts/4-单表检查与模拟.md",
+    "prompts/5-汇总确认与交付.md"
+  ],
+  "commandContract": {
+    "scripts": {
+      "project:new": "node tools/project-new.mjs",
+      "project:import-tables": "node tools/project-import-tables.mjs",
+      "project:add-item": "node tools/project-add-item.mjs",
+      "project:skip-table": "node tools/project-skip-table.mjs",
+      "project:status": "node tools/project-status.mjs",
+      "project:check": "node tools/project-check.mjs",
+      "preview": "node tools/preview-preset.mjs",
+      "tables:cli": "node tools/table-source.cjs",
+      "tables:check": "node tools/verify-tables.mjs",
+      "tables:test": "node tests/table-source-tests.mjs"
+    }
+  },
+  "processContract": {
+    "phaseOrder": ["setup", "per-table", "release"],
+    "guidance": {
+      "role": "guide-not-decision-maker",
+      "decisionOwner": "user",
+      "audience": "non-technical-beginner",
+      "plainLanguageFirst": true,
+      "explainNecessaryTermsInline": true,
+      "recommendNextStepAfterEachResult": true,
+      "recommendNextStepAtEveryDecisionGate": true,
+      "presentOptionsWithConsequences": true,
+      "neverChooseForUser": true
+    },
+    "intake": {
+      "validChatSheetsInput": "auto-create-and-import",
+      "deriveProjectIdentity": true,
+      "dryRunBeforeWrite": true,
+      "splitBeforeClarification": true,
+      "postSplitChoices": ["start-beautification", "choose-beautification-target", "edit-markdown-first"],
+      "markdownEditOutput": "rebuild-generated-tables"
+    },
+    "externalApiDocs": {
+      "readOnlyWhenExplicitlyRequested": true,
+      "tavernDocuments": ["docs/architecture-notes.md", "docs/sillytavern-api.txt"],
+      "triggerExamples": ["酒馆接口", "SillyTavern", "TavernHelper", "酒馆输入框"],
+      "hostDomAllowedWhenExplicitlyRequested": true
+    },
+    "tableLoop": {
+      "queueSource": "workflow-state.json#queue",
+      "currentSource": "workflow-state.json#currentTable",
+      "defaultCoverage": "all-imported-tables",
+      "oneTableAtATime": true,
+      "batchBypass": "forbidden",
+      "advanceStates": ["completed", "skipped"],
+      "iterationOrder": [
+        "requirements",
+        "field-contract",
+        "design",
+        "implementation",
+        "add-item",
+        "static-check",
+        "preview-decision",
+        "result-confirmation"
+      ],
+      "skip": {
+        "requiresExplicitUserDecision": true,
+        "requiresReason": true,
+        "capability": "skip-table"
+      },
+      "preview": {
+        "askEveryCompletedTable": true,
+        "executionOptional": true,
+        "simulationLabel": "制作期模拟",
+        "recordStatuses": ["not-run", "passed", "skipped", "failed"]
+      }
+    },
+    "schemaChange": {
+      "explainImpactBeforeEdit": true,
+      "requiresExplicitUserConfirmation": true,
+      "editSource": "tables/source/*.md",
+      "preserveOriginal": "tables/original/imported.json",
+      "rebuildGenerated": "tables/generated/tables.json",
+      "refreshInvalidatesAffectedItems": true,
+      "removedTablesLeaveQueueOnRefresh": true,
+      "skipKeepsTableInGenerated": true
+    },
+    "verification": {
+      "routineTableEdit": ["source-check", "build-dry-run", "build", "refresh-project", "draft-check"],
+      "toolOrWorkflowChange": ["targeted-check", "full-verify-before-delivery"],
+      "releaseUsesActualProject": true
+    },
+    "releaseGate": {
+      "requiresAllQueueTerminal": true,
+      "terminalStates": ["completed", "skipped"],
+      "summaryFields": ["completed", "skipped", "preview-not-run", "preview-skipped", "preview-failed"],
+      "requiresExplicitUserConfirmation": true,
+      "orderedCapabilities": ["project-status", "confirm-project", "release-check", "pack-bundle", "readback-bundle"],
+      "bundleWritesTables": false
+    },
+    "deliverables": [
+      {
+        "id": "tables-json",
+        "kind": "chatSheets-json",
+        "path": "projects/*/tables/generated/tables.json",
+        "independent": true
+      },
+      {
+        "id": "beautify-bundle",
+        "kind": "yuzi-beautify-preset-v2",
+        "path": "output/*.json",
+        "independent": true
+      },
+      {
+        "id": "editable-source",
+        "kind": "source-project",
+        "path": "projects/*/project.json",
+        "independent": true
+      }
+    ]
+  },
+  "runtimeBoundary": {
+    "status": "external-required",
+    "requiredEvidence": [
+      "real-sillytavern-blob-esm",
+      "real-sillytavern-csp",
+      "real-sillytavern-routing",
+      "real-sillytavern-resource-blob-url",
+      "real-sillytavern-page-lifecycle",
+      "real-sillytavern-database",
+      "real-sillytavern-indexeddb",
+      "real-sillytavern-theme-overlay",
+      "real-sillytavern-scroll-restore"
+    ],
+    "prohibitedClaimsWithoutEvidence": [
+      "runtime-verified",
+      "database-verified",
+      "p8-completed",
+      "p9-completed"
+    ]
+  },
+  "workflows": [
+    {
+      "id": "independent-project-workbench",
+      "title": "玉子美化独立逐表制作工作台",
+      "entryPrompt": "prompts/0-总览与启动.md",
+      "scope": "bundle-source",
+      "steps": [
+        {
+          "id": "setup",
+          "title": "有效表格自动建项、拆分与全表盘点",
+          "prompt": "prompts/1-建项导表与全表盘点.md",
+          "requiredReads": [
+            "AGENTS.md",
+            "README.md",
+            "prompts/0-总览与启动.md",
+            "docs/bundle/source-project-format.md",
+            "docs/tables/README.md",
+            "docs/tables/markdown-source-format.md",
+            "tools/project-new.mjs",
+            "tools/project-import-tables.mjs",
+            "tools/project-status.mjs",
+            "tools/project-check.mjs"
+          ],
+          "dependsOn": [],
+          "inputs": ["完整 chatSheets JSON", "可选项目 ID、显示名与美化目标"],
+          "requiredProjectCapabilities": [
+            "create-project",
+            "import-tables",
+            "project-status",
+            "draft-check",
+            "tables-roundtrip"
+          ],
+          "outputs": [
+            { "type": "fileGlob", "path": "projects/*/project.json" },
+            { "type": "fileGlob", "path": "projects/*/workflow-state.json" },
+            { "type": "fileGlob", "path": "projects/*/tables/original/imported.json" },
+            { "type": "fileGlob", "path": "projects/*/tables/source/*.md" },
+            { "type": "fileGlob", "path": "projects/*/tables/generated/tables.json" },
+            { "type": "artifact", "name": "全表盘点与默认制作队列" }
+          ],
+          "checks": [
+            {
+              "type": "projectCommand",
+              "capability": "create-project",
+              "command": "npm run project:new -- --projects-dir <projects-dir> --id <project-id> --name <project-name>",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "import-tables",
+              "command": "npm run project:import-tables -- --project <project.json> --input <chatSheets.json>",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "project-status",
+              "command": "npm run project:status -- --project <project.json> --json",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "draft-check",
+              "command": "npm run project:check -- --project <project.json>",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "tables-roundtrip",
+              "command": "npm run tables:cli -- roundtrip <chatSheets.json>",
+              "evidence": "actual-project"
+            }
+          ],
+          "risk": "high",
+          "deliveryRequirements": [
+            "reject-non-chatSheets-import",
+            "preserve-original-bytes",
+            "queue-all-imported-tables",
+            "do-not-auto-skip",
+            "auto-split-valid-input",
+            "do-not-request-natural-language-split-plan",
+            "offer-post-split-choice",
+            "rebuild-generated-after-markdown-edit"
+          ]
+        },
+        {
+          "id": "per-table",
+          "title": "严格逐表设计、实现、检查与模拟选择",
+          "prompt": "prompts/2-逐表需求与字段合同.md",
+          "requiredReads": [
+            "prompts/3-逐表设计与实现.md",
+            "prompts/4-单表检查与模拟.md",
+            "prompts/制作提示.md",
+            "docs/phone-ui-variables.md",
+            "docs/runtime/runtime-api-v1.md",
+            "docs/runtime/yuzi-beautify-runtime-v1.d.ts",
+            "docs/bundle/source-project-format.md",
+            "tools/project-add-item.mjs",
+            "tools/project-skip-table.mjs",
+            "tools/preview-preset.mjs"
+          ],
+          "dependsOn": ["setup"],
+          "inputs": ["全表制作队列", "当前表", "当前表需求与字段合同"],
+          "requiredProjectCapabilities": [
+            "project-status",
+            "add-item",
+            "skip-table",
+            "draft-check",
+            "preview",
+            "tables-build",
+            "refresh-project"
+          ],
+          "outputs": [
+            { "type": "fileGlob", "path": "projects/*/pages/*" },
+            { "type": "fileGlob", "path": "projects/*/notes/*.md" },
+            { "type": "fileGlob", "path": "projects/*/workflow-state.json" },
+            { "type": "artifact", "name": "当前表结果确认" }
+          ],
+          "checks": [
+            {
+              "type": "projectCommand",
+              "capability": "project-status",
+              "command": "npm run project:status -- --project <project.json> --json",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "add-item",
+              "command": "npm run project:add-item -- --project <project.json> --table <sheet-key> --id <item-id> --mount <mount.js> --field <field-name>",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "skip-table",
+              "command": "npm run project:skip-table -- --project <project.json> --table <sheet-key> --reason <user-reason>",
+              "evidence": "actual-project",
+              "optional": true,
+              "condition": "explicit-user-skip"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "draft-check",
+              "command": "npm run project:check -- --project <project.json>",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "preview",
+              "command": "npm run preview -- <project.json> --table <sheet-key>",
+              "evidence": "actual-project",
+              "optional": true,
+              "condition": "user-accepts-simulation"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "tables-build",
+              "command": "npm run tables:cli -- build <source-dir> <generated.json>",
+              "evidence": "actual-project",
+              "optional": true,
+              "condition": "user-confirms-schema-change"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "refresh-project",
+              "command": "npm run project:status -- --project <project.json> --refresh",
+              "evidence": "actual-project",
+              "optional": true,
+              "condition": "generated-tables-changed"
+            }
+          ],
+          "risk": "high",
+          "deliveryRequirements": [
+            "one-current-table-only",
+            "batch-related-decision-questions",
+            "recommend-an-answer-for-each-question",
+            "persist-verbatim-interview-dialogue",
+            "present-all-four-runtime-actions-for-user-choice",
+            "require-explicit-start-permission",
+            "use-phone-ui-variables-as-independent-reference",
+            "default-single-mount-source",
+            "continuous-implementation-registration-check",
+            "hide-routine-internal-steps-from-user",
+            "confirm-requirements-and-field-contract",
+            "confirm-design-before-implementation",
+            "ask-preview-every-table",
+            "preview-auto-add-representative-mock-row",
+            "preview-verify-live-update-and-primary-interaction",
+            "preview-lifecycle-cleanup-remount-check",
+            "preview-check-console-and-duplicate-events",
+            "record-preview-result",
+            "advance-only-after-table-result-confirmation"
+          ]
+        },
+        {
+          "id": "release",
+          "title": "全项目汇总确认、发布检查、打包、回读与交付",
+          "prompt": "prompts/5-汇总确认与交付.md",
+          "requiredReads": [
+            "README.md",
+            "docs/bundle/bundle-format-v2.md",
+            "docs/bundle/source-project-format.md",
+            "tools/project-status.mjs",
+            "tools/project-check.mjs",
+            "tools/pack-preset.mjs",
+            "tools/readback-preset.mjs"
+          ],
+          "dependsOn": ["per-table"],
+          "inputs": ["全部完成或跳过的队列", "完成/跳过/未模拟汇总", "用户最终确认"],
+          "requiredProjectCapabilities": [
+            "project-status",
+            "confirm-project",
+            "release-check",
+            "pack-bundle",
+            "readback-bundle"
+          ],
+          "outputs": [
+            { "type": "fileGlob", "path": "projects/*/tables/generated/tables.json" },
+            { "type": "fileGlob", "path": "output/*.json" },
+            { "type": "fileGlob", "path": "projects/*/project.json" },
+            { "type": "report", "name": "制作期验证与真实宿主待验收报告" }
+          ],
+          "checks": [
+            {
+              "type": "projectCommand",
+              "capability": "project-status",
+              "command": "npm run project:status -- --project <project.json> --json",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "confirm-project",
+              "command": "npm run project:status -- --project <project.json> --confirm",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "release-check",
+              "command": "npm run project:check -- --project <project.json> --release",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "pack-bundle",
+              "command": "node tools/pack-preset.mjs <project.json> <bundle.json>",
+              "evidence": "actual-project"
+            },
+            {
+              "type": "projectCommand",
+              "capability": "readback-bundle",
+              "command": "node tools/readback-preset.mjs <project.json> <bundle.json>",
+              "evidence": "actual-project"
+            }
+          ],
+          "risk": "high",
+          "deliveryRequirements": [
+            "show-summary-before-confirmation",
+            "confirm-current-summary-hash",
+            "release-check-before-pack",
+            "pack-before-readback",
+            "deliver-three-independent-products",
+            "report-simulation-only-boundary"
+          ]
+        }
+      ]
+    }
+  ]
+}

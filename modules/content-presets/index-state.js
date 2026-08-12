@@ -1,9 +1,25 @@
+import { Logger } from '../error-handler.js';
+
+const logger = Logger.withScope({ scope: 'content-presets/index-state', feature: 'content-presets' });
 const state = {
     status: 'loading', error: null, metadata: new Map(), activeByTable: new Map(), revision: 0,
 };
 const listeners = new Set();
 
-function emit() { for (const listener of [...listeners]) listener(getContentPresetIndexSnapshot()); }
+function emit() {
+    const snapshot = getContentPresetIndexSnapshot();
+    for (const listener of [...listeners]) {
+        try {
+            listener(snapshot);
+        } catch (error) {
+            logger.warn({
+                action: 'index.subscriber-error',
+                message: '内容预设索引订阅回调执行失败',
+                error,
+            });
+        }
+    }
+}
 export function getContentPresetIndexSnapshot() {
     return Object.freeze({ status: state.status, error: state.error, metadata: new Map(state.metadata), activeByTable: new Map(state.activeByTable), revision: state.revision });
 }

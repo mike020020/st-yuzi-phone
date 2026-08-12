@@ -102,15 +102,17 @@ function main() {
         && has(facade, 'export async function applyAppearancePackFromRepository(id)')
         && has(facade, 'export async function deleteAppearancePackFromRepository(id)'));
     check(results, FILES.facade, 'facade 应用仓库包时写入 activePackId', has(facade, 'applyAppearanceResourcePackImpl(entryResult.pack, { activePackId: entryResult.meta?.id || id })'));
-    check(results, FILES.facade, 'facade 删除当前激活仓库包先清 active id 并确认 flush 可触发，失败时不删除仓库包', has(facadeDeleteSection, "savePhoneSettingsPatch({ appearanceActivePackId: '' })")
-        && appearsBefore(facadeDeleteSection, "savePhoneSettingsPatch({ appearanceActivePackId: '' })", 'const deleteResult = await deleteAppearancePackImpl(id);')
-        && has(facadeDeleteSection, 'const flushResult = flushPhoneSettingsSave();')
-        && has(facadeDeleteSection, 'if (!flushResult)')
-        && has(facadeDeleteSection, '当前激活标记无法持久化，仓库包未删除')
+    check(results, FILES.facade, 'facade 删除仓库包先原子保存激活标记与来源图标清理，失败时不删除仓库包', has(facadeDeleteSection, 'buildPackIconOriginCleanup(settings, targetPackId)')
+        && has(facadeDeleteSection, 'const settingsBackup = {')
+        && has(facadeDeleteSection, 'appIcons: iconCleanup.appIcons')
+        && has(facadeDeleteSection, 'appIconOrigins: iconCleanup.appIconOrigins')
+        && has(facadeDeleteSection, "if (activeCleared) patch.appearanceActivePackId = '';")
+        && appearsBefore(facadeDeleteSection, 'const saved = savePhoneSettingsPatch(patch);', 'const deleteResult = await deleteAppearancePackImpl(targetPackId);')
+        && has(facadeDeleteSection, 'if (!saved || !flushPhoneSettingsSave())')
         && has(facadeDeleteSection, '仓库包未删除')
-        && has(facadeDeleteSection, 'flushPhoneSettingsSave();')
+        && has(facadeDeleteSection, 'savePhoneSettingsPatch(settingsBackup)')
         && !has(facadeDeleteSection, 'backgroundImage')
-        && !has(facadeDeleteSection, 'appIcons'));
+        && !has(facadeDeleteSection, 'appIcons: {}'));
 
     check(results, FILES.appearancePage, '页面通过 facade 注入能力操作仓库，不裸用 IndexedDB', has(appearancePage, 'appearancePageService.listAppearancePacks()')
         && has(appearancePage, 'appearancePageService.importAppearancePackToRepository')

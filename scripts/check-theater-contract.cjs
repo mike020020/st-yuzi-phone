@@ -21,6 +21,7 @@ const FILES = {
     diaryScene: 'modules/phone-theater/scenes/diary.js',
     homeViewModel: 'modules/phone-home/view-model.js',
     routeRenderer: 'modules/phone-core/route-renderer.js',
+    navigationUi: 'modules/phone-core/navigation-ui.js',
     visibilitySettings: 'modules/settings-app/services/appearance-settings/visibility-settings.js',
     iconUploadService: 'modules/settings-app/services/appearance-settings/icon-upload-service.js',
     iconSlots: 'modules/settings-app/services/appearance-settings/icon-slots.js',
@@ -351,7 +352,7 @@ function main() {
     pushCheck(results, 'deleteService', 'delete-service 并发校验区分 deleteRole 与 tableRole', has(contents.deleteService, 'function buildDeleteRoleMappings') && has(contents.deleteService, 'getDeleteRoleCandidates(tableRole)') && has(contents.deleteService, 'mappings.get(target.role)') && has(contents.deleteService, 'const tableRole = mappedTableRoles[0];') && has(contents.deleteService, 'resolveTargetIdentity(scene, target.role, tableRole'));
     pushCheck(results, 'deleteService', 'delete-service 支持组合 identity 字段协议', has(contents.deleteService, "identitySpec.split('|')") && has(contents.deleteService, "getCellByHeader(table, row, header)") && has(contents.deleteService, ".join('|')"));
     pushCheck(results, 'deleteService', 'delete-service 汇总 mutation 刷新结果且不重复刷新投影', has(contents.deleteService, 'const refreshed = execution.results.length > 0') && has(contents.deleteService, 'execution.results.every((result) => result.refreshed !== false);') && !has(contents.deleteService, 'refreshPhoneTableProjection'));
-    pushCheck(results, 'deleteService', 'delete-service 删除后仍派发手机本地表更新', has(contents.deleteService, 'dispatchPhoneTableUpdated(sheetKey)'));
+    pushCheck(results, 'deleteService', 'delete-service 删除后仍通过公共表更新出口派发手机本地表更新', has(contents.deleteService, 'dispatchTableUpdated(sheetKey)'));
     pushCheck(results, 'deleteService', 'delete-service 调用 scene.deleteEntities(context)', has(contents.deleteService, 'scene.deleteEntities(buildDeleteContext'));
     pushCheck(results, 'deleteService', 'delete-service 将 typed delete helpers 注入 context', has(contents.deleteService, 'buildDeleteTargets,') && has(contents.deleteService, 'hasDeleteTarget,'));
     pushCheck(results, 'deleteService', 'delete-service 不再使用裸 sidebar 前缀判断', !has(contents.deleteService, "startsWith('sidebar:')"));
@@ -371,25 +372,38 @@ function main() {
 
     pushCheck(results, 'templates', 'theater templates 导出 buildTheaterScenePageHtml(viewModel, uiState)', has(contents.templates, 'export function buildTheaterScenePageHtml(viewModel, uiState = {})'));
     pushCheck(results, 'templates', 'theater templates 导入 renderKit', has(contents.templates, "from './core/render-kit.js'"));
+    pushCheck(results, 'templates', 'theater templates 导入并使用共享导航模块', has(contents.templates, "from '../phone-core/navigation-ui.js'")
+        && has(contents.templates, 'buildPhoneNavBar({')
+        && has(contents.templates, 'buildPhoneBackButton()')
+        && has(contents.templates, 'buildPhoneNavTitleSwitcher({')
+        && has(contents.templates, 'has-inline-actions')
+        && has(contents.templates, 'phone-nav-inline-actions phone-theater-nav-actions')
+        && !has(contents.templates, 'has-secondary-actions')
+        && !has(contents.templates, 'phone-nav-secondary-actions phone-theater-nav-actions')
+        && !has(contents.templates, '<span>返回</span>'));
     pushCheck(results, 'templates', '页面根挂载 data-theater-scene 与 style scope', has(contents.templates, 'data-theater-scene=') && has(contents.templates, 'data-theater-style-scope='));
     pushCheck(results, 'templates', 'data-theater-scene 使用属性转义', has(contents.templates, 'data-theater-scene="${escapeHtmlAttr(sceneId)}"'));
     pushCheck(results, 'templates', 'theater nav 不渲染场景 subtitle 小字', !has(contents.templates, 'phone-theater-subtitle') && !has(contents.templates, 'const subtitle = viewModel?.subtitle'));
     pushCheck(results, 'templates', 'theater templates 调用 scene.renderContent', has(contents.templates, 'viewModel?.scene?.renderContent') && has(contents.templates, 'renderContent(viewModel, uiState, theaterRenderKit)'));
     pushCheck(results, 'templates', 'theater templates 包含删除管理栏 action', has(contents.templates, 'toggle-theater-delete-mode') && has(contents.templates, 'theater-select-all') && has(contents.templates, 'theater-clear-selection') && has(contents.templates, 'theater-confirm-delete'));
     const theaterTitleNavigationSource = contents.templates.slice(
-        indexOfOrInfinity(contents.templates, 'phone-theater-title-navigation phone-theater-table-navigation'),
+        indexOfOrInfinity(contents.templates, 'function renderTitleNavigation'),
         indexOfOrInfinity(contents.templates, 'function renderNavActions')
     );
     const theaterNavActionsSource = contents.templates.slice(
         indexOfOrInfinity(contents.templates, 'function renderNavActions'),
         indexOfOrInfinity(contents.templates, 'function renderNav(')
     );
-    pushCheck(results, 'templates', 'theater 公共标题组按上一张、标题、下一张顺序渲染表级控件', has(theaterTitleNavigationSource, 'phone-theater-title-navigation')
+    pushCheck(results, 'templates', 'theater 公共标题组通过共享 helper 渲染上一张、标题、下一张', has(theaterTitleNavigationSource, 'phone-theater-title-navigation')
         && has(theaterTitleNavigationSource, 'phone-theater-table-navigation')
-        && indexOfOrInfinity(theaterTitleNavigationSource, 'theater-table-navigation-previous') < indexOfOrInfinity(theaterTitleNavigationSource, 'phone-nav-title')
-        && indexOfOrInfinity(theaterTitleNavigationSource, 'phone-nav-title') < indexOfOrInfinity(theaterTitleNavigationSource, 'theater-table-navigation-next')
-        && has(theaterTitleNavigationSource, "previous.disabled ? 'disabled' : ''")
-        && has(theaterTitleNavigationSource, "next.disabled ? 'disabled' : ''"));
+        && has(theaterTitleNavigationSource, "buildPhoneSwitchButton('previous'")
+        && has(theaterTitleNavigationSource, "action: 'theater-table-navigation-previous'")
+        && has(theaterTitleNavigationSource, 'disabled: previous.disabled === true')
+        && has(theaterTitleNavigationSource, "buildPhoneSwitchButton('next'")
+        && has(theaterTitleNavigationSource, "action: 'theater-table-navigation-next'")
+        && has(theaterTitleNavigationSource, 'disabled: next.disabled === true'));
+    pushCheck(results, 'navigationUi', '共享标题切换器保持上一张、标题、下一张 DOM 顺序', indexOfOrInfinity(contents.navigationUi, '${isTitleOnly ? \'\' : previousSlot}') < indexOfOrInfinity(contents.navigationUi, '<span class="phone-nav-title">')
+        && indexOfOrInfinity(contents.navigationUi, '<span class="phone-nav-title">') < indexOfOrInfinity(contents.navigationUi, '${isTitleOnly ? \'\' : nextSlot}'));
     pushCheck(results, 'templates', 'theater 编辑删除操作区不包含表级切换控件', has(theaterNavActionsSource, 'phone-theater-nav-actions')
         && !has(theaterNavActionsSource, 'phone-theater-table-navigation')
         && !has(theaterNavActionsSource, 'theater-table-navigation-previous')
@@ -429,9 +443,16 @@ function main() {
     pushCheck(results, 'theaterCss', '06-phone-theater.css 仅作为兼容入口 import style registry', has(contents.theaterCss, "@import url('./phone-theater/index.css')") && !has(contents.theaterCss, '[data-theater-scene="square"]'));
     pushCheck(results, 'theaterCssIndex', 'style registry 按 core → square → forum → live → calendar → diary 顺序 import', indexOfOrInfinity(contents.theaterCssIndex, "./00-core.css") < indexOfOrInfinity(contents.theaterCssIndex, "./square.css") && indexOfOrInfinity(contents.theaterCssIndex, "./square.css") < indexOfOrInfinity(contents.theaterCssIndex, "./forum.css") && indexOfOrInfinity(contents.theaterCssIndex, "./forum.css") < indexOfOrInfinity(contents.theaterCssIndex, "./live.css") && indexOfOrInfinity(contents.theaterCssIndex, "./live.css") < indexOfOrInfinity(contents.theaterCssIndex, "./calendar.css") && indexOfOrInfinity(contents.theaterCssIndex, "./calendar.css") < indexOfOrInfinity(contents.theaterCssIndex, "./diary.css"));
     pushCheck(results, 'theaterCoreCss', 'core CSS 包含 theater 删除按钮与管理条样式', has(contents.theaterCoreCss, '.phone-theater-delete-toggle') && has(contents.theaterCoreCss, '.phone-theater-manage-bar') && has(contents.theaterCoreCss, '.phone-theater-manage-btn'));
-    pushCheck(results, 'theaterCoreCss', 'core CSS 包含 scoped 表级导航与禁用态', has(contents.theaterCoreCss, '.phone-app-page.phone-theater-page .phone-theater-table-navigation') && has(contents.theaterCoreCss, '.phone-theater-table-navigation-button:disabled'));
-    pushCheck(results, 'theaterCoreCss', 'core CSS 在 420/375/320px 使用两行 grid 避免标题与操作重叠', has(contents.theaterCoreCss, '@media screen and (max-width: 420px)') && has(contents.theaterCoreCss, 'grid-template-rows: auto auto') && has(contents.theaterCoreCss, '@media screen and (max-width: 375px)') && has(contents.theaterCoreCss, '@media screen and (max-width: 320px)'));
-    pushCheck(results, 'theaterCoreCss', 'core CSS 包含 theater 编辑按钮与菜单样式', has(contents.theaterCoreCss, '.phone-theater-edit-toggle') && has(contents.theaterCoreCss, '.phone-theater-edit-menu') && has(contents.theaterCoreCss, '.phone-theater-nav-actions'));
+    pushCheck(results, 'theaterCoreCss', 'core CSS 只保留 scoped 表级导航主题与禁用态', has(contents.theaterCoreCss, '.phone-theater-table-navigation-button:disabled')
+        && !hasAny(contents.theaterCoreCss, ['max-content', 'fit-content', 'overflow: visible', 'text-overflow: clip', '--phone-theater-nav-side-reserve']));
+    pushCheck(results, 'theaterCoreCss', 'core CSS 让 theater 操作保留共享首行 trailing 槽', !has(contents.theaterCoreCss, '.phone-theater-nav.has-secondary-actions .phone-nav-trailing')
+        && !has(contents.theaterCoreCss, 'grid-template-rows: var(--yuzi-phone-nav-content-height) auto')
+        && !has(contents.theaterCoreCss, '@media screen and (max-width: 420px)')
+        && !has(contents.theaterCoreCss, '@media screen and (max-width: 375px)')
+        && !has(contents.theaterCoreCss, '@media screen and (max-width: 320px)'));
+    pushCheck(results, 'theaterCoreCss', 'core CSS 包含 theater 编辑按钮与菜单皮肤', has(contents.theaterCoreCss, '.phone-theater-edit-toggle')
+        && has(contents.theaterCoreCss, '.phone-theater-edit-menu')
+        && has(contents.theaterCoreCss, 'var(--yuzi-phone-nav-inline-action-padding-inline)'));
     pushCheck(results, 'theaterCoreCss', 'core CSS 包含 theater 选择按钮与选中态样式', has(contents.theaterCoreCss, '.phone-theater-select-toggle') && has(contents.theaterCoreCss, '.is-delete-selected'));
     pushCheck(results, 'theaterCoreCss', 'core CSS 删除态定位使用通用 delete-key 协议', has(contents.theaterCoreCss, '[data-theater-delete-key]:not(.phone-theater-select-toggle)'));
     pushCheck(results, 'theaterCoreCss', 'core CSS 不引用内置 scene 容器 class', !hasAny(contents.theaterCoreCss, ['phone-theater-square-post', 'phone-theater-forum-note-card', 'phone-theater-live-room']));
@@ -467,7 +488,10 @@ function main() {
     pushCheck(results, 'homeViewModel', '首页 view-model 导入组合数据函数', has(contents.homeViewModel, "from '../phone-theater/data.js'"));
     pushCheck(results, 'homeViewModel', '首页 view-model 生成组合 app', has(contents.homeViewModel, 'getAvailableTheaterScenes(rawData).forEach'));
     pushCheck(results, 'homeViewModel', '首页 view-model 使用组合 appKey', has(contents.homeViewModel, 'key: scene.appKey'));
-    pushCheck(results, 'homeViewModel', '首页 view-model 写入组合 route', has(contents.homeViewModel, 'route: scene.route'));
+    pushCheck(results, 'homeViewModel', '首页 view-model 通过主物理表目录写入组合 route', has(contents.homeViewModel, "from '../table-navigation/catalog.js'")
+        && has(contents.homeViewModel, 'scene.primarySheetKey')
+        && has(contents.homeViewModel, 'route: target.route')
+        && !has(contents.homeViewModel, 'route: scene.route'));
     pushCheck(results, 'homeViewModel', '首页 view-model 过滤已成组子表', has(contents.homeViewModel, 'groupedTheaterSheetKeys.has(key)'));
 
     pushCheck(results, 'routeRenderer', 'route-renderer 导入 theater route 工具', has(contents.routeRenderer, "from '../phone-theater/config.js'"));

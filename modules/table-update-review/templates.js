@@ -1,5 +1,9 @@
 import { escapeHtml, escapeHtmlAttr } from '../utils/dom-escape.js';
-import { PHONE_ICONS } from '../phone-home/icons.js';
+import {
+    buildPhoneBackButton,
+    buildPhoneNavBar,
+    buildPhoneNavTitleSwitcher,
+} from '../phone-core/navigation-ui.js';
 import { TABLE_UPDATE_REVIEW_APP_NAME } from './constants.js';
 
 function formatCount(value) {
@@ -117,12 +121,17 @@ function buildTableGroupHtml(table = {}) {
 }
 
 export function buildTableUpdateReviewPageHtml(state = {}) {
+    const navigationHtml = buildPhoneNavBar({
+        className: 'tur-nav',
+        leadingHtml: buildPhoneBackButton({
+            className: 'tur-nav-back',
+            attributes: { 'data-action': 'nav-back' },
+        }),
+        centerHtml: buildPhoneNavTitleSwitcher({ title: TABLE_UPDATE_REVIEW_APP_NAME }),
+    });
     return `
         <div class="phone-app-page tur-page">
-            <div class="phone-nav-bar tur-nav">
-                <button type="button" class="phone-nav-back tur-nav-back" data-action="nav-back" aria-label="返回">${PHONE_ICONS.back}<span>返回</span></button>
-                <span class="phone-nav-title">${escapeHtml(TABLE_UPDATE_REVIEW_APP_NAME)}</span>
-            </div>
+            ${navigationHtml}
             <div class="phone-app-body tur-body">
                 <div class="tur-content">${buildTableUpdateReviewContentHtml(state)}</div>
             </div>

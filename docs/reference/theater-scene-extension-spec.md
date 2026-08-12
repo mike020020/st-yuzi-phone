@@ -97,13 +97,13 @@ editableTables: Object.freeze([
 1. `role` 必须存在于同一 scene 的 `tables` 中；registry 会在启动时校验，写错 role 应立即失败。
 2. 当前 scene 只有一个可用编辑表时，右上“编辑”按钮直接导航到 `table-generic:<sheetKey>`。
 3. 当前 scene 有多个可用编辑表时，右上“编辑”按钮打开表选择菜单，菜单项再导航到 `table-generic:<sheetKey>`。
-4. `table-generic:<sheetKey>` 是强制通用表列表桥。它必须跳过 special renderer，直接进入原始表的通用列表页。
+4. `table-generic:<sheetKey>` 是强制通用表列表桥。它必须跳过 Theater scene 重定向与 content preset 查询，直接进入原始表的通用列表页。
 5. 首次编辑通过普通 route history push 进入。用户在原始通用表列表点击返回时，必须先回到当前小剧场美化页。
 6. 仅在 `table:<sheetKey>` 跨表浏览后再次编辑时，核心交互层可以替换 history 顶部的旧 Theater / 兼容 App / 物理表浏览锚点，再压入当前 Theater。不得清空全局 history，也不得替换审核来源。
 7. 编辑 route 渲染失败必须恢复点击前的 history；过期 render token 的失败不得回滚更新后的导航状态。
 8. 缺失或当前 rawData 中不可用的表项不得触发无效导航；UI 应隐藏或禁用该项。
 
-不要在 scene 的 `bindInteractions` 中自己手搓 `app:${sheetKey}` 跳转，也不要直接 import Table Viewer 或手写返回目标。那会重新进入普通 App 分流，未来遇到 special 表时又被拦截，还会破坏“编辑后返回美化页”的交互合同。标准做法是统一走 `table-generic:<sheetKey>`。
+不要在 scene 的 `bindInteractions` 中自己手搓 `app:${sheetKey}` 跳转，也不要直接 import Table Viewer 或手写返回目标。那会重新进入普通 App 分流，并破坏“编辑后返回美化页”的交互合同。标准做法是统一走 `table-generic:<sheetKey>`。
 
 ### 2.4 物理表导航锚点
 

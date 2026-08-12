@@ -16,13 +16,12 @@ npm install
 | 命令 | 用途 |
 |------|------|
 | `npm run build` | 生产构建（minified，发版用） |
+| `npm run build:candidate:check` | 在系统临时目录执行生产候选构建，验证产物完整且正式 `dist/` 未被触碰 |
 | `npm run build:dev` | 一次性开发构建（未压缩，调试用） |
 | `npm run build:watch` | 监听模式（未压缩，自动重建） |
 | `npm run lint` | 静态代码检查（ESLint） |
 | `npm run check` | 运行全部 contract checks，任何失败都会让命令失败 |
 | `npm run check:ci` | 运行全部 contract checks，并额外校验历史失败基线是否仍匹配；当前基线应为 0 |
-| `npm run beautify:check` | 校验玉子美化 Bundle、真实表匹配和制作工具测试 |
-| `npm run beautify:readback` | 确定性打包玉子美化示例，并按 project/source 字节级回读 |
 | `npm run tables:check` | 校验 `tables/sources/` 与 `tables/generated/` 的表源契约和新鲜度 |
 | `npm run tables:build` | 从 `tables/sources/` 重新生成 `tables/generated/` 表格模板产物 |
 
@@ -35,7 +34,23 @@ npm install
 
 开发构建与监听模式也输出到同一组 `dist/` 文件。发版前必须重新执行 `npm run build`，不要把开发构建产物提交到 main。
 
-发布前的最低自动化门禁是：`npm run lint`、`npm run check`、`npm run check:ci`、`npm run beautify:check`、`npm run beautify:readback`、`npm run tables:check`、`npm run tables:build`、`npm run build` 全部通过。`check` 证明合同脚本真实全绿；`check:ci` 额外证明历史失败基线没有过期或重新堆积；玉子美化门禁证明 Bundle 严格校验、真实表匹配、确定性打包与 source 回读未漂移；`tables:check` / `tables:build` 证明表源 Markdown 与 generated JSON 未漂移。当前项目不允许保留历史失败基线，否则发布链路就是假绿。
+需要为候选验证或真实宿主 probe 生成隔离产物时，必须显式指定输出目录：
+
+```cmd
+node build.mjs --outdir <候选目录>
+```
+
+相对路径以扩展根目录为基准，但解析后的候选目录必须位于项目目录之外；推荐直接使用系统临时目录的绝对路径。`--dev`、`--watch` 可以与 `--outdir` 组合，压缩和 source map 语义与默认构建保持一致。显式 `--outdir` 会拒绝项目根目录、项目内任意目录、项目祖先目录和文件系统根目录；参数缺值、重复参数和未知参数也会在写入前失败。候选构建只删除并重建四个固定 bundle/map 产物，不会清理目标目录中的 probe 元数据或其他文件。无 `--outdir` 的 canonical build 仍按既有合同整目录清理并输出到正式 `dist/`。
+
+候选目录不是发布入口：不得修改 `manifest.json` 或 loader 指向候选目录，不得用候选产物替代正式 `dist/` 提交。P7/P8 使用候选产物；只有真实 SillyTavern probe 全部通过后，P9 才执行无 `--outdir` 的 canonical build 更新正式 `dist/`。
+
+隔离合同可独立验证：
+
+```cmd
+npm run build:candidate:check
+```
+
+小手机发布前的最低自动化门禁是：`npm run lint`、`npm run check`、`npm run check:ci`、`npm run tables:check`、`npm run tables:build`、`npm run build:candidate:check`、`npm run build` 全部通过。`check` 证明合同脚本真实全绿；`check:ci` 额外证明历史失败基线没有过期或重新堆积；`tables:check` / `tables:build` 证明表源 Markdown 与 generated JSON 未漂移；候选构建检查证明自定义输出不会改写正式 `dist/`。玉子美化制作工具是独立发布单元，其安装、检查、测试、打包和回读在该项目自身目录执行，不由小手机构建链代跑。
 
 当前发布链路还显式检查脚本版 loader 互斥、`window.__YUZI_PHONE_INSTANCE__` singleton guard、版本字段、release/dist 交付与 table source 边界；对应 contract 入口分别是 `scripts/check-script-loader-contract.cjs`、`scripts/check-extension-version-contract.cjs`、`scripts/check-release-chain-contract.cjs` 与 `scripts/check-table-sources-contract.cjs`。
 
@@ -71,10 +86,9 @@ npm run build
 npm run lint
 npm run check
 npm run check:ci
-npm run beautify:check
-npm run beautify:readback
 npm run tables:check
 npm run tables:build
+npm run build:candidate:check
 npm run build
 ```
 

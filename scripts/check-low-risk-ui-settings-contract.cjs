@@ -53,7 +53,7 @@ function main() {
         results,
         'settingsSchema',
         '废弃顶部通知气泡设置通过 removed key 机制丢弃',
-        has(contents.settingsSchema, "export const REMOVED_SETTING_KEYS = new Set(['notificationBubblesEnabled']);")
+        /export const REMOVED_SETTING_KEYS = new Set\(\[[\s\S]*?'notificationBubblesEnabled'/.test(contents.settingsSchema)
             && has(contents.settingsSchema, 'REMOVED_SETTING_KEYS.has(key)')
             && has(contents.settingsSchema, 'return { valid: true, value: undefined, removed: true };')
             && has(contents.settingsSchema, 'if (result.removed) {\n            continue;\n        }')

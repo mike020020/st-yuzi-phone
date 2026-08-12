@@ -1,8 +1,11 @@
 import { escapeHtmlAttr } from '../utils/dom-escape.js';
 import { formatTableCountBadge, getHomeDockApps, getSheetRowCount, normalizeHiddenTableApps } from './home-data.js';
 import { getIconForSheet, getTextIcon } from './icons.js';
+import { formatQQHomeUnreadBadge, normalizeQQHomeUnreadTotal } from './qq-unread.js';
 import { VARIABLE_MANAGER_APP, getVariableManagerIcon } from '../variable-manager/index.js';
 import { getAvailableTheaterScenes, getGroupedTheaterSheetKeys } from '../phone-theater/data.js';
+import { QQ_APP } from '../qq-v2/app-definition.js';
+import { buildTableNavigationCatalog } from '../table-navigation/catalog.js';
 import {
     TABLE_UPDATE_REVIEW_APP_ICON_TEXT,
     TABLE_UPDATE_REVIEW_APP_ID,
@@ -20,11 +23,12 @@ function buildTheaterAppIconHtml(scene, customIcon = '') {
     return `<div class="phone-app-icon-svg">${getTextIcon(scene?.iconText || name, colorA, colorB)}</div>`;
 }
 
-export function buildHomeScreenViewModel(rawData, phoneSettings, deps = {}) {
-    const { getSheetKeys } = deps;
-
+export function buildHomeScreenViewModel(rawData, phoneSettings, options = {}) {
     const hiddenTableApps = normalizeHiddenTableApps(phoneSettings?.hiddenTableApps);
     const hideTableCountBadge = !!phoneSettings?.hideTableCountBadge;
+    const qqUnreadTotal = normalizeQQHomeUnreadTotal(options?.qqUnreadTotal);
+    const tableCatalog = rawData ? buildTableNavigationCatalog(rawData) : [];
+    const tableTargetBySheetKey = new Map(tableCatalog.map(target => [target.sheetKey, target]));
 
     const apps = [];
 
@@ -66,11 +70,37 @@ export function buildHomeScreenViewModel(rawData, phoneSettings, deps = {}) {
         });
     }
 
+    if (!hiddenTableApps[QQ_APP.id]) {
+        const qqCustomIcon = phoneSettings?.appIcons?.[QQ_APP.id] || '';
+        const qqIconHtml = qqCustomIcon
+            ? `<img src="${escapeHtmlAttr(qqCustomIcon)}" class="phone-app-icon-img" alt="${escapeHtmlAttr(QQ_APP.name)}">`
+            : `<div class="phone-app-icon-svg">${getTextIcon(
+                'Q',
+                'var(--yuzi-phone-home-qq-icon-start)',
+                'var(--yuzi-phone-home-qq-icon-end)',
+            )}</div>`;
+        apps.push({
+            key: QQ_APP.id,
+            name: QQ_APP.name,
+            iconHtml: qqIconHtml,
+            badgeText: formatQQHomeUnreadBadge(qqUnreadTotal),
+            totalCount: qqUnreadTotal,
+            animationDelay: '0s',
+            isSystemApp: QQ_APP.isSystemApp,
+            route: QQ_APP.route,
+            sortOrder: Number.POSITIVE_INFINITY,
+            sortName: QQ_APP.name,
+        });
+    }
+
     const groupedTheaterSheetKeys = rawData ? getGroupedTheaterSheetKeys(rawData) : new Set();
 
     if (rawData) {
         getAvailableTheaterScenes(rawData).forEach((scene) => {
             if (hiddenTableApps[scene.appKey]) return;
+
+            const target = tableTargetBySheetKey.get(scene.primarySheetKey);
+            if (!target?.route) return;
 
             const customIcon = phoneSettings?.appIcons?.[scene.appKey] || '';
             const totalCount = Number.isFinite(Number(scene.rowCount)) ? Number(scene.rowCount) : 0;
@@ -82,7 +112,7 @@ export function buildHomeScreenViewModel(rawData, phoneSettings, deps = {}) {
                 badgeText,
                 totalCount,
                 animationDelay: '0s',
-                route: scene.route,
+                route: target.route,
                 isTheaterApp: true,
                 theaterSceneId: scene.id,
                 childSheetKeys: scene.childSheetKeys,
@@ -92,11 +122,12 @@ export function buildHomeScreenViewModel(rawData, phoneSettings, deps = {}) {
         });
     }
 
-    if (rawData && typeof getSheetKeys === 'function') {
-        const sheetKeys = getSheetKeys(rawData);
-        sheetKeys.forEach((key) => {
+    if (rawData) {
+        tableCatalog.forEach((target) => {
+            const key = target.sheetKey;
             if (groupedTheaterSheetKeys.has(key)) return;
             if (hiddenTableApps[key]) return;
+            if (!target.route) return;
 
             const sheet = rawData[key];
             if (!sheet || !sheet.name) return;
@@ -118,6 +149,7 @@ export function buildHomeScreenViewModel(rawData, phoneSettings, deps = {}) {
                 badgeText,
                 totalCount,
                 animationDelay: '0s',
+                route: target.route,
                 sortOrder,
                 sortName: name,
             });

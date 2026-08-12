@@ -2,15 +2,11 @@ import {
     ALLOWED_RENDERER_KEYS,
     ALLOWED_TEMPLATE_TYPES,
     DEFAULT_GENERIC_MIN_SCORE,
-    DEFAULT_SPECIAL_MIN_SCORE,
     PHONE_TEMPLATE_TYPE_GENERIC,
-    PHONE_TEMPLATE_TYPE_SPECIAL,
 } from './constants.js';
 import {
     DEFAULT_GENERIC_FIELD_BINDINGS,
     DEFAULT_GENERIC_LAYOUT_OPTIONS,
-    DEFAULT_SPECIAL_FIELD_BINDINGS_BY_RENDERER,
-    DEFAULT_SPECIAL_STYLE_OPTIONS_BY_RENDERER,
 } from './defaults.js';
 import {
     clampNumber,
@@ -26,46 +22,7 @@ import {
     unwrapAnnotatedValue,
 } from './core.js';
 
-const REMOVED_SPECIAL_RENDERER_KEYS = new Set(['special_moments', 'special_forum']);
-
-const SPECIAL_FIELD_BINDING_ALLOWED_KEYS = Object.freeze([
-    'threadId',
-    'threadTitle',
-    'threadSubtitle',
-    'sender',
-    'senderRole',
-    'chatTarget',
-    'content',
-    'sentAt',
-    'messageStatus',
-    'requestId',
-    'replyToMessageId',
-    'imageDesc',
-    'videoDesc',
-]);
-
-const SPECIAL_STYLE_OPTION_ENUM_ALLOWED_VALUES = Object.freeze({
-    density: ['compact', 'normal', 'loose'],
-    avatarShape: ['circle', 'rounded', 'square'],
-    conversationTitleMode: ['auto', 'sender', 'thread', 'titleField'],
-    mediaActionTextMode: ['short', 'detailed'],
-});
-
-const SPECIAL_STYLE_OPTION_NUMERIC_RULES = Object.freeze({
-    bubbleMaxWidthPct: { min: 48, max: 96 },
-});
-
-const SPECIAL_STYLE_OPTION_BOOLEAN_KEYS = new Set([
-    'showAvatar',
-    'showMessageTime',
-]);
-
-const SPECIAL_STYLE_OPTION_TEXT_LIMITS = Object.freeze({
-    emptyConversationText: 48,
-    emptyDetailText: 48,
-    emptyMessageText: 48,
-    timeFallbackText: 24,
-});
+const LEGACY_SPECIAL_TEMPLATE_TYPE = 'special_app_template';
 
 const GENERIC_LAYOUT_ALLOWED_VALUES = Object.freeze({
     pageMode: ['framed', 'plain'],
@@ -102,28 +59,9 @@ const GENERIC_STYLE_TOKEN_ALIAS_MAP = Object.freeze({
     backdropFilter: ['gtBackdropFilter'],
 });
 
-const SPECIAL_STYLE_TOKEN_ALIAS_MAP = Object.freeze({
-    pageBgColor: ['spPageBg', 'spBodyBg'],
-    navBgColor: ['spNavBg'],
-    navTextColor: ['spNavTitle', 'spNavBackText'],
-    bubbleLeftBg: ['spBubbleLeftBg'],
-    bubbleLeftText: ['spBubbleLeftText'],
-    bubbleRightBg: ['spBubbleRightBg'],
-    bubbleRightText: ['spBubbleRightText'],
-    bubbleBorderRadius: ['spRadiusMd'],
-    timeTextColor: ['spMetaText', 'spMessageTimeText'],
-});
-
 export function normalizeTemplateType(rawType, fallback = PHONE_TEMPLATE_TYPE_GENERIC) {
     const text = normalizeString(rawType, 48);
     return ALLOWED_TEMPLATE_TYPES.has(text) ? text : fallback;
-}
-
-function defaultRendererKeyByType(templateType) {
-    if (templateType === PHONE_TEMPLATE_TYPE_SPECIAL) {
-        return 'special_message';
-    }
-    return 'generic_table';
 }
 
 function normalizeGenericLayoutOptions(rawLayout) {
@@ -162,57 +100,9 @@ function normalizeGenericStyleTokens(rawStyleTokens) {
 
         mappedKeys.forEach((nextKey) => {
             const safeKey = normalizeString(nextKey, 48).replace(/[^a-zA-Z0-9_-]/g, '');
-            if (!safeKey) return;
-            if (!merged[safeKey]) {
-                merged[safeKey] = legacyValue;
-            }
+            if (!safeKey || merged[safeKey]) return;
+            merged[safeKey] = legacyValue;
         });
-    });
-
-    return merged;
-}
-
-function normalizeSpecialStyleTokens(rawStyleTokens) {
-    const normalized = normalizeStyleTokens(rawStyleTokens);
-    const merged = { ...normalized };
-
-    Object.entries(SPECIAL_STYLE_TOKEN_ALIAS_MAP).forEach(([legacyKey, mappedKeys]) => {
-        const legacyValue = merged[legacyKey];
-        if (!legacyValue || !Array.isArray(mappedKeys)) return;
-
-        mappedKeys.forEach((nextKey) => {
-            const safeKey = normalizeString(nextKey, 48).replace(/[^a-zA-Z0-9_-]/g, '');
-            if (!safeKey) return;
-            if (!merged[safeKey]) {
-                merged[safeKey] = legacyValue;
-            }
-        });
-    });
-
-    return merged;
-}
-
-function normalizeSpecialFieldBindings(rawFieldBindings, rendererKey) {
-    const source = unwrapAnnotatedValue(rawFieldBindings);
-    const src = source && typeof source === 'object' && !Array.isArray(source)
-        ? source
-        : {};
-
-    const defaults = DEFAULT_SPECIAL_FIELD_BINDINGS_BY_RENDERER[rendererKey]
-        || DEFAULT_SPECIAL_FIELD_BINDINGS_BY_RENDERER.special_message
-        || {};
-
-    const merged = {};
-
-    SPECIAL_FIELD_BINDING_ALLOWED_KEYS.forEach((fieldKey) => {
-        const rawValue = Object.prototype.hasOwnProperty.call(src, fieldKey)
-            ? src[fieldKey]
-            : defaults[fieldKey];
-
-        const normalized = normalizeFieldBindingCandidates(rawValue);
-        if (normalized.length > 0) {
-            merged[fieldKey] = normalized;
-        }
     });
 
     return merged;
@@ -223,85 +113,29 @@ function normalizeGenericFieldBindings(rawFieldBindings) {
     const src = source && typeof source === 'object' && !Array.isArray(source)
         ? source
         : {};
-
     const merged = {};
 
     GENERIC_FIELD_BINDING_ALLOWED_KEYS.forEach((fieldKey) => {
         const rawValue = Object.prototype.hasOwnProperty.call(src, fieldKey)
             ? src[fieldKey]
             : DEFAULT_GENERIC_FIELD_BINDINGS[fieldKey];
-
         const normalized = normalizeFieldBindingCandidates(rawValue);
-        if (normalized.length > 0) {
-            merged[fieldKey] = normalized;
-        }
+        if (normalized.length > 0) merged[fieldKey] = normalized;
     });
 
     return merged;
 }
 
-function normalizeSpecialStyleOptions(rawStyleOptions, rendererKey) {
-    const defaults = DEFAULT_SPECIAL_STYLE_OPTIONS_BY_RENDERER[rendererKey]
-        || DEFAULT_SPECIAL_STYLE_OPTIONS_BY_RENDERER.special_message
-        || {};
-
-    const source = unwrapAnnotatedValue(rawStyleOptions);
-    const src = source && typeof source === 'object' && !Array.isArray(source)
-        ? source
-        : {};
-
-    const merged = {};
-
-    Object.keys(defaults).forEach((optionKey) => {
-        const fallbackValue = defaults[optionKey];
-        const rawValue = Object.prototype.hasOwnProperty.call(src, optionKey)
-            ? src[optionKey]
-            : fallbackValue;
-
-        if (Object.prototype.hasOwnProperty.call(SPECIAL_STYLE_OPTION_ENUM_ALLOWED_VALUES, optionKey)) {
-            const allowed = SPECIAL_STYLE_OPTION_ENUM_ALLOWED_VALUES[optionKey] || [];
-            merged[optionKey] = normalizeEnumValue(rawValue, allowed, String(fallbackValue || ''));
-            return;
-        }
-
-        if (Object.prototype.hasOwnProperty.call(SPECIAL_STYLE_OPTION_NUMERIC_RULES, optionKey)) {
-            const rule = SPECIAL_STYLE_OPTION_NUMERIC_RULES[optionKey] || {};
-            const min = Number.isFinite(Number(rule.min)) ? Number(rule.min) : 0;
-            const max = Number.isFinite(Number(rule.max)) ? Number(rule.max) : 999;
-            const fallback = Number.isFinite(Number(fallbackValue)) ? Number(fallbackValue) : min;
-            merged[optionKey] = clampNumber(rawValue, min, max, fallback);
-            return;
-        }
-
-        if (SPECIAL_STYLE_OPTION_BOOLEAN_KEYS.has(optionKey)) {
-            merged[optionKey] = normalizeBooleanLike(rawValue, !!fallbackValue);
-            return;
-        }
-
-        const maxLength = Number.isFinite(Number(SPECIAL_STYLE_OPTION_TEXT_LIMITS[optionKey]))
-            ? Number(SPECIAL_STYLE_OPTION_TEXT_LIMITS[optionKey])
-            : 80;
-
-        merged[optionKey] = normalizeString(rawValue, maxLength)
-            || normalizeString(fallbackValue, maxLength);
-    });
-
-    return merged;
-}
-
-function normalizeMatcher(rawMatcher, templateType) {
+function normalizeMatcher(rawMatcher) {
     const source = unwrapAnnotatedValue(rawMatcher);
     const src = source && typeof source === 'object' ? source : {};
-    const minScoreFallback = templateType === PHONE_TEMPLATE_TYPE_SPECIAL
-        ? DEFAULT_SPECIAL_MIN_SCORE
-        : DEFAULT_GENERIC_MIN_SCORE;
 
     return {
         tableNameExact: uniqueStringArray(src.tableNameExact, 20, 80),
         tableNameIncludes: uniqueStringArray(src.tableNameIncludes, 20, 40),
         requiredHeaders: uniqueStringArray(src.requiredHeaders, 40, 80),
         optionalHeaders: uniqueStringArray(src.optionalHeaders, 60, 80),
-        minScore: clampNumber(src.minScore, 0, 100, minScoreFallback),
+        minScore: clampNumber(src.minScore, 0, 100, DEFAULT_GENERIC_MIN_SCORE),
     };
 }
 
@@ -313,20 +147,8 @@ function sanitizeCustomCss(rawCss) {
     if (!text) return '';
 
     const lower = text.toLowerCase();
-    const blockedKeywords = [
-        '</style',
-        '<script',
-        'javascript:',
-        '@import',
-        'expression(',
-        'url(',
-    ];
-
-    if (blockedKeywords.some(keyword => lower.includes(keyword))) {
-        return '';
-    }
-
-    return text;
+    const blockedKeywords = ['</style', '<script', 'javascript:', '@import', 'expression(', 'url('];
+    return blockedKeywords.some(keyword => lower.includes(keyword)) ? '' : text;
 }
 
 function normalizeRenderAdvanced(rawAdvanced, rawCustomCss) {
@@ -334,16 +156,11 @@ function normalizeRenderAdvanced(rawAdvanced, rawCustomCss) {
     const src = source && typeof source === 'object' && !Array.isArray(source)
         ? source
         : {};
-
     const legacyCustomCss = sanitizeCustomCss(rawCustomCss);
-    const candidateCss = sanitizeCustomCss(src.customCss);
-    const customCss = candidateCss || legacyCustomCss;
-
-    const hasLegacyCustomCss = !!legacyCustomCss;
-    const customCssEnabled = normalizeBooleanLike(src.customCssEnabled, hasLegacyCustomCss);
+    const customCss = sanitizeCustomCss(src.customCss) || legacyCustomCss;
 
     return {
-        customCssEnabled,
+        customCssEnabled: normalizeBooleanLike(src.customCssEnabled, !!legacyCustomCss),
         customCss,
     };
 }
@@ -354,42 +171,25 @@ function normalizeRenderExtraGroup(rawGroup) {
     return stripAnnotationStructure(source);
 }
 
-function normalizeRender(rawRender, templateType) {
+function normalizeRender(rawRender) {
     const source = unwrapAnnotatedValue(rawRender);
     const src = source && typeof source === 'object' ? source : {};
-    const fallbackRenderer = defaultRendererKeyByType(templateType);
-
     const requestedRendererKey = normalizeString(src.rendererKey, 48);
-    const rendererKey = ALLOWED_RENDERER_KEYS.has(requestedRendererKey)
-        ? requestedRendererKey
-        : fallbackRenderer;
+    if (requestedRendererKey && !ALLOWED_RENDERER_KEYS.has(requestedRendererKey)) return null;
 
-    const isGenericRenderer = rendererKey === 'generic_table';
     const advanced = normalizeRenderAdvanced(src.advanced, src.customCss);
-    const customCss = advanced.customCssEnabled
-        ? sanitizeCustomCss(advanced.customCss)
-        : '';
-
     return {
-        rendererKey,
-        styleTokens: isGenericRenderer
-            ? normalizeGenericStyleTokens(src.styleTokens)
-            : normalizeSpecialStyleTokens(src.styleTokens),
-        fieldBindings: isGenericRenderer
-            ? normalizeGenericFieldBindings(src.fieldBindings)
-            : normalizeSpecialFieldBindings(src.fieldBindings, rendererKey),
-        styleOptions: isGenericRenderer
-            ? {}
-            : normalizeSpecialStyleOptions(src.styleOptions, rendererKey),
-        layoutOptions: isGenericRenderer
-            ? normalizeGenericLayoutOptions(src.layoutOptions)
-            : {},
+        rendererKey: 'generic_table',
+        styleTokens: normalizeGenericStyleTokens(src.styleTokens),
+        fieldBindings: normalizeGenericFieldBindings(src.fieldBindings),
+        styleOptions: {},
+        layoutOptions: normalizeGenericLayoutOptions(src.layoutOptions),
         structureOptions: normalizeRenderExtraGroup(src.structureOptions),
         typographyOptions: normalizeRenderExtraGroup(src.typographyOptions),
         motionOptions: normalizeRenderExtraGroup(src.motionOptions),
         stateOptions: normalizeRenderExtraGroup(src.stateOptions),
         fieldDecorators: normalizeRenderExtraGroup(src.fieldDecorators),
-        customCss,
+        customCss: advanced.customCssEnabled ? sanitizeCustomCss(advanced.customCss) : '',
         advanced,
     };
 }
@@ -411,35 +211,34 @@ export function normalizeTemplate(rawTemplate, options = {}) {
     const sourceTemplate = unwrapAnnotatedValue(rawTemplate);
     if (!sourceTemplate || typeof sourceTemplate !== 'object') return null;
 
-    const sourceFallback = normalizeString(options.sourceFallback || 'user', 24) || 'user';
-    const templateType = normalizeTemplateType(sourceTemplate.templateType, options.templateTypeFallback || PHONE_TEMPLATE_TYPE_GENERIC);
+    const requestedTemplateType = normalizeString(sourceTemplate.templateType, 48);
     const requestedRendererKey = normalizeString(unwrapAnnotatedValue(sourceTemplate.render)?.rendererKey, 48);
+    if (requestedTemplateType === LEGACY_SPECIAL_TEMPLATE_TYPE) return null;
+    if (requestedRendererKey && !ALLOWED_RENDERER_KEYS.has(requestedRendererKey)) return null;
 
-    if (templateType === PHONE_TEMPLATE_TYPE_SPECIAL && REMOVED_SPECIAL_RENDERER_KEYS.has(requestedRendererKey)) {
-        return null;
-    }
+    const templateType = normalizeTemplateType(
+        requestedTemplateType,
+        options.templateTypeFallback || PHONE_TEMPLATE_TYPE_GENERIC,
+    );
+    if (templateType !== PHONE_TEMPLATE_TYPE_GENERIC) return null;
 
+    const render = normalizeRender(sourceTemplate.render);
+    if (!render) return null;
+
+    const sourceFallback = normalizeString(options.sourceFallback || 'user', 24) || 'user';
     const idFallback = options.idFallback || `user.template.${nowTs().toString(36)}`;
     const nameFallback = options.nameFallback || '未命名模板';
 
-    const id = sanitizeId(sourceTemplate.id, idFallback);
-    const name = normalizeString(sourceTemplate.name, 80) || nameFallback;
-
-    const source = normalizeString(sourceTemplate.source, 24) || sourceFallback;
-    const readOnly = normalizeBooleanLike(sourceTemplate.readOnly, false);
-    const exportable = normalizeBooleanLike(sourceTemplate.exportable, true);
-    const enabled = normalizeBooleanLike(sourceTemplate.enabled, true);
-
     return {
-        id,
-        name,
+        id: sanitizeId(sourceTemplate.id, idFallback),
+        name: normalizeString(sourceTemplate.name, 80) || nameFallback,
         templateType,
-        source,
-        readOnly,
-        exportable,
-        enabled,
-        matcher: normalizeMatcher(sourceTemplate.matcher, templateType),
-        render: normalizeRender(sourceTemplate.render, templateType),
+        source: normalizeString(sourceTemplate.source, 24) || sourceFallback,
+        readOnly: normalizeBooleanLike(sourceTemplate.readOnly, false),
+        exportable: normalizeBooleanLike(sourceTemplate.exportable, true),
+        enabled: normalizeBooleanLike(sourceTemplate.enabled, true),
+        matcher: normalizeMatcher(sourceTemplate.matcher),
+        render,
         meta: normalizeTemplateMeta(sourceTemplate.meta),
     };
 }

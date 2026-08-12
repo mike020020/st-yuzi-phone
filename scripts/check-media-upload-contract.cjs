@@ -53,27 +53,42 @@ function main() {
 
     check(results, 'crop', '存在 compressDataUrl()', has(contents.crop, 'export async function compressDataUrl('));
     check(results, 'crop', '存在 openImageCropDialog()', has(contents.crop, 'export async function openImageCropDialog('));
+    check(results, 'crop', '裁剪弹窗通过壳内临时层服务挂载', has(contents.crop, "from '../../../phone-core/shell-temporary-layer-host.js';") && has(contents.crop, 'export function mountPhoneImageCropOverlay('));
     check(results, 'crop', '裁剪弹窗支持默认开启的全图按钮 options', has(contents.crop, 'options.showCropFullImageButton !== false'));
     check(results, 'crop', '裁剪弹窗支持全图按钮文案 options 与默认全图文案', has(contents.crop, 'options.cropFullImageButtonText') && has(contents.crop, "'全图'"));
     check(results, 'crop', '裁剪弹窗渲染全图按钮节点', has(contents.crop, 'phone-image-crop-full'));
     check(results, 'crop', '全图按钮使用整张图片归一化裁剪矩形', has(contents.crop, 'normalizeCropRect({ x: 0, y: 0, w: 1, h: 1 }, constraints)'));
     check(results, 'crop', 'crop runtime adapter 暴露 isDisposed()', has(contents.crop, 'isDisposed()') && has(contents.crop, 'return !!safeRuntime?.isDisposed?.();'));
-    check(results, 'crop', '裁剪弹窗 append overlay 前检查 runtime disposed', has(contents.crop, 'if (runtime.isDisposed()) return null;') && has(contents.crop, 'document.body.appendChild(overlay);'));
+    check(results, 'crop', '裁剪弹窗挂载前检查 runtime disposed 且不再覆盖浏览器 body', has(contents.crop, 'if (runtime.isDisposed()) return null;') && has(contents.crop, 'unmountOverlay = mountPhoneImageCropOverlay(overlay,') && !has(contents.crop, 'document.body.appendChild(overlay);'));
+    check(results, 'crop', '裁剪弹窗在关闭或页面销毁后忽略异步图片布局回调', has(contents.crop, 'const isDialogActive = () => !isClosed && !runtime.isDisposed();')
+        && has(contents.crop, 'const syncDisplayRect = () => {\n        if (!isDialogActive()) return;')
+        && has(contents.crop, 'runtime.requestAnimationFrame(() => {\n        if (!isDialogActive()) return;'));
 
     check(results, 'picker', '存在 pickImageFile()', has(contents.picker, 'export function pickImageFile('));
     check(results, 'picker', 'pickImageFile 默认保持压缩路径', has(contents.picker, 'const compress = options.compress !== false;'));
     check(results, 'picker', 'pickImageFile 支持关闭二次压缩', has(contents.picker, 'const best = compress') && has(contents.picker, ': croppedDataUrl;'));
+    check(results, 'picker', 'pickImageFile 支持跳过裁剪并保留原图', has(contents.picker, 'const skipCrop = options.skipCrop === true;')
+        && has(contents.picker, 'const croppedDataUrl = skipCrop')
+        && has(contents.picker, '? rawDataUrl'));
+    check(results, 'picker', 'pickImageFile 回调提供文件名与类型元数据', has(contents.picker, 'callback(best, Object.freeze({')
+        && has(contents.picker, "name: String(file.name || '')")
+        && has(contents.picker, "type: String(file.type || '')"));
     check(results, 'picker', 'pickImageFile 声明 runtime disposed helper', has(contents.picker, 'const isDisposed = () => !!runtime?.isDisposed?.();'));
     check(results, 'picker', 'pickImageFile 在异步节点后检查 disposed', has(contents.picker, 'const rawDataUrl = await fileToDataUrl(file);\n            if (isDisposed()) return;')
-        && has(contents.picker, 'const croppedDataUrl = await openImageCropDialog(rawDataUrl, options);\n            if (isDisposed()) return;')
+        && has(contents.picker, ': await openImageCropDialog(rawDataUrl, options);\n            if (isDisposed()) return;')
         && has(contents.picker, 'if (isDisposed()) return null;'));
-    check(results, 'imageCropCss', '裁剪 overlay 层级高于小手机与悬浮按钮', has(contents.imageCropCss, 'z-index: 10020;'));
+    check(results, 'imageCropCss', '裁剪 overlay 限制在小手机壳内', has(contents.imageCropCss, 'position: absolute;') && has(contents.imageCropCss, 'min-height: 100%;') && !has(contents.imageCropCss, 'min-height: 100dvh;'));
     check(results, 'imageCropCss', '裁剪按钮区支持 secondary 分组', has(contents.imageCropCss, '.phone-image-crop-actions-secondary'));
     check(results, 'imageCropCss', '裁剪按钮区保持 sticky 操作区', has(contents.imageCropCss, 'position: sticky;') && has(contents.imageCropCss, 'bottom: 0;'));
-    check(results, 'imageCropCss', '移动端裁剪 overlay 顶部对齐并增大触摸手柄', has(contents.imageCropCss, 'align-items: flex-start;') && has(contents.imageCropCss, 'width: 18px;') && has(contents.imageCropCss, 'height: 18px;'));
+    check(results, 'imageCropCss', '移动端裁剪 overlay 顶部对齐并通过语义 token 增大触摸手柄', has(contents.imageCropCss, 'align-items: flex-start;') && has(contents.imageCropCss, 'width: var(--yuzi-phone-crop-handle-compact-size);') && has(contents.imageCropCss, 'height: var(--yuzi-phone-crop-handle-compact-size);'));
+    check(results, 'imageCropCss', '裁剪弹窗复用 QQ 删除好友确认框的遮罩、表面、圆角和阴影语义变量', has(contents.imageCropCss, 'var(--yuzi-qq-overlay)')
+        && has(contents.imageCropCss, 'var(--yuzi-qq-dialog-surface)')
+        && has(contents.imageCropCss, 'var(--yuzi-qq-radius-dialog)')
+        && has(contents.imageCropCss, 'var(--yuzi-qq-shadow-dialog)'));
     check(results, 'download', '存在 downloadTextFile()', has(contents.download, 'export function downloadTextFile('));
 
-    check(results, 'appearance', 'appearance-settings façade 继续组合 background/icon upload service', has(contents.appearance, 'createIconUploadService()'));
+    check(results, 'appearance', 'appearance-settings façade 继续组合 background/icon upload service', has(contents.appearance, 'createIconUploadService({')
+        && has(contents.appearance, 'getAppearancePack: getAppearancePackImpl,'));
     check(results, 'appearance', 'appearance-settings façade 转发 setupBgUpload options', has(contents.appearance, 'return setupBgUploadImpl(container, options);'));
     check(results, 'appearance', 'appearance-settings façade 转发 renderIconUploadList options', has(contents.appearance, 'return renderIconUploadListImpl(listEl, options);'));
     check(results, 'backgroundService', 'background-service 继续从 media-upload façade 导入上传能力', has(contents.backgroundService, "from '../media-upload.js';"));
@@ -85,7 +100,8 @@ function main() {
     check(results, 'constants', '背景图片预算提升到 12MB', has(contents.constants, 'backgroundImageBytes: 12 * 1024 * 1024'));
     check(results, 'iconUploadService', 'icon-upload-service 继续从 media-upload façade 导入上传能力', has(contents.iconUploadService, "from '../media-upload.js';"));
     check(results, 'iconUploadService', 'icon-upload-service 接收上传 runtime options', has(contents.iconUploadService, 'const renderIconUploadList = (listEl, options = {}) =>'));
-    check(results, 'iconUploadService', 'icon-upload-service 将 runtime 传给 pickImageFile()', has(contents.iconUploadService, 'runtime,\n                        maxSizeMB: 6'));
+    check(results, 'iconUploadService', 'icon-upload-service 将 runtime 传给 pickImageFile()', has(contents.iconUploadService, 'pickImageFile((dataUrl) => {')
+        && has(contents.iconUploadService, 'runtime,\n                maxSizeMB: 6'));
     check(results, 'buttonStyle', '继续从 media-upload façade 导入按钮封面上传能力', has(contents.buttonStyle, "from '../services/media-upload.js';"));
     check(results, 'buttonStyle', 'button-style 将 page runtime 传给 pickImageFile()', has(contents.buttonStyle, 'runtime,\n            compress: false,\n            maxSizeMB: 8'));
     check(results, 'buttonStyle', 'button-style 声明页面 disposed helper', has(contents.buttonStyle, 'const isPageDisposed = () => {'));

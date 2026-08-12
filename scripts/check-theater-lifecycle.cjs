@@ -52,7 +52,7 @@ const interactions = sources.interactions;
 
 assert(
     /async function loadRouteRenderer\s*\(\s*route\s*,\s*renderToken(?:\s*,[^)]*)?\)/.test(routeRenderer)
-        && routeRenderer.includes('const routeRenderer = await loadRouteRenderer(route, renderToken);'),
+        && /const routeRenderer\s*=\s*await loadRouteRenderer\(\s*route\s*,\s*renderToken(?:\s*,[^)]*)?\);/.test(routeRenderer),
     'route-renderer 必须把 renderToken 传入 loadRouteRenderer，不能让 theater 自己猜 route token',
 );
 assert(

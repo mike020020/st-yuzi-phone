@@ -1,30 +1,36 @@
 /* --- Page Transitions --- */
 .phone-page {
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
+    inset: 0;
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
 }
+
 .phone-page-enter {
     animation: phoneSlideIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
+
 .phone-page-enter-back {
     animation: phoneSlideInBack 0.25s ease forwards;
 }
+
 .phone-page-exit {
     animation: phoneSlideOut 0.25s ease forwards;
     pointer-events: none;
 }
+
 .phone-page-exit-back {
     animation: phoneSlideOutBack 0.25s ease forwards;
     pointer-events: none;
 }
+
 .phone-page[aria-hidden="true"] {
     pointer-events: none !important;
     visibility: hidden;
 }
+
 .phone-page-active {
     transform: translateX(0);
     opacity: 1;
@@ -34,14 +40,17 @@
     from { transform: translateX(100%); opacity: 0.6; }
     to { transform: translateX(0); opacity: 1; }
 }
+
 @keyframes phoneSlideOut {
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(-30%); opacity: 0; }
 }
+
 @keyframes phoneSlideInBack {
     from { transform: translateX(-30%); opacity: 0.6; }
     to { transform: translateX(0); opacity: 1; }
 }
+
 @keyframes phoneSlideOutBack {
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(100%); opacity: 0; }
@@ -54,174 +63,188 @@
     display: flex;
     flex-direction: column;
     position: relative;
-    background: linear-gradient(180deg, #f4efe6 0%, #dfe8df 52%, #c9d8d0 100%);
-    background-size: cover;
+    overflow: hidden;
+    background-color: var(--yuzi-phone-bg-app);
+    background-image: var(--yuzi-phone-home-wallpaper-image);
     background-position: center;
+    background-size: cover;
+    font-family: var(--yuzi-phone-font-family);
 }
 
 .phone-app-grid {
-    flex: 1;
+    flex: 1 1 var(--yuzi-phone-home-grid-block-size);
     min-height: 0;
     display: grid;
-    grid-template-columns: repeat(var(--phone-app-grid-columns, 4), minmax(0, 1fr));
-    grid-auto-rows: min-content;
-    gap: 20px var(--phone-app-grid-gap, 12px);
-    padding: clamp(56px, 10%, 70px) 18px 20px;
-    overflow-y: auto;
+    grid-template-columns: repeat(var(--yuzi-phone-home-grid-columns), minmax(0, 1fr));
+    grid-auto-rows: var(--yuzi-phone-home-app-slot-height);
+    column-gap: var(--yuzi-phone-home-grid-column-gap);
+    row-gap: var(--yuzi-phone-home-grid-row-gap);
+    padding:
+        calc(var(--yuzi-phone-status-safe-height) + var(--yuzi-phone-home-grid-padding-top))
+        var(--yuzi-phone-home-grid-padding-inline)
+        0;
     overflow-x: hidden;
+    overflow-y: auto;
     overscroll-behavior-y: contain;
     touch-action: pan-y;
     align-content: start;
-    position: relative;
-    z-index: 1;
-}
-
-.phone-app-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    animation: phoneAppPopIn 0.3s ease both;
-    position: relative;
-}
-@keyframes phoneAppPopIn {
-    from { transform: scale(0.7); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-}
-
-.phone-app-icon {
-    width: var(--phone-app-icon-size, 60px);
-    height: var(--phone-app-icon-size, 60px);
-    border-radius: var(--phone-app-icon-radius, 14px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: visible;
-    transition: transform 0.15s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-    box-shadow: none;
-    position: relative;
-    background: transparent;
-}
-/* override overflow on image inner */
-.phone-app-icon-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: var(--phone-app-icon-radius);
-}
-/* let corner stay rounded */
-.phone-app-icon > * {
-    border-radius: var(--phone-app-icon-radius);
-}
-
-.phone-app-icon:active,
-.phone-app-tap {
-    transform: scale(0.85) !important;
-}
-.phone-app-icon-svg {
-    width: 100%;
-    height: 100%;
-    border-radius: var(--phone-app-icon-radius);
-}
-.phone-app-icon-svg svg,
-.phone-app-icon-svg .phone-dock-text-icon {
-    width: 100%;
-    height: 100%;
-    display: block;
-    border-radius: var(--phone-app-icon-radius);
-}
-.phone-app-icon-svg .phone-dock-text-icon {
-    display: flex;
-}
-
-.phone-app-label {
-    font-size: calc(11px * var(--yuzi-phone-readable-text-scale, 1));
-    font-weight: 500;
-    color: var(--phone-home-app-label-color, rgba(255, 255, 255, 0.96));
-    text-align: center;
-    max-width: 66px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-shadow: var(--phone-home-app-label-shadow, 0 1px 3px rgba(0, 0, 0, 0.32));
-}
-
-/* --- Dock --- */
-.phone-dock {
-    --phone-dock-icon-size-default: clamp(42px, 15vw, 56px);
-    --phone-dock-icon-size-resolved: var(--phone-dock-icon-size, var(--phone-dock-icon-size-default));
-    --phone-dock-icon-radius: var(--phone-app-icon-radius, 14px);
-    --phone-dock-icon-font-size: clamp(18px, calc(var(--phone-dock-icon-size-resolved) * 0.44), 24px);
-
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    align-items: start;
-    column-gap: min(18px, 4vw);
-    row-gap: 10px;
-    margin: 0 14px 24px;
-    padding: 14px min(18px, 4vw);
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
-    border-radius: 28px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    flex-shrink: 0;
+    justify-items: center;
     position: relative;
     z-index: 1;
     box-sizing: border-box;
 }
 
-.phone-dock-item {
+.phone-home.has-status-bar .phone-app-grid {
+    padding-top: var(--yuzi-phone-home-grid-first-row-badge-clearance);
+}
+
+.phone-app-item {
+    width: min(100%, var(--yuzi-phone-home-app-slot-width));
+    height: var(--yuzi-phone-home-app-slot-height);
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    gap: 6px;
+    gap: var(--yuzi-phone-home-app-label-gap);
     cursor: pointer;
-    min-width: 0;
-    width: 100%;
+    animation: phoneAppPopIn var(--yuzi-phone-home-app-enter-duration) var(--yuzi-phone-home-app-enter-easing) both;
+    position: relative;
 }
 
-.phone-dock-icon {
-    width: var(--phone-dock-icon-size-resolved);
-    height: var(--phone-dock-icon-size-resolved);
-    border-radius: var(--phone-dock-icon-radius);
+@keyframes phoneAppPopIn {
+    from {
+        transform: scale(var(--yuzi-phone-home-app-enter-start-scale));
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.phone-app-icon {
+    width: min(100%, var(--yuzi-phone-home-app-icon-size));
+    aspect-ratio: 1;
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    position: relative;
+    border-radius: var(--yuzi-phone-home-app-icon-radius);
+    background: transparent;
+}
+
+.phone-app-icon:active,
+.phone-app-tap {
+    transform: scale(var(--yuzi-phone-home-app-press-scale)) !important;
+}
+
+.phone-app-icon-img,
+.phone-app-icon-svg,
+.phone-app-icon-svg svg,
+.phone-app-icon-svg .phone-dock-text-icon {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: inherit;
+}
+
+.phone-app-icon-img {
+    object-fit: cover;
+}
+
+.phone-app-icon-svg .phone-dock-text-icon {
+    display: flex;
+}
+
+.phone-app-label {
+    width: 100%;
+    max-width: var(--yuzi-phone-home-app-slot-width);
+    overflow: hidden;
+    color: var(--yuzi-phone-home-app-label-color);
+    font-size: calc(var(--yuzi-phone-home-app-label-size) * var(--yuzi-phone-readable-text-scale, 1));
+    font-weight: var(--yuzi-phone-home-app-label-weight);
+    line-height: normal;
+    text-align: center;
+    text-overflow: ellipsis;
+    text-shadow: var(--yuzi-phone-home-app-label-shadow);
+    white-space: nowrap;
+}
+
+.phone-home .phone-table-count-badge {
+    background: var(--yuzi-phone-home-badge-bg);
+    border-color: var(--yuzi-phone-home-badge-bg);
+    color: var(--yuzi-phone-home-badge-fg);
+}
+
+/* --- Dock --- */
+.phone-dock {
+    flex: 0 0 var(--yuzi-phone-home-dock-height);
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    padding:
+        var(--yuzi-phone-home-dock-padding-top)
+        var(--yuzi-phone-home-dock-padding-inline)
+        var(--yuzi-phone-home-dock-padding-bottom);
+    position: relative;
+    z-index: 2;
+    box-sizing: border-box;
+}
+
+.phone-dock-material,
+.phone-home-status-card {
     overflow: hidden;
 }
 
-.phone-dock-icon .phone-app-icon-img,
-.phone-dock-icon .phone-app-icon-svg,
-.phone-dock-icon .phone-app-icon-svg > svg,
-.phone-dock-icon .phone-dock-text-icon {
-    width: 100%;
-    height: 100%;
-    border-radius: var(--phone-dock-icon-radius);
-}
-
-.phone-dock-icon .phone-app-icon-img {
-    object-fit: cover;
-    display: block;
-}
-
-.phone-dock-icon .phone-app-icon-svg {
+.phone-dock-material {
+    background: var(--yuzi-phone-home-dock-glass-background);
+    backdrop-filter: blur(var(--yuzi-phone-home-dock-glass-blur));
+    -webkit-backdrop-filter: blur(var(--yuzi-phone-home-dock-glass-blur));
+    border: var(--yuzi-phone-home-glass-border-width) solid var(--yuzi-phone-home-glass-border-color);
+    box-shadow: var(--yuzi-phone-shadow-medium);
+    width: min(100%, var(--yuzi-phone-home-dock-material-width));
+    height: var(--yuzi-phone-home-dock-material-height);
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: var(--yuzi-phone-home-dock-material-icon-layout);
+    padding:
+        var(--yuzi-phone-home-dock-material-padding-block)
+        var(--yuzi-phone-home-dock-material-padding-inline);
+    border-radius: var(--yuzi-phone-home-dock-material-radius);
+    position: relative;
+    box-sizing: border-box;
 }
 
-.phone-dock-icon .phone-app-icon-svg > svg {
-    display: block;
+.phone-dock-item {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex: 0 1 var(--yuzi-phone-home-dock-icon-size);
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.phone-dock-icon {
+    width: min(100%, var(--yuzi-phone-home-dock-icon-size));
+    border-radius: var(--yuzi-phone-home-app-icon-radius);
+    overflow: hidden;
+}
+
+.phone-dock-item .phone-app-label {
+    display: var(--yuzi-phone-home-dock-label-display);
 }
 
 .phone-dock-text-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--phone-dock-text-icon-start, #4DB6AC), var(--phone-dock-text-icon-end, #009688));
-    color: #ffffff;
     box-sizing: border-box;
+    background: linear-gradient(135deg, var(--phone-dock-text-icon-start), var(--phone-dock-text-icon-end));
+    color: var(--yuzi-phone-color-white);
 }
 
 .phone-dock-text-icon-glyph-wrap {
@@ -233,167 +256,83 @@
 }
 
 .phone-dock-text-icon-glyph {
-    font-size: var(--phone-dock-icon-font-size);
+    font-family: var(--yuzi-phone-font-family);
+    font-size: calc(var(--yuzi-phone-home-dock-icon-size) * 0.44);
+    font-weight: var(--yuzi-phone-status-font-weight);
     line-height: 1;
-    font-weight: 700;
-    transform: translateY(-0.5px);
-    font-family: var(--yuzi-phone-font-family, -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", "HarmonyOS Sans", "Noto Sans CJK SC", sans-serif);
 }
 
-.phone-dock-item .phone-app-label {
-    max-width: 100%;
-    width: 100%;
-    font-size: clamp(
-        calc(10px * var(--yuzi-phone-readable-text-scale, 1)),
-        calc(2.8vw * var(--yuzi-phone-readable-text-scale, 1)),
-        calc(11px * var(--yuzi-phone-readable-text-scale, 1))
-    );
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-@media screen and (max-width: 430px) {
-    .phone-dock {
-        --phone-dock-icon-size-default: clamp(38px, 13vw, 48px);
-        gap: clamp(8px, 2.8vw, 12px);
-        margin: 0 10px 18px;
-        padding: 10px clamp(10px, 3vw, 14px);
-        border-radius: 24px;
-    }
-}
-
-@media screen and (max-width: 360px) {
-    .phone-dock {
-        --phone-dock-icon-size-default: clamp(34px, 12vw, 42px);
-        --phone-dock-icon-font-size: clamp(16px, calc(var(--phone-dock-icon-size-resolved) * 0.43), 20px);
-        column-gap: clamp(6px, 2.2vw, 10px);
-        row-gap: 8px;
-        margin: 0 8px 16px;
-        padding: 8px clamp(8px, 2.6vw, 10px);
-    }
-
-    .phone-dock-item .phone-app-label {
-        font-size: calc(10px * var(--yuzi-phone-readable-text-scale, 1));
-    }
-}
-
-@media screen and (max-width: 320px) {
-    .phone-dock {
-        --phone-dock-icon-size-default: clamp(32px, 11.5vw, 38px);
-        column-gap: 6px;
-        row-gap: 6px;
-        margin: 0 6px 14px;
-        padding: 8px 6px;
-        border-radius: 20px;
-    }
-
-    .phone-dock-item .phone-app-label {
-        font-size: calc(9.5px * var(--yuzi-phone-readable-text-scale, 1));
-    }
-}
-
-
-/* ─── 主页最右侧滚动条隐藏 ─── */
-.phone-app-grid::-webkit-scrollbar {
-    display: none !important;
-}
-.phone-app-grid {
-    scrollbar-width: none !important; /* Firefox */
-    -ms-overflow-style: none !important; /* IE 10+ */
-}
-
-/* ─── 状态栏/时间栏高级磨砂毛玻璃 ─── */
+/* --- Story Status --- */
 .phone-home-status-bar {
-    display: flex;
-    gap: 12px;
-    margin: 44px 16px 4px; /* 顶部 44px 完美避开灵动岛与系统栏 */
-    padding: 0;
-    min-height: 76px;
-    background: transparent;
-    z-index: 10;
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--yuzi-phone-home-status-gap);
+    margin:
+        calc(var(--yuzi-phone-status-safe-height) + var(--yuzi-phone-home-status-offset))
+        var(--yuzi-phone-home-status-inline-padding)
+        var(--yuzi-phone-home-grid-padding-top);
+    position: relative;
+    z-index: 2;
 }
 
-/* 自适应避让布局调整 */
-.phone-home.has-status-bar .phone-app-grid {
-    padding-top: 12px !important;
-}
-
-/* 磨砂卡片基类 */
 .phone-home-status-card {
-    flex: 1;
+    background: var(--yuzi-phone-home-status-glass-background);
+    backdrop-filter: blur(var(--yuzi-phone-home-status-glass-blur)) saturate(var(--yuzi-phone-home-status-glass-saturation));
+    -webkit-backdrop-filter: blur(var(--yuzi-phone-home-status-glass-blur)) saturate(var(--yuzi-phone-home-status-glass-saturation));
+    border: var(--yuzi-phone-home-glass-border-width) solid var(--yuzi-phone-home-glass-border-color);
+    box-shadow: var(--yuzi-phone-home-status-glass-shadow);
+    min-width: 0;
+    min-height: var(--yuzi-phone-home-status-card-min-height);
     display: flex;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
-    padding: 12px 14px;
-    border-radius: 18px;
+    justify-content: center;
+    gap: var(--yuzi-phone-home-app-label-gap);
+    padding:
+        var(--yuzi-phone-home-status-card-padding-block)
+        var(--yuzi-phone-home-status-card-padding-inline);
+    border-radius: var(--yuzi-phone-home-status-card-radius);
+    position: relative;
+    box-sizing: border-box;
+    color: var(--yuzi-phone-home-app-label-color);
     text-align: center;
-    min-width: 0; /* 防止子元素溢出撑大 */
-    
-    /* 苹果级磨砂毛玻璃质感 */
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(20px) saturate(1.6);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2), 
-                inset 0 1px 1px rgba(255, 255, 255, 0.1);
-    
-    color: var(--phone-home-app-label-color, rgba(255, 255, 255, 0.96));
-    text-shadow: var(--phone-home-app-label-shadow, 0 1px 3px rgba(0, 0, 0, 0.32));
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    text-shadow: var(--yuzi-phone-home-app-label-shadow);
 }
 
-/* 悬浮微动效，增强拟物手机质感 */
-.phone-home-status-card:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    transform: translateY(-1px);
-}
-
-/* 单卡片降级展示：当只有一侧有数据时，撑满宽度 */
-.phone-home-status-bar > .phone-home-status-card:only-child {
-    flex: 0 0 100%;
-}
-
-/* 左卡片：时间大字号美化 */
-.status-card-left .phone-home-status-time {
-    font-size: 26px;
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.5px;
-    margin-bottom: 3px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
-/* 只有日期时的中大字号自适应 */
-.status-card-left .phone-home-status-time + .phone-home-status-date {
-    font-size: 11px;
-    opacity: 0.8;
-    font-weight: 500;
-}
-
-.status-card-left:not(:has(.phone-home-status-time)) .phone-home-status-date {
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.3;
-}
-
-/* 右卡片：天气与状态 */
-.status-card-right .phone-home-status-weather-row {
-    font-size: 14px;
-    font-weight: 600;
-    margin-bottom: 5px;
-    letter-spacing: 0.2px;
-}
-
-.status-card-right .phone-home-status-event {
-    font-size: 11px;
-    opacity: 0.8;
-    line-height: 1.4;
+.phone-home-status-card > * {
+    position: relative;
+    z-index: 1;
     max-width: 100%;
-    white-space: nowrap;
+}
+
+.phone-home-status-bar > .phone-home-status-card:only-child {
+    grid-column: 1 / -1;
+}
+
+.phone-home-status-time {
+    font-size: var(--yuzi-phone-status-font-size);
+    font-weight: var(--yuzi-phone-status-font-weight);
+    line-height: var(--yuzi-phone-status-line-height);
+}
+
+.phone-home-status-date,
+.phone-home-status-weather-row,
+.phone-home-status-event {
     overflow: hidden;
+    font-size: calc(var(--yuzi-phone-home-app-label-size) * var(--yuzi-phone-readable-text-scale, 1));
+    font-weight: var(--yuzi-phone-home-app-label-weight);
+    line-height: var(--yuzi-phone-status-line-height);
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The home grid remains the only scroll layer. */
+.phone-app-grid::-webkit-scrollbar {
+    display: none;
+}
+
+.phone-app-grid {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }

@@ -1,0 +1,3259 @@
+/* QQ v2 consumes only the semantic tokens declared in 00-phone-tokens.css. */
+
+.yuzi-qq-app,
+.yuzi-qq-app * {
+    box-sizing: border-box;
+}
+
+.yuzi-qq-app {
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-surface);
+    font-family: var(--yuzi-phone-font-family);
+    font-size: var(--yuzi-qq-body-size);
+    font-weight: var(--yuzi-qq-body-weight);
+    line-height: var(--yuzi-qq-body-line-height);
+}
+
+:where(.yuzi-qq-app) :where(button, input, textarea, select) {
+    color: inherit;
+    font: inherit;
+}
+
+:where(.yuzi-qq-app) button {
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.yuzi-qq-app button:disabled,
+.yuzi-qq-app input:disabled,
+.yuzi-qq-app textarea:disabled,
+.yuzi-qq-app select:disabled {
+    cursor: default;
+    opacity: var(--yuzi-qq-disabled-opacity);
+}
+
+.yuzi-qq-app button:focus-visible,
+.yuzi-qq-app input:focus-visible,
+.yuzi-qq-app textarea:focus-visible,
+.yuzi-qq-app select:focus-visible {
+    outline: var(--yuzi-qq-focus-ring-width) solid var(--yuzi-qq-accent);
+    outline-offset: var(--yuzi-qq-line-width);
+}
+
+.yuzi-qq-viewport {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    block-size: 100%;
+    min-block-size: 100%;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.yuzi-qq-view {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    inline-size: 100%;
+    min-block-size: 0;
+    max-inline-size: var(--yuzi-qq-max-content-width);
+    margin-inline: auto;
+    gap: var(--yuzi-qq-section-gap);
+    padding: var(--yuzi-qq-safe-top) var(--yuzi-qq-page-padding) var(--yuzi-qq-page-padding);
+    overflow: auto;
+    background: var(--yuzi-qq-surface);
+}
+
+.yuzi-qq-header {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--yuzi-qq-header-height);
+    gap: var(--yuzi-qq-header-gap);
+}
+
+.yuzi-qq-header-spacer,
+.yuzi-qq-header-actions {
+    display: flex;
+    flex: 0 0 var(--yuzi-qq-header-action-width);
+    align-items: center;
+    min-inline-size: var(--yuzi-qq-header-action-width);
+}
+
+.yuzi-qq-header-actions {
+    justify-content: flex-end;
+}
+
+.yuzi-qq-title {
+    flex: 1 1 auto;
+    margin: 0;
+    overflow: hidden;
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-title-size);
+    font-weight: var(--yuzi-qq-title-weight);
+    line-height: var(--yuzi-qq-body-line-height);
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yuzi-qq-icon-button,
+.yuzi-qq-chat-person-button {
+    display: inline-grid;
+    inline-size: var(--yuzi-qq-touch-size);
+    block-size: var(--yuzi-qq-touch-size);
+    place-items: center;
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-icon);
+}
+
+.yuzi-qq-icon-button:hover,
+.yuzi-qq-chat-person-button:hover,
+.yuzi-qq-tool-button:hover,
+.yuzi-qq-contact-utility:hover,
+.yuzi-qq-setting-row:hover {
+    background: var(--yuzi-qq-control);
+}
+
+.yuzi-qq-nav {
+    display: flex;
+    flex: 0 0 var(--yuzi-qq-nav-height);
+    inline-size: 100%;
+    max-inline-size: var(--yuzi-qq-max-content-width);
+    min-block-size: var(--yuzi-qq-nav-height);
+    margin-inline: auto;
+    padding: var(--yuzi-qq-nav-padding-block) var(--yuzi-qq-nav-padding-inline);
+    border-block-start: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    background: var(--yuzi-qq-elevated);
+    box-shadow: var(--yuzi-qq-shadow);
+    z-index: var(--yuzi-qq-nav-z-index);
+}
+
+.yuzi-qq-nav-item {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-block-size: var(--yuzi-qq-touch-size);
+    border-radius: var(--yuzi-qq-radius);
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-nav-label-size);
+    font-weight: var(--yuzi-qq-nav-label-weight);
+}
+
+.yuzi-qq-nav-item.is-active {
+    color: var(--yuzi-qq-accent);
+    background: var(--yuzi-qq-subtle);
+    font-weight: var(--yuzi-qq-nav-label-active-weight);
+}
+
+.yuzi-qq-search {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--yuzi-qq-search-height);
+    padding-inline: var(--yuzi-qq-search-padding-inline);
+    border-radius: var(--yuzi-qq-search-radius);
+    color: var(--yuzi-qq-muted);
+    background: var(--yuzi-qq-input);
+}
+
+.yuzi-qq-presence,
+.yuzi-qq-row-preview,
+.yuzi-qq-row-meta,
+.yuzi-qq-profile-status,
+.yuzi-qq-settings-status,
+.yuzi-qq-form-error,
+.yuzi-qq-time-divider,
+.yuzi-qq-system-message {
+    margin: 0;
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-caption-size);
+    line-height: var(--yuzi-qq-caption-line-height);
+}
+
+.yuzi-qq-presence {
+    opacity: var(--yuzi-qq-presence-opacity);
+}
+
+.yuzi-qq-conversation-list,
+.yuzi-qq-contact-list,
+.yuzi-qq-settings-list,
+.yuzi-qq-profile-actions,
+.yuzi-qq-form,
+.yuzi-qq-dialog-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yuzi-qq-section-gap);
+}
+
+.yuzi-qq-swipe-row {
+    --yuzi-qq-swipe-offset: 0px;
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--yuzi-qq-swipe-reveal-radius);
+}
+
+.yuzi-qq-conversation-row {
+    position: relative;
+    z-index: var(--yuzi-qq-nav-z-index);
+    display: flex;
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: var(--yuzi-qq-list-row-min-height);
+    gap: var(--yuzi-qq-row-gap);
+    padding: var(--yuzi-qq-list-row-padding);
+    border-radius: inherit;
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-elevated);
+    text-align: start;
+    touch-action: pan-y;
+    transform: translateX(var(--yuzi-qq-swipe-offset));
+    transition: transform var(--yuzi-qq-transition);
+}
+
+.yuzi-qq-swipe-row.is-swiped {
+    --yuzi-qq-swipe-offset: calc(var(--yuzi-qq-swipe-reveal-width) * -1);
+}
+
+.yuzi-qq-swipe-row.is-dragging .yuzi-qq-conversation-row {
+    cursor: grabbing;
+    transition: none;
+}
+
+.yuzi-qq-swipe-delete {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    display: grid;
+    inline-size: var(--yuzi-qq-swipe-reveal-width);
+    place-items: center;
+    border-radius: var(--yuzi-qq-swipe-reveal-radius);
+    color: var(--yuzi-qq-elevated);
+    background: var(--yuzi-qq-danger);
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.yuzi-qq-swipe-row.is-swiped .yuzi-qq-swipe-delete {
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.yuzi-qq-swipe-row.is-dragging.is-revealing .yuzi-qq-swipe-delete {
+    visibility: visible;
+    pointer-events: none;
+}
+
+.yuzi-qq-row-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-inline-size: 0;
+    gap: var(--yuzi-qq-tool-gap);
+    overflow: hidden;
+}
+
+.yuzi-qq-row-title,
+.yuzi-qq-contact-name {
+    overflow: hidden;
+    color: var(--yuzi-qq-text);
+    font-weight: var(--yuzi-qq-title-weight);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yuzi-qq-row-preview {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yuzi-qq-row-meta {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--yuzi-qq-tool-gap);
+}
+
+.yuzi-qq-badge {
+    display: grid;
+    min-inline-size: var(--yuzi-qq-control-size);
+    min-block-size: var(--yuzi-qq-control-size);
+    padding-inline: var(--yuzi-qq-tool-gap);
+    place-items: center;
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-elevated);
+    background: var(--yuzi-qq-danger);
+    font-size: var(--yuzi-qq-caption-size);
+}
+
+.yuzi-qq-avatar {
+    display: inline-grid;
+    flex: 0 0 var(--yuzi-qq-avatar-size);
+    inline-size: var(--yuzi-qq-avatar-size);
+    block-size: var(--yuzi-qq-avatar-size);
+    place-items: center;
+    overflow: hidden;
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-avatar-ink);
+    background: var(--yuzi-qq-avatar-surface);
+    font-weight: var(--yuzi-qq-title-weight);
+}
+
+.yuzi-qq-avatar img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+}
+
+.yuzi-qq-avatar-large {
+    flex-basis: var(--yuzi-qq-avatar-large);
+    inline-size: var(--yuzi-qq-avatar-large);
+    block-size: var(--yuzi-qq-avatar-large);
+    align-self: center;
+}
+
+.yuzi-qq-message-avatar,
+.yuzi-qq-header-avatar {
+    flex-basis: var(--yuzi-qq-message-avatar-size);
+    inline-size: var(--yuzi-qq-message-avatar-size);
+    block-size: var(--yuzi-qq-message-avatar-size);
+}
+
+.yuzi-qq-contact-utilities {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yuzi-qq-contact-utility-gap);
+}
+
+.yuzi-qq-contact-utility,
+.yuzi-qq-contact-row,
+.yuzi-qq-setting-row {
+    display: flex;
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: var(--yuzi-qq-list-row-min-height);
+    gap: var(--yuzi-qq-row-gap);
+    padding: var(--yuzi-qq-list-row-padding);
+    border-radius: var(--yuzi-qq-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-elevated);
+    text-align: start;
+}
+
+.yuzi-qq-contact-initial {
+    display: grid;
+    inline-size: var(--yuzi-qq-control-size);
+    block-size: var(--yuzi-qq-control-size);
+    place-items: center;
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-avatar-ink);
+    background: var(--yuzi-qq-avatar-surface);
+}
+
+.yuzi-qq-contact-name {
+    flex: 1 1 auto;
+}
+
+.yuzi-qq-profile-view {
+    align-items: stretch;
+}
+
+.yuzi-qq-profile-name {
+    margin: 0;
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-title-size);
+    font-weight: var(--yuzi-qq-title-weight);
+    text-align: center;
+}
+
+.yuzi-qq-profile-status {
+    text-align: center;
+}
+
+.yuzi-qq-profile-actions {
+    inline-size: 100%;
+}
+
+.yuzi-qq-primary-button,
+.yuzi-qq-secondary-button,
+.yuzi-qq-danger-button {
+    min-block-size: var(--yuzi-qq-dialog-action-height);
+    padding-inline: var(--yuzi-qq-page-padding);
+    border-radius: var(--yuzi-qq-radius);
+    text-align: center;
+}
+
+.yuzi-qq-primary-button {
+    color: var(--yuzi-qq-elevated);
+    background: var(--yuzi-qq-accent);
+}
+
+.yuzi-qq-secondary-button {
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-control);
+}
+
+.yuzi-qq-danger-button {
+    color: var(--yuzi-qq-elevated);
+    background: var(--yuzi-qq-danger);
+}
+
+.yuzi-qq-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yuzi-qq-tool-gap);
+    color: var(--yuzi-qq-muted);
+}
+
+.yuzi-qq-field input,
+.yuzi-qq-field select,
+.yuzi-qq-dialog-form input,
+.yuzi-qq-dialog-form textarea,
+.yuzi-qq-composer-input {
+    inline-size: 100%;
+    min-block-size: var(--yuzi-qq-dialog-input-height);
+    padding: var(--yuzi-qq-list-row-padding);
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    border-radius: var(--yuzi-qq-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-input);
+    resize: vertical;
+}
+
+.yuzi-qq-field input[type="checkbox"] {
+    inline-size: var(--yuzi-qq-control-size);
+    block-size: var(--yuzi-qq-control-size);
+    accent-color: var(--yuzi-qq-accent);
+}
+
+.yuzi-qq-chat-view {
+    overflow: hidden;
+}
+
+.yuzi-qq-chat-view.has-chat-background .yuzi-qq-message-stream::before {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: var(--yuzi-qq-chat-background-image) center / cover;
+    content: '';
+}
+
+.yuzi-qq-chat-view.has-chat-background .yuzi-qq-message-stream::after {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: var(--yuzi-qq-background-overlay);
+    content: '';
+}
+
+.yuzi-qq-message-stream {
+    position: relative;
+    isolation: isolate;
+}
+
+.yuzi-qq-chat-view > * {
+    position: relative;
+    z-index: var(--yuzi-qq-nav-z-index);
+}
+
+.yuzi-qq-message-stream > * {
+    position: relative;
+    z-index: var(--yuzi-qq-nav-z-index);
+}
+
+.yuzi-qq-message-stream {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-block-size: 0;
+    gap: var(--yuzi-qq-chat-gap);
+    overflow: auto;
+}
+
+.yuzi-qq-message {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--yuzi-qq-message-gap);
+}
+
+.yuzi-qq-message.is-self {
+    align-self: flex-end;
+}
+
+.yuzi-qq-message-stack {
+    display: flex;
+    flex-direction: column;
+    max-inline-size: var(--yuzi-qq-message-max-width);
+    gap: var(--yuzi-qq-message-gap);
+}
+
+.yuzi-qq-message-bubble,
+.yuzi-qq-voice-message,
+.yuzi-qq-narrative-card,
+.yuzi-qq-transfer-card,
+.yuzi-qq-sticker-message {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yuzi-qq-tool-gap);
+    padding: var(--yuzi-qq-bubble-padding-block) var(--yuzi-qq-bubble-padding-inline);
+    border-radius: var(--yuzi-qq-bubble-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-bubble-other);
+    box-shadow: var(--yuzi-qq-shadow);
+}
+
+.yuzi-qq-message.is-self .yuzi-qq-message-bubble,
+.yuzi-qq-message.is-self .yuzi-qq-voice-message,
+.yuzi-qq-message.is-self .yuzi-qq-narrative-card,
+.yuzi-qq-message.is-self .yuzi-qq-transfer-card,
+.yuzi-qq-message.is-self .yuzi-qq-sticker-message {
+    color: var(--yuzi-qq-elevated);
+    background: var(--yuzi-qq-bubble-self);
+}
+
+.yuzi-qq-voice-message,
+.yuzi-qq-transfer-card {
+    text-align: start;
+}
+
+.yuzi-qq-voice-original {
+    display: none;
+}
+
+.yuzi-qq-voice-message.is-expanded .yuzi-qq-voice-original {
+    display: inline;
+}
+
+.yuzi-qq-narrative-card strong,
+.yuzi-qq-transfer-card strong,
+.yuzi-qq-transfer-card small {
+    color: inherit;
+}
+
+.yuzi-qq-quote {
+    margin: 0;
+    padding-inline-start: var(--yuzi-qq-bubble-padding-inline);
+    border-inline-start: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-caption-size);
+}
+
+.yuzi-qq-retry-button {
+    align-self: flex-end;
+    inline-size: var(--yuzi-qq-tool-size);
+    block-size: var(--yuzi-qq-tool-size);
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-danger);
+    background: var(--yuzi-qq-control);
+}
+
+.yuzi-qq-message.is-selected-for-delete .yuzi-qq-message-stack {
+    outline: var(--yuzi-qq-line-width) solid var(--yuzi-qq-accent);
+    outline-offset: var(--yuzi-qq-line-width);
+    border-radius: var(--yuzi-qq-bubble-radius);
+}
+
+.yuzi-qq-message.is-selected-for-delete .yuzi-qq-system-message {
+    outline: var(--yuzi-qq-line-width) solid var(--yuzi-qq-accent);
+    outline-offset: var(--yuzi-qq-line-width);
+}
+
+.yuzi-qq-chat-view.is-message-selection-mode .yuzi-qq-message {
+    cursor: pointer;
+}
+
+.yuzi-qq-chat-view.is-message-selection-mode .yuzi-qq-message::before {
+    display: grid;
+    flex: 0 0 22px;
+    inline-size: 22px;
+    block-size: 22px;
+    place-items: center;
+    align-self: center;
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-weak);
+    border-radius: 50%;
+    color: transparent;
+    background: var(--yuzi-qq-content-surface);
+    content: '\2713';
+    font-size: 14px;
+    line-height: 1;
+}
+
+.yuzi-qq-chat-view.is-message-selection-mode .yuzi-qq-message.is-selected-for-delete::before {
+    border-color: var(--yuzi-qq-accent);
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-accent);
+}
+
+.yuzi-qq-unanswered-indicator {
+    align-self: flex-end;
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-caption-size);
+    line-height: var(--yuzi-qq-caption-line-height);
+}
+
+
+.yuzi-qq-time-divider,
+.yuzi-qq-system-message {
+    align-self: center;
+    max-inline-size: var(--yuzi-qq-message-max-width);
+    padding: var(--yuzi-qq-tool-gap) var(--yuzi-qq-bubble-padding-inline);
+    border-radius: var(--yuzi-phone-radius-pill);
+    background: var(--yuzi-qq-subtle);
+    text-align: center;
+}
+
+.yuzi-qq-composer {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: var(--yuzi-qq-composer-gap);
+    padding: var(--yuzi-qq-composer-padding-block);
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    border-radius: var(--yuzi-qq-radius);
+    background: var(--yuzi-qq-elevated);
+}
+
+.yuzi-qq-quote-preview {
+    display: flex;
+    align-items: center;
+    gap: var(--yuzi-qq-tool-gap);
+    min-inline-size: 0;
+    padding-inline-start: var(--yuzi-qq-bubble-padding-inline);
+    border-inline-start: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-caption-size);
+}
+
+.yuzi-qq-quote-preview > span {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yuzi-qq-quote-preview-close {
+    flex: 0 0 auto;
+    inline-size: var(--yuzi-qq-tool-size);
+    block-size: var(--yuzi-qq-tool-size);
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-icon);
+}
+
+.yuzi-qq-tool-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    min-block-size: var(--yuzi-qq-tool-bar-height);
+    gap: var(--yuzi-qq-tool-gap);
+    overflow-x: auto;
+}
+
+.yuzi-qq-tool-button {
+    display: grid;
+    flex: 0 0 var(--yuzi-qq-tool-size);
+    inline-size: var(--yuzi-qq-tool-size);
+    block-size: var(--yuzi-qq-tool-size);
+    place-items: center;
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-icon);
+}
+
+.yuzi-qq-composer-input {
+    min-block-size: var(--yuzi-qq-composer-input-min-height);
+    max-block-size: var(--yuzi-qq-composer-input-max-height);
+    line-height: var(--yuzi-qq-composer-line-height);
+    overflow-y: auto;
+}
+
+.yuzi-qq-emoji-panel {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: var(--yuzi-qq-overlay-z-index);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(var(--yuzi-qq-emoji-item-min-size), 1fr));
+    max-block-size: var(--yuzi-qq-emoji-panel-height);
+    gap: var(--yuzi-qq-emoji-panel-gap);
+    padding: var(--yuzi-qq-emoji-panel-padding);
+    overflow: auto;
+    border-block-start: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    background: var(--yuzi-qq-dialog-surface);
+    box-shadow: var(--yuzi-qq-shadow-dialog);
+}
+
+.yuzi-qq-emoji-item {
+    min-inline-size: var(--yuzi-qq-emoji-item-min-size);
+    min-block-size: var(--yuzi-qq-emoji-item-min-size);
+    padding: var(--yuzi-qq-tool-gap);
+    border-radius: var(--yuzi-qq-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-control);
+}
+
+.yuzi-qq-jump-button {
+    position: absolute;
+    inset-inline-end: var(--yuzi-qq-page-padding);
+    inset-block-end: var(--yuzi-qq-jump-bottom);
+    z-index: var(--yuzi-qq-overlay-z-index);
+    display: grid;
+    inline-size: var(--yuzi-qq-jump-size);
+    block-size: var(--yuzi-qq-jump-size);
+    place-items: center;
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-elevated);
+    background: var(--yuzi-qq-accent);
+    box-shadow: var(--yuzi-qq-shadow);
+}
+
+.yuzi-qq-background-preview {
+    display: grid;
+    min-block-size: var(--yuzi-qq-avatar-large);
+    padding: var(--yuzi-qq-page-padding);
+    place-items: center;
+    overflow: hidden;
+    border-radius: var(--yuzi-qq-radius);
+    color: var(--yuzi-qq-text);
+    background-color: var(--yuzi-qq-subtle);
+    background-position: center;
+    background-size: cover;
+    text-align: center;
+}
+
+.yuzi-qq-settings-list {
+    gap: var(--yuzi-qq-line-width);
+    overflow: hidden;
+    border-radius: var(--yuzi-qq-radius);
+    background: var(--yuzi-qq-line);
+}
+
+.yuzi-qq-setting-row {
+    justify-content: space-between;
+    border-radius: 0;
+}
+
+.yuzi-qq-setting-arrow {
+    color: var(--yuzi-qq-muted);
+}
+
+.yuzi-qq-assistant-view {
+    background: var(--yuzi-qq-surface);
+}
+
+.yuzi-qq-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: var(--yuzi-qq-overlay-z-index);
+    display: grid;
+    padding: var(--yuzi-qq-page-padding);
+    place-items: center;
+    background: var(--yuzi-qq-overlay);
+}
+
+.yuzi-qq-anchored-menu-layer {
+    position: absolute;
+    inset: 0;
+    z-index: var(--yuzi-qq-overlay-z-index);
+    background: transparent;
+}
+
+.yuzi-qq-dialog {
+    display: flex;
+    flex-direction: column;
+    inline-size: var(--yuzi-qq-dialog-width);
+    max-inline-size: 100%;
+    gap: var(--yuzi-qq-dialog-gap);
+    padding: var(--yuzi-qq-dialog-padding);
+    border-radius: var(--yuzi-qq-radius-dialog);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-dialog-surface);
+    box-shadow: var(--yuzi-qq-shadow-dialog);
+}
+
+.yuzi-qq-dialog-title {
+    margin: 0;
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-title-size);
+    font-weight: var(--yuzi-qq-title-weight);
+    text-align: center;
+}
+
+.yuzi-qq-dialog-actions {
+    display: flex;
+    gap: var(--yuzi-qq-dialog-gap);
+}
+
+.yuzi-qq-dialog-actions > * {
+    flex: 1 1 auto;
+}
+
+.yuzi-qq-dialog-menu {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yuzi-qq-dialog-menu-gap);
+    overflow: hidden;
+    border-radius: var(--yuzi-qq-radius);
+    background: var(--yuzi-qq-line);
+}
+
+.yuzi-qq-dialog-menu-item {
+    min-block-size: var(--yuzi-qq-dialog-action-height);
+    padding-inline: var(--yuzi-qq-page-padding);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-dialog-muted);
+    text-align: start;
+}
+
+.yuzi-qq-message-add-menu {
+    position: absolute;
+    inset-block-start: calc(var(--yuzi-qq-anchored-menu-top) + var(--yuzi-qq-message-add-menu-offset));
+    inset-inline-end: max(var(--yuzi-qq-page-padding), var(--yuzi-qq-anchored-menu-right));
+    inline-size: var(--yuzi-qq-dialog-menu-width);
+    max-inline-size: calc(100% - (var(--yuzi-qq-page-padding) * 2));
+    min-block-size: var(--yuzi-qq-dialog-menu-height);
+    block-size: var(--yuzi-qq-dialog-menu-height);
+    justify-content: space-between;
+    gap: 0;
+    padding: var(--yuzi-qq-dialog-menu-padding);
+    border-radius: var(--yuzi-qq-dialog-menu-radius);
+    background: var(--yuzi-qq-dialog-surface);
+    box-shadow: var(--yuzi-qq-message-add-menu-shadow);
+}
+
+.yuzi-qq-message-add-menu-item {
+    display: flex;
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: var(--yuzi-qq-dialog-menu-row-height);
+    padding-inline: 0;
+    gap: var(--yuzi-qq-inline-gap);
+    background: transparent;
+}
+
+.yuzi-qq-confirm-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--yuzi-qq-dialog-gap);
+    color: var(--yuzi-qq-muted);
+    text-align: center;
+}
+
+.yuzi-qq-confirm-copy p {
+    margin: 0;
+}
+
+.yuzi-qq-dialog-illustration {
+    display: grid;
+    inline-size: var(--yuzi-qq-dialog-illustration-size);
+    block-size: var(--yuzi-qq-dialog-illustration-size);
+    place-items: center;
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-elevated);
+    background: var(--yuzi-qq-danger);
+    font-weight: var(--yuzi-qq-title-weight);
+}
+
+::selection {
+    background: var(--yuzi-qq-text-selection-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .yuzi-qq-app {
+        --yuzi-qq-transition: var(--yuzi-qq-reduced-transition);
+    }
+}
+
+/*
+ * Figma 02 mapping layer.  This deliberately follows the QQ v2 DOM in
+ * modules/qq-v2/ui/app.js; every visual value resolves through a QQ role
+ * token declared in 00-phone-tokens.css.
+ */
+.yuzi-qq-app {
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-page);
+    font-size: var(--yuzi-qq-body-size);
+    line-height: var(--yuzi-qq-body-line-height);
+}
+
+.yuzi-qq-viewport {
+    inline-size: 100%;
+    min-inline-size: 0;
+    max-inline-size: none;
+    margin-inline: 0;
+    background: var(--yuzi-qq-page);
+}
+
+.yuzi-qq-view {
+    min-inline-size: 0;
+    max-inline-size: none;
+    margin-inline: 0;
+    gap: var(--yuzi-qq-square-radius);
+    padding-block-start: calc(var(--yuzi-qq-safe-top) + var(--yuzi-qq-detail-top-gap));
+    padding-inline: var(--yuzi-qq-square-radius);
+    padding-block-end: var(--yuzi-qq-square-radius);
+    background: var(--yuzi-qq-page);
+}
+
+.yuzi-qq-list-view {
+    padding-block-start: var(--yuzi-qq-safe-top);
+    background: var(--yuzi-qq-page);
+}
+
+.yuzi-qq-header {
+    flex: 0 0 var(--yuzi-qq-chat-header-height);
+    min-block-size: var(--yuzi-qq-chat-header-height);
+    padding-inline: var(--yuzi-qq-chat-header-padding-inline);
+    gap: var(--yuzi-qq-chat-header-gap);
+    background: var(--yuzi-qq-chat-header-surface);
+}
+
+.yuzi-qq-header-spacer,
+.yuzi-qq-header-actions {
+    flex-basis: var(--yuzi-qq-chat-header-action-size);
+    min-inline-size: var(--yuzi-qq-chat-header-action-size);
+}
+
+.yuzi-qq-title {
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-root-title-size);
+    font-weight: var(--yuzi-qq-title-weight);
+    line-height: var(--yuzi-qq-root-title-line-height);
+}
+
+.yuzi-qq-icon-button,
+.yuzi-qq-chat-person-button {
+    inline-size: var(--yuzi-qq-chat-header-action-size);
+    block-size: var(--yuzi-qq-chat-header-action-size);
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-icon);
+}
+
+.yuzi-qq-icon-button:hover,
+.yuzi-qq-chat-person-button:hover,
+.yuzi-qq-tool-button:hover,
+.yuzi-qq-contact-utility:hover,
+.yuzi-qq-setting-row:hover {
+    background: var(--yuzi-qq-control);
+}
+
+/* Root identity header: Figma 96:225 / 233:430 */
+.yuzi-qq-identity-header {
+    display: flex;
+    flex: 0 0 var(--yuzi-qq-root-header-height);
+    align-items: center;
+    min-block-size: var(--yuzi-qq-root-header-height);
+    padding-inline: var(--yuzi-qq-root-header-padding-inline);
+    gap: var(--yuzi-qq-root-header-gap);
+    background: var(--yuzi-qq-page);
+}
+
+.yuzi-qq-identity-avatar {
+    display: grid;
+    flex: 0 0 var(--yuzi-qq-root-identity-avatar-size);
+    inline-size: var(--yuzi-qq-root-identity-avatar-size);
+    block-size: var(--yuzi-qq-root-identity-avatar-size);
+    padding: 0;
+    place-items: center;
+    overflow: hidden;
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-avatar-ink);
+    background: var(--yuzi-qq-avatar-surface);
+    font-size: var(--yuzi-qq-row-preview-size);
+    font-weight: var(--yuzi-qq-title-weight);
+}
+
+.yuzi-qq-identity-avatar img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+}
+
+.yuzi-qq-identity-copy,
+.yuzi-qq-chat-heading-copy,
+.yuzi-qq-contact-copy,
+.yuzi-qq-profile-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-inline-size: var(--yuzi-qq-square-radius);
+}
+
+.yuzi-qq-identity-title {
+    margin: var(--yuzi-qq-square-radius);
+    overflow: hidden;
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-root-title-size);
+    font-weight: var(--yuzi-qq-root-title-weight);
+    line-height: var(--yuzi-qq-root-title-line-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yuzi-qq-contact-root-title {
+    font-size: var(--yuzi-qq-contact-title-size);
+    font-weight: var(--yuzi-qq-contact-title-weight);
+    line-height: var(--yuzi-qq-contact-title-line-height);
+}
+
+.yuzi-qq-identity-status,
+.yuzi-qq-chat-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--yuzi-qq-tool-gap);
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-root-status-size);
+    line-height: var(--yuzi-qq-root-status-line-height);
+}
+
+.yuzi-qq-identity-status-dot,
+.yuzi-qq-chat-status-dot {
+    inline-size: var(--yuzi-qq-root-status-dot-size);
+    block-size: var(--yuzi-qq-root-status-dot-size);
+    border-radius: var(--yuzi-phone-radius-pill);
+    background: var(--yuzi-qq-success);
+}
+
+.yuzi-qq-identity-actions {
+    display: flex;
+    flex: 0 0 var(--yuzi-qq-root-action-size);
+    align-items: center;
+    justify-content: flex-end;
+    min-inline-size: var(--yuzi-qq-root-action-size);
+}
+
+.yuzi-qq-identity-action,
+.yuzi-qq-contact-add-visual {
+    display: grid;
+    inline-size: var(--yuzi-qq-root-action-size);
+    block-size: var(--yuzi-qq-root-action-size);
+    place-items: center;
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-icon);
+    font-size: var(--yuzi-qq-root-status-size);
+}
+
+/* The Figma tab widths are the 402px baseline; the live bar fills the phone. */
+.yuzi-qq-nav {
+    flex: 0 0 var(--yuzi-qq-nav-height);
+    inline-size: 100%;
+    max-inline-size: none;
+    min-block-size: var(--yuzi-qq-nav-height);
+    margin-inline: 0;
+    padding-block: var(--yuzi-qq-nav-padding-block);
+    padding-inline: var(--yuzi-qq-nav-padding-inline);
+    justify-content: flex-start;
+    gap: var(--yuzi-qq-nav-gap);
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-block-start: none;
+    background: var(--yuzi-qq-tab-surface);
+    box-shadow: none;
+    scrollbar-width: none;
+}
+
+.yuzi-qq-nav::-webkit-scrollbar {
+    display: none;
+}
+
+.yuzi-qq-nav-item {
+    display: flex;
+    flex: 1 1 var(--yuzi-qq-nav-item-width);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: var(--yuzi-qq-touch-size);
+    max-inline-size: none;
+    min-block-size: var(--yuzi-qq-nav-item-height);
+    gap: var(--yuzi-qq-tool-gap);
+    border-radius: var(--yuzi-qq-square-radius);
+    color: var(--yuzi-qq-weak);
+    background: var(--yuzi-qq-tab-surface);
+    font-size: var(--yuzi-qq-nav-label-size);
+    font-weight: var(--yuzi-qq-nav-label-weight);
+    line-height: var(--yuzi-qq-nav-label-line-height);
+}
+
+.yuzi-qq-nav-item.is-active {
+    color: var(--yuzi-qq-accent);
+    background: var(--yuzi-qq-tab-surface);
+    font-weight: var(--yuzi-qq-nav-label-active-weight);
+}
+
+.yuzi-qq-nav-icon {
+    inline-size: var(--yuzi-qq-nav-icon-size);
+    block-size: var(--yuzi-qq-nav-icon-size);
+    font-size: var(--yuzi-qq-nav-icon-size);
+    line-height: var(--yuzi-qq-nav-icon-size);
+    text-align: center;
+}
+
+.yuzi-qq-nav-label {
+    font-size: var(--yuzi-qq-nav-label-size);
+    line-height: var(--yuzi-qq-nav-label-line-height);
+}
+
+/* Figma continuous list sheet and its tokenized search band. */
+.yuzi-qq-list-sheet {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-block-size: var(--yuzi-qq-square-radius);
+    padding-block-start: var(--yuzi-qq-list-search-sheet-padding-block);
+    background: var(--yuzi-qq-list-surface);
+}
+
+.yuzi-qq-search {
+    flex: 0 0 var(--yuzi-qq-search-height);
+    min-block-size: var(--yuzi-qq-search-height);
+    margin-inline: var(--yuzi-qq-page-padding);
+    margin-block-end: var(--yuzi-qq-list-search-sheet-padding-block);
+    padding-inline: var(--yuzi-qq-search-padding-inline);
+    gap: var(--yuzi-qq-tool-gap);
+    border-radius: var(--yuzi-qq-search-radius);
+    color: var(--yuzi-qq-weak);
+    background: var(--yuzi-qq-control);
+    font-size: var(--yuzi-qq-row-preview-size);
+    line-height: var(--yuzi-qq-row-preview-line-height);
+}
+
+.yuzi-qq-contact-root-search {
+    font-size: var(--yuzi-qq-contact-search-size);
+    font-weight: var(--yuzi-qq-contact-search-weight);
+    line-height: var(--yuzi-qq-contact-search-line-height);
+}
+
+.yuzi-qq-contact-root-search .yuzi-qq-search-icon {
+    font-size: var(--yuzi-qq-contact-search-size);
+}
+
+.yuzi-qq-search-icon {
+    color: var(--yuzi-qq-icon);
+    font-size: var(--yuzi-qq-row-preview-size);
+}
+
+.yuzi-qq-conversation-list,
+.yuzi-qq-contact-list,
+.yuzi-qq-settings-list {
+    gap: var(--yuzi-qq-square-radius);
+    background: var(--yuzi-qq-list-surface);
+}
+
+.yuzi-qq-swipe-row {
+    border-radius: var(--yuzi-qq-square-radius);
+}
+
+.yuzi-qq-conversation-row,
+.yuzi-qq-contact-row,
+.yuzi-qq-contact-utility {
+    min-block-size: var(--yuzi-qq-conversation-row-height);
+    padding-block: var(--yuzi-qq-conversation-row-padding-block);
+    padding-inline: var(--yuzi-qq-conversation-row-padding-inline);
+    gap: var(--yuzi-qq-conversation-row-gap);
+    border-radius: var(--yuzi-qq-square-radius);
+    border-block-end: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-list-surface);
+}
+
+.yuzi-qq-contact-utility {
+    min-block-size: var(--yuzi-qq-contact-utility-row-height);
+}
+
+.yuzi-qq-conversation-row {
+    z-index: var(--yuzi-qq-nav-z-index);
+    transition: transform var(--yuzi-qq-transition);
+}
+
+.yuzi-qq-swipe-row.is-swiped {
+    --yuzi-qq-swipe-offset: calc(var(--yuzi-qq-swipe-reveal-width) * -1);
+}
+
+.yuzi-qq-swipe-delete {
+    inline-size: var(--yuzi-qq-swipe-reveal-width);
+    border-radius: var(--yuzi-qq-swipe-reveal-radius);
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-danger);
+}
+
+.yuzi-qq-avatar {
+    flex-basis: var(--yuzi-qq-conversation-avatar-size);
+    inline-size: var(--yuzi-qq-conversation-avatar-size);
+    block-size: var(--yuzi-qq-conversation-avatar-size);
+    color: var(--yuzi-qq-avatar-ink);
+    background: var(--yuzi-qq-avatar-surface);
+}
+
+.yuzi-qq-row-main {
+    gap: var(--yuzi-qq-square-radius);
+}
+
+.yuzi-qq-row-title,
+.yuzi-qq-contact-name {
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-row-title-size);
+    font-weight: var(--yuzi-qq-row-title-weight);
+    line-height: var(--yuzi-qq-row-title-line-height);
+}
+
+.yuzi-qq-contact-name {
+    font-size: var(--yuzi-qq-contact-primary-size);
+    font-weight: var(--yuzi-qq-contact-primary-weight);
+    line-height: var(--yuzi-qq-contact-primary-line-height);
+}
+
+.yuzi-qq-row-preview,
+.yuzi-qq-contact-presence {
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-row-preview-size);
+    font-weight: var(--yuzi-qq-body-weight);
+    line-height: var(--yuzi-qq-row-preview-line-height);
+}
+
+.yuzi-qq-contact-presence {
+    font-size: var(--yuzi-qq-contact-secondary-size);
+    font-weight: var(--yuzi-qq-contact-secondary-weight);
+    line-height: var(--yuzi-qq-contact-secondary-line-height);
+}
+
+.yuzi-qq-row-meta {
+    inline-size: var(--yuzi-qq-conversation-meta-width);
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-caption-size);
+    font-weight: var(--yuzi-qq-body-weight);
+    line-height: var(--yuzi-qq-caption-line-height);
+}
+
+.yuzi-qq-badge {
+    min-inline-size: var(--yuzi-qq-root-action-size);
+    min-block-size: var(--yuzi-qq-root-action-size);
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-unread);
+    font-size: var(--yuzi-qq-caption-size);
+}
+
+.yuzi-qq-contact-utility-icon,
+.yuzi-qq-contact-utility-arrow {
+    color: var(--yuzi-qq-icon);
+}
+
+.yuzi-qq-contact-utility-label {
+    flex: 1 1 auto;
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-contact-primary-size);
+    font-weight: var(--yuzi-qq-contact-primary-weight);
+    line-height: var(--yuzi-qq-contact-primary-line-height);
+}
+
+/* Chat has its own 62 + 8 + 54 top structure and a full-width composer. */
+.yuzi-qq-chat-view {
+    padding-block-start: calc(var(--yuzi-qq-safe-top) + var(--yuzi-qq-detail-top-gap));
+    background: var(--yuzi-qq-page);
+}
+
+.yuzi-qq-chat-header {
+    display: flex;
+    flex: 0 0 var(--yuzi-qq-chat-header-height);
+    align-items: center;
+    min-block-size: var(--yuzi-qq-chat-header-height);
+    padding-inline: var(--yuzi-qq-chat-header-padding-inline);
+    gap: var(--yuzi-qq-chat-header-gap);
+    background: var(--yuzi-qq-chat-header-surface);
+}
+
+.yuzi-qq-chat-heading-copy {
+    gap: var(--yuzi-qq-square-radius);
+}
+
+.yuzi-qq-chat-title {
+    margin: var(--yuzi-qq-square-radius);
+    overflow: hidden;
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-chat-title-size);
+    font-weight: var(--yuzi-qq-chat-title-weight);
+    line-height: var(--yuzi-qq-chat-title-line-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yuzi-qq-chat-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--yuzi-qq-tool-gap);
+}
+
+.yuzi-qq-header-avatar,
+.yuzi-qq-message-avatar {
+    flex-basis: var(--yuzi-qq-chat-avatar-size);
+    inline-size: var(--yuzi-qq-chat-avatar-size);
+    block-size: var(--yuzi-qq-chat-avatar-size);
+}
+
+.yuzi-qq-message-stream {
+    gap: var(--yuzi-qq-chat-gap);
+    padding-block: var(--yuzi-qq-message-stream-padding-block);
+    padding-inline: var(--yuzi-qq-message-stream-padding-inline);
+    background: var(--yuzi-qq-page);
+}
+
+.yuzi-qq-message {
+    gap: var(--yuzi-qq-message-gap);
+}
+
+.yuzi-qq-message.is-self {
+    margin-inline-start: auto;
+}
+
+.yuzi-qq-message-stack {
+    max-inline-size: var(--yuzi-qq-chat-bubble-max-width);
+    gap: var(--yuzi-qq-message-gap);
+}
+
+.yuzi-qq-message-bubble,
+.yuzi-qq-voice-message,
+.yuzi-qq-narrative-card,
+.yuzi-qq-transfer-card,
+.yuzi-qq-sticker-message {
+    max-inline-size: var(--yuzi-qq-chat-bubble-max-width);
+    gap: var(--yuzi-qq-tool-gap);
+    padding: var(--yuzi-qq-bubble-padding-block) var(--yuzi-qq-bubble-padding-inline);
+    border-radius: var(--yuzi-qq-bubble-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-bubble-other);
+    box-shadow: none;
+    font-size: var(--yuzi-qq-body-size);
+    font-weight: var(--yuzi-qq-body-weight);
+    line-height: var(--yuzi-qq-body-line-height);
+}
+
+.yuzi-qq-message.is-self .yuzi-qq-message-bubble,
+.yuzi-qq-message.is-self .yuzi-qq-voice-message,
+.yuzi-qq-message.is-self .yuzi-qq-narrative-card,
+.yuzi-qq-message.is-self .yuzi-qq-transfer-card,
+.yuzi-qq-message.is-self .yuzi-qq-sticker-message {
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-bubble-self);
+}
+
+.yuzi-qq-quote,
+.yuzi-qq-quote-preview {
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-caption-size);
+    font-weight: var(--yuzi-qq-body-weight);
+    line-height: var(--yuzi-qq-caption-line-height);
+}
+
+.yuzi-qq-time-divider,
+.yuzi-qq-system-message {
+    color: var(--yuzi-qq-muted);
+    background: var(--yuzi-qq-tab-surface);
+    font-size: var(--yuzi-qq-time-divider-size);
+    font-weight: var(--yuzi-qq-body-weight);
+    line-height: var(--yuzi-qq-caption-line-height);
+}
+
+.yuzi-qq-retry-button {
+    inline-size: var(--yuzi-qq-root-action-size);
+    block-size: var(--yuzi-qq-root-action-size);
+    color: var(--yuzi-qq-danger);
+    background: var(--yuzi-qq-composer-surface);
+}
+
+.yuzi-qq-composer {
+    flex: 0 0 var(--yuzi-qq-composer-height);
+    min-block-size: var(--yuzi-qq-composer-height);
+    padding-block: var(--yuzi-qq-composer-padding-block);
+    padding-inline: var(--yuzi-qq-composer-padding-inline);
+    gap: var(--yuzi-qq-composer-gap);
+    border: none;
+    border-radius: var(--yuzi-qq-square-radius);
+    background: var(--yuzi-qq-composer-surface);
+}
+
+.yuzi-qq-composer-input {
+    min-block-size: var(--yuzi-qq-composer-input-height);
+    padding-inline: var(--yuzi-qq-search-padding-inline);
+    padding-block: var(--yuzi-qq-square-radius);
+    border: none;
+    border-radius: var(--yuzi-qq-search-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-elevated);
+    font-size: var(--yuzi-qq-body-size);
+    font-weight: var(--yuzi-qq-composer-weight);
+    line-height: var(--yuzi-qq-composer-line-height);
+    resize: none;
+}
+
+.yuzi-qq-tool-bar {
+    min-block-size: var(--yuzi-qq-tool-bar-height);
+    justify-content: space-between;
+    gap: var(--yuzi-qq-square-radius);
+}
+
+.yuzi-qq-tool-button {
+    flex: 0 0 var(--yuzi-qq-tool-size);
+    inline-size: var(--yuzi-qq-tool-size);
+    block-size: var(--yuzi-qq-tool-size);
+    border-radius: var(--yuzi-phone-radius-pill);
+    color: var(--yuzi-qq-icon);
+    font-size: var(--yuzi-qq-tool-icon-size);
+    line-height: var(--yuzi-qq-tool-icon-size);
+}
+
+.yuzi-qq-emoji-panel {
+    inset-block-end: var(--yuzi-qq-emoji-panel-bottom);
+    max-block-size: var(--yuzi-qq-emoji-panel-height);
+    gap: var(--yuzi-qq-emoji-panel-gap);
+    padding: var(--yuzi-qq-emoji-panel-padding);
+    border-block-start: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    background: var(--yuzi-qq-list-surface);
+    box-shadow: var(--yuzi-qq-shadow-dialog);
+}
+
+.yuzi-qq-emoji-item {
+    border-radius: var(--yuzi-qq-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-composer-surface);
+    font-size: var(--yuzi-qq-row-preview-size);
+    line-height: var(--yuzi-qq-row-preview-line-height);
+}
+
+.yuzi-qq-jump-button,
+.yuzi-qq-jump-bubble {
+    inline-size: var(--yuzi-qq-jump-width);
+    block-size: var(--yuzi-qq-jump-height);
+    inset-inline-end: var(--yuzi-qq-page-padding);
+    inset-block-end: var(--yuzi-qq-jump-bottom);
+    gap: var(--yuzi-qq-jump-gap);
+    border-radius: var(--yuzi-qq-jump-radius);
+    color: var(--yuzi-qq-accent);
+    background: var(--yuzi-qq-elevated);
+    box-shadow: var(--yuzi-qq-shadow);
+    font-size: var(--yuzi-qq-caption-size);
+    line-height: var(--yuzi-qq-caption-line-height);
+}
+
+.yuzi-qq-jump-icon {
+    font-size: var(--yuzi-qq-row-preview-size);
+}
+
+/* Profile information sheet and bottom three-action bar. */
+.yuzi-qq-profile-view {
+    padding-block-start: calc(var(--yuzi-qq-safe-top) + var(--yuzi-qq-detail-top-gap));
+    background: var(--yuzi-qq-page);
+}
+
+.yuzi-qq-profile-sheet {
+    margin-inline: var(--yuzi-qq-page-padding);
+    border-radius: var(--yuzi-qq-profile-sheet-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-elevated);
+}
+
+.yuzi-qq-profile-view > .yuzi-qq-profile-sheet:not(.yuzi-qq-profile-editor-sheet) {
+    margin-block-start: var(--yuzi-qq-profile-sheet-offset);
+}
+
+.yuzi-qq-profile-row {
+    min-block-size: var(--yuzi-qq-profile-row-height);
+    padding-inline: var(--yuzi-qq-profile-row-padding-inline);
+    gap: var(--yuzi-qq-profile-row-gap);
+}
+
+.yuzi-qq-avatar-large {
+    flex-basis: var(--yuzi-qq-profile-avatar-size);
+    inline-size: var(--yuzi-qq-profile-avatar-size);
+    block-size: var(--yuzi-qq-profile-avatar-size);
+}
+
+.yuzi-qq-profile-name {
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-profile-name-size);
+    font-weight: var(--yuzi-qq-profile-name-weight);
+    line-height: var(--yuzi-qq-profile-name-line-height);
+    text-align: start;
+}
+
+.yuzi-qq-profile-status {
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-profile-copy-size);
+    font-weight: var(--yuzi-qq-profile-summary-weight);
+    line-height: var(--yuzi-qq-profile-copy-line-height);
+    text-align: start;
+}
+
+.yuzi-qq-profile-actions,
+.yuzi-qq-profile-action-bar {
+    display: grid;
+    flex: 0 0 var(--yuzi-qq-profile-action-bar-height);
+    grid-template-columns: repeat(3, minmax(var(--yuzi-qq-square-radius), 1fr));
+    min-block-size: var(--yuzi-qq-profile-action-bar-height);
+    margin-block-start: auto;
+    padding-block-start: var(--yuzi-qq-profile-action-padding-top);
+    padding-block-end: var(--yuzi-qq-profile-action-padding-bottom);
+    padding-inline: var(--yuzi-qq-profile-action-padding-inline);
+    gap: var(--yuzi-qq-profile-action-gap);
+    background: var(--yuzi-qq-tab-surface);
+}
+
+.yuzi-qq-profile-action-bar > .yuzi-qq-primary-button,
+.yuzi-qq-profile-action-bar > .yuzi-qq-secondary-button,
+.yuzi-qq-profile-action-bar > .yuzi-qq-danger-button {
+    min-block-size: var(--yuzi-qq-square-radius);
+    padding-inline: var(--yuzi-qq-square-radius);
+    border-radius: var(--yuzi-qq-profile-action-radius);
+    font-size: var(--yuzi-qq-profile-action-size);
+    font-weight: var(--yuzi-qq-profile-action-weight);
+    line-height: var(--yuzi-qq-profile-action-line-height);
+}
+
+.yuzi-qq-profile-editor-sheet {
+    margin-block-start: var(--yuzi-qq-square-radius);
+    padding: var(--yuzi-qq-editor-group-padding-block) var(--yuzi-qq-editor-group-padding-inline);
+    gap: var(--yuzi-qq-editor-group-padding-block);
+    border-radius: var(--yuzi-qq-editor-group-radius);
+}
+
+/* QQ settings follows the profile/edit sheet family, with Figma's distinct page skin. */
+.yuzi-qq-settings-view {
+    background: var(--yuzi-qq-settings-page);
+}
+
+.yuzi-qq-settings-view > .yuzi-qq-header {
+    background: var(--yuzi-qq-settings-page);
+}
+
+.yuzi-qq-settings-sheet {
+    margin-inline: var(--yuzi-qq-page-padding);
+    padding: var(--yuzi-qq-settings-group-padding-block) var(--yuzi-qq-settings-group-padding-inline);
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-settings-outline);
+    border-radius: var(--yuzi-qq-settings-group-radius);
+    background: var(--yuzi-qq-settings-group);
+}
+
+.yuzi-qq-settings-list {
+    overflow: hidden;
+    border-radius: var(--yuzi-qq-settings-detail-group-radius);
+    background: var(--yuzi-qq-settings-group);
+}
+
+.yuzi-qq-setting-row {
+    min-block-size: var(--yuzi-qq-conversation-row-height);
+    padding-block: var(--yuzi-qq-settings-group-padding-block);
+    padding-inline: var(--yuzi-qq-settings-group-padding-inline);
+    border-radius: var(--yuzi-qq-square-radius);
+    border-block-end: var(--yuzi-qq-line-width) solid var(--yuzi-qq-settings-outline);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-settings-group);
+    font-size: var(--yuzi-qq-row-title-size);
+    line-height: var(--yuzi-qq-row-title-line-height);
+}
+
+.yuzi-qq-setting-arrow {
+    color: var(--yuzi-qq-weak);
+}
+
+/* Forms and shared modal frame. */
+.yuzi-qq-form,
+.yuzi-qq-dialog-form {
+    gap: var(--yuzi-qq-dialog-gap);
+}
+
+.yuzi-qq-field {
+    gap: var(--yuzi-qq-tool-gap);
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-row-preview-size);
+    line-height: var(--yuzi-qq-row-preview-line-height);
+}
+
+.yuzi-qq-field input,
+.yuzi-qq-field select,
+.yuzi-qq-dialog-form input,
+.yuzi-qq-dialog-form textarea {
+    min-block-size: var(--yuzi-qq-dialog-input-height);
+    padding-inline: var(--yuzi-qq-search-padding-inline);
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    border-radius: var(--yuzi-qq-search-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-input);
+}
+
+.yuzi-qq-primary-button,
+.yuzi-qq-secondary-button,
+.yuzi-qq-danger-button {
+    min-block-size: var(--yuzi-qq-dialog-action-height);
+    border-radius: var(--yuzi-qq-radius);
+}
+
+.yuzi-qq-primary-button {
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-accent);
+}
+
+.yuzi-qq-secondary-button {
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-control);
+}
+
+.yuzi-qq-danger-button {
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-danger);
+}
+
+.yuzi-qq-overlay {
+    padding: var(--yuzi-qq-page-padding);
+    background: var(--yuzi-qq-overlay);
+}
+
+.yuzi-qq-dialog {
+    inline-size: var(--yuzi-qq-dialog-width);
+    gap: var(--yuzi-qq-dialog-gap);
+    padding: var(--yuzi-qq-dialog-padding);
+    border-radius: var(--yuzi-qq-radius-dialog);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-dialog-surface);
+    box-shadow: var(--yuzi-qq-shadow-dialog);
+}
+
+.yuzi-qq-dialog-title {
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-root-title-size);
+    font-weight: var(--yuzi-qq-title-weight);
+    line-height: var(--yuzi-qq-root-title-line-height);
+}
+
+.yuzi-qq-dialog-menu {
+    align-self: center;
+    inline-size: var(--yuzi-qq-dialog-menu-width);
+    min-block-size: var(--yuzi-qq-dialog-menu-height);
+    gap: var(--yuzi-qq-dialog-menu-gap);
+    border-radius: var(--yuzi-qq-radius);
+    background: var(--yuzi-qq-line);
+}
+
+.yuzi-qq-dialog-menu-item {
+    min-block-size: var(--yuzi-qq-dialog-action-height);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-dialog-muted);
+    font-size: var(--yuzi-qq-row-preview-size);
+    line-height: var(--yuzi-qq-row-preview-line-height);
+}
+
+.yuzi-qq-dialog-illustration {
+    inline-size: var(--yuzi-qq-dialog-illustration-size);
+    block-size: var(--yuzi-qq-dialog-illustration-size);
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-danger);
+}
+
+.yuzi-qq-assistant-view {
+    background: var(--yuzi-qq-page);
+}
+
+.yuzi-qq-background-preview {
+    border-radius: var(--yuzi-qq-editor-group-radius);
+    color: var(--yuzi-qq-text);
+    background-color: var(--yuzi-qq-control);
+}
+
+::selection {
+    background: var(--yuzi-qq-text-selection-color);
+}
+
+.yuzi-qq-tool-bar {
+    justify-content: flex-start;
+    gap: var(--yuzi-qq-tool-gap);
+}
+
+
+/* Figma 02 production layer. */
+.yuzi-qq-app,
+.yuzi-qq-view {
+    background: var(--yuzi-qq-page);
+}
+
+.yuzi-qq-identity-header {
+    background: var(--yuzi-qq-page);
+}
+
+.yuzi-qq-identity-avatar {
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-accent);
+}
+
+.yuzi-qq-identity-status,
+.yuzi-qq-chat-status {
+    gap: var(--yuzi-qq-status-inline-gap);
+}
+
+.yuzi-qq-nav-item {
+    gap: var(--yuzi-qq-nav-item-gap);
+}
+
+.yuzi-qq-list-sheet {
+    overflow: hidden;
+    border-radius: var(--yuzi-qq-list-sheet-radius);
+}
+
+.yuzi-qq-search,
+.yuzi-qq-chat-header-actions {
+    gap: var(--yuzi-qq-inline-gap);
+}
+
+.yuzi-qq-row-main {
+    gap: var(--yuzi-qq-row-copy-gap);
+}
+
+.yuzi-qq-row-meta {
+    gap: var(--yuzi-qq-row-meta-gap);
+}
+
+.yuzi-qq-badge {
+    padding-inline: var(--yuzi-qq-badge-padding-inline);
+}
+
+.yuzi-qq-chat-header {
+    padding-inline-start: var(--yuzi-qq-chat-header-padding-inline-start);
+    padding-inline-end: var(--yuzi-qq-chat-header-padding-inline-end);
+}
+
+.yuzi-qq-message-bubble,
+.yuzi-qq-voice-message,
+.yuzi-qq-narrative-card,
+.yuzi-qq-transfer-card,
+.yuzi-qq-sticker-message {
+    gap: var(--yuzi-qq-bubble-content-gap);
+}
+
+.yuzi-qq-system-message {
+    padding-block: var(--yuzi-qq-system-message-padding-block);
+}
+
+.yuzi-qq-message.yuzi-qq-system-message-row {
+    align-items: center;
+    justify-content: center;
+}
+
+.yuzi-qq-message-selection-bar {
+    justify-content: center;
+    gap: var(--yuzi-qq-inline-gap);
+    border-block-start: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+}
+
+.yuzi-qq-message-selection-primary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--yuzi-qq-inline-gap);
+    inline-size: 100%;
+}
+
+.yuzi-qq-message-selection-status {
+    min-inline-size: 0;
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-caption-size);
+    font-weight: var(--yuzi-qq-body-weight);
+    line-height: var(--yuzi-qq-caption-line-height);
+}
+
+.yuzi-qq-message-selection-injection-action {
+    min-block-size: var(--yuzi-qq-message-selection-action-size);
+    padding-inline: var(--yuzi-qq-message-selection-injection-padding-inline);
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-accent);
+    border-radius: var(--yuzi-qq-radius-12);
+    color: var(--yuzi-qq-accent);
+    background: var(--yuzi-qq-content-surface);
+    font-size: var(--yuzi-qq-caption-size);
+    font-weight: 600;
+    line-height: var(--yuzi-qq-caption-line-height);
+    white-space: nowrap;
+}
+
+.yuzi-qq-message-selection-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--yuzi-qq-inline-gap);
+    inline-size: 100%;
+}
+
+.yuzi-qq-message-selection-action {
+    display: grid;
+    min-inline-size: 0;
+    block-size: var(--yuzi-qq-message-selection-action-size);
+    place-items: center;
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    border-radius: var(--yuzi-qq-radius-12);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-content-surface);
+    font-size: var(--yuzi-qq-message-selection-icon-size);
+    line-height: var(--yuzi-qq-message-selection-icon-size);
+}
+
+.yuzi-qq-message-selection-action.is-danger {
+    border-color: var(--yuzi-qq-danger);
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-danger);
+}
+
+.yuzi-qq-quote-preview {
+    gap: var(--yuzi-qq-quote-preview-gap);
+}
+
+.yuzi-qq-composer {
+    padding-block: var(--yuzi-qq-composer-padding-block-start) var(--yuzi-qq-composer-padding-block-end);
+}
+
+.yuzi-qq-composer-input {
+    padding-inline: var(--yuzi-qq-composer-input-padding-inline);
+    background: var(--yuzi-qq-content-surface);
+}
+
+.yuzi-qq-tool-bar {
+    justify-content: flex-start;
+    gap: var(--yuzi-qq-tool-interval);
+}
+
+.yuzi-qq-emoji-item {
+    padding: var(--yuzi-qq-emoji-item-padding);
+}
+
+.yuzi-qq-jump-button,
+.yuzi-qq-jump-bubble {
+    padding: var(--yuzi-qq-jump-padding);
+    border: var(--yuzi-qq-jump-border-width) solid var(--yuzi-qq-line);
+    border-radius: var(--yuzi-qq-jump-radius);
+    font-size: var(--yuzi-qq-jump-label-size);
+    line-height: var(--yuzi-qq-jump-label-size);
+}
+
+.yuzi-qq-jump-icon {
+    inline-size: var(--yuzi-qq-jump-icon-size);
+    block-size: var(--yuzi-qq-jump-icon-size);
+    font-size: var(--yuzi-qq-jump-icon-size);
+    line-height: var(--yuzi-qq-jump-icon-size);
+}
+
+.yuzi-qq-profile-view > .yuzi-qq-profile-sheet:not(.yuzi-qq-profile-editor-sheet) {
+    margin-inline: var(--yuzi-qq-square-radius);
+}
+
+.yuzi-qq-profile-sheet {
+    border-radius: var(--yuzi-qq-profile-sheet-radius);
+    background: var(--yuzi-qq-list-surface);
+}
+
+.yuzi-qq-profile-editor-sheet {
+    margin-inline: var(--yuzi-qq-page-padding);
+    padding: var(--yuzi-qq-editor-group-padding-block) var(--yuzi-qq-editor-group-padding-inline);
+    gap: var(--yuzi-qq-form-group-gap);
+    border-radius: var(--yuzi-qq-editor-group-radius);
+    background: var(--yuzi-qq-content-surface);
+}
+
+.yuzi-qq-profile-action-bar {
+    padding-block-end: var(--yuzi-qq-profile-action-padding-bottom);
+    background: var(--yuzi-qq-content-surface);
+}
+
+.yuzi-qq-settings-view,
+.yuzi-qq-settings-root-view,
+.yuzi-qq-settings-detail-view {
+    background: var(--yuzi-qq-settings-page);
+}
+
+.yuzi-qq-settings-root-view {
+    padding: var(--yuzi-qq-safe-top) 0 var(--yuzi-qq-page-padding);
+    gap: 0;
+}
+
+.yuzi-qq-settings-root-view > .yuzi-qq-settings-root-header {
+    min-block-size: var(--yuzi-qq-settings-root-title-height);
+    background: var(--yuzi-qq-content-surface);
+}
+
+.yuzi-qq-settings-root-title {
+    margin: 0;
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-settings-root-title-size);
+    font-weight: var(--yuzi-qq-settings-root-title-weight);
+    line-height: var(--yuzi-qq-settings-root-title-line-height);
+}
+
+.yuzi-qq-settings-root-groups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yuzi-qq-settings-root-stack-gap);
+    margin: var(--yuzi-qq-settings-root-scroll-padding-inline);
+}
+
+.yuzi-qq-settings-root-view .yuzi-qq-settings-sheet,
+.yuzi-qq-settings-root-sheet {
+    inline-size: 100%;
+    max-inline-size: var(--yuzi-qq-settings-root-group-width);
+    margin-inline: 0;
+    padding: var(--yuzi-qq-settings-root-group-padding-block-start) var(--yuzi-qq-settings-root-group-padding-inline-end) var(--yuzi-qq-settings-root-group-padding-block-end) var(--yuzi-qq-settings-root-group-padding-inline-start);
+    overflow: hidden;
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-settings-outline);
+    border-radius: var(--yuzi-qq-settings-root-group-radius);
+    background: var(--yuzi-qq-settings-group);
+}
+
+.yuzi-qq-settings-root-view .yuzi-qq-settings-list,
+.yuzi-qq-settings-root-list {
+    gap: 0;
+    overflow: visible;
+    border-radius: 0;
+    background: transparent;
+}
+
+.yuzi-qq-settings-root-view .yuzi-qq-setting-row,
+.yuzi-qq-settings-root-row {
+    min-block-size: var(--yuzi-qq-settings-row-min-height);
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: var(--yuzi-qq-settings-group);
+    font-size: var(--yuzi-qq-settings-row-size);
+    font-weight: var(--yuzi-qq-settings-row-weight);
+    line-height: var(--yuzi-qq-settings-row-line-height);
+}
+
+.yuzi-qq-settings-root-row + .yuzi-qq-settings-root-row {
+    margin-block-start: var(--yuzi-qq-settings-root-group-gap);
+    padding-block-start: var(--yuzi-qq-settings-root-group-gap);
+    border-block-start: var(--yuzi-qq-line-width) solid var(--yuzi-qq-settings-outline);
+}
+
+.yuzi-qq-settings-root-label {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+}
+
+.yuzi-qq-settings-root-arrow {
+    display: grid;
+    flex: 0 0 var(--yuzi-qq-settings-root-arrow-size);
+    inline-size: var(--yuzi-qq-settings-root-arrow-size);
+    block-size: var(--yuzi-qq-settings-root-arrow-size);
+    place-items: center;
+    overflow: visible;
+}
+
+.yuzi-qq-settings-detail-view {
+    padding-block-start: calc(var(--yuzi-qq-safe-top) + var(--yuzi-qq-settings-detail-scroll-padding-top));
+    padding-inline: var(--yuzi-qq-settings-detail-scroll-padding-inline);
+    gap: var(--yuzi-qq-settings-detail-scroll-gap);
+}
+
+.yuzi-qq-settings-detail-view .yuzi-qq-settings-sheet,
+.yuzi-qq-settings-detail-sheet {
+    margin-inline: var(--yuzi-qq-square-radius);
+    padding: var(--yuzi-qq-settings-detail-card-padding-block) var(--yuzi-qq-settings-detail-card-padding-inline);
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-settings-outline);
+    border-radius: var(--yuzi-qq-settings-detail-card-radius);
+    background: var(--yuzi-qq-settings-group);
+}
+
+.yuzi-qq-settings-detail-view .yuzi-qq-settings-list,
+.yuzi-qq-settings-detail-list {
+    gap: var(--yuzi-qq-form-group-gap);
+    border-radius: var(--yuzi-qq-settings-detail-group-radius);
+}
+
+.yuzi-qq-settings-detail-view .yuzi-qq-field,
+.yuzi-qq-settings-detail-view .yuzi-qq-field input,
+.yuzi-qq-settings-detail-view .yuzi-qq-field select {
+    gap: var(--yuzi-qq-form-group-gap);
+    font-size: var(--yuzi-qq-settings-detail-field-label-size);
+    font-weight: var(--yuzi-qq-settings-detail-field-label-weight);
+    line-height: var(--yuzi-qq-settings-detail-field-label-line-height);
+}
+
+.yuzi-qq-field {
+    gap: var(--yuzi-qq-form-group-gap);
+}
+
+.yuzi-qq-dialog-menu {
+    padding: var(--yuzi-qq-dialog-menu-padding);
+    gap: var(--yuzi-qq-dialog-menu-row-gap);
+    border-radius: var(--yuzi-qq-dialog-menu-radius);
+    background: var(--yuzi-qq-menu);
+}
+
+.yuzi-qq-dialog-menu-item {
+    min-block-size: var(--yuzi-qq-dialog-menu-row-height);
+}
+
+
+.yuzi-qq-settings-list {
+    border-radius: var(--yuzi-qq-settings-detail-card-radius);
+}
+
+
+/* Figma 02 root-page detail mappings. */
+.yuzi-qq-search {
+    justify-content: center;
+}
+
+.yuzi-qq-message-add-menu-item {
+    min-block-size: var(--yuzi-qq-dialog-menu-row-height);
+    background: transparent;
+}
+
+.yuzi-qq-dialog-menu.yuzi-qq-message-add-menu {
+    gap: 0;
+    background: var(--yuzi-qq-dialog-surface);
+}
+
+.yuzi-qq-contact-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yuzi-qq-square-radius);
+    background: var(--yuzi-qq-list-surface);
+}
+
+.yuzi-qq-contact-section-label {
+    padding-inline: var(--yuzi-qq-page-padding);
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-contact-index-size);
+    font-weight: var(--yuzi-qq-contact-index-weight);
+    line-height: var(--yuzi-qq-contact-index-line-height);
+}
+
+.yuzi-qq-contact-section-list {
+    display: flex;
+    flex-direction: column;
+    background: var(--yuzi-qq-list-surface);
+}
+
+.yuzi-qq-assistant-empty {
+    flex: 1 1 auto;
+    background: var(--yuzi-qq-list-surface);
+}
+
+/* QQ Figma refinement: profile, settings, and media library. */
+.yuzi-qq-nav-item {
+    color: var(--yuzi-qq-icon);
+}
+
+.yuzi-qq-profile-content-sheet {
+    background: var(--yuzi-qq-list-surface);
+}
+
+.yuzi-qq-profile-actions > :only-child,
+.yuzi-qq-profile-action-bar > :only-child {
+    grid-column: 1 / -1;
+}
+
+.yuzi-qq-profile-editor-view {
+    padding-block-start: var(--yuzi-qq-safe-top);
+    padding-inline: 0;
+    gap: 0;
+    background: var(--yuzi-qq-deep-page);
+}
+
+.yuzi-qq-conversation-settings-view {
+    padding-block-start: var(--yuzi-qq-safe-top);
+    padding-inline: 0;
+    gap: 0;
+    background: var(--yuzi-qq-deep-page);
+}
+
+.yuzi-qq-image-library-view {
+    padding-block-start: var(--yuzi-qq-safe-top);
+    padding-inline: 0;
+    gap: 0;
+    background: var(--yuzi-qq-settings-page);
+}
+
+.yuzi-qq-profile-editor-header {
+    position: sticky;
+}
+
+.yuzi-qq-settings-detail-header {
+    position: sticky;
+}
+
+.yuzi-qq-conversation-settings-header {
+    position: sticky;
+}
+
+.yuzi-qq-image-library-header {
+    position: sticky;
+}
+
+.yuzi-qq-profile-editor-header,
+.yuzi-qq-conversation-settings-header {
+    inset-block-start: 0;
+    z-index: var(--yuzi-qq-nav-z-index);
+    flex: 0 0 var(--yuzi-qq-header-height);
+    min-block-size: var(--yuzi-qq-header-height);
+    padding-inline: var(--yuzi-qq-page-padding);
+    background: var(--yuzi-qq-content-surface);
+}
+
+.yuzi-qq-settings-detail-header,
+.yuzi-qq-image-library-header {
+    inset-block-start: 0;
+    z-index: var(--yuzi-qq-nav-z-index);
+    flex: 0 0 var(--yuzi-qq-header-height);
+    min-block-size: var(--yuzi-qq-header-height);
+    padding-inline: var(--yuzi-qq-page-padding);
+    background: var(--yuzi-qq-settings-page);
+}
+
+.yuzi-qq-profile-editor-group,
+.yuzi-qq-conversation-settings-form,
+.yuzi-qq-image-library-group {
+    margin-inline: var(--yuzi-qq-page-padding);
+    padding: var(--yuzi-qq-editor-group-padding-block) var(--yuzi-qq-editor-group-padding-inline);
+    border-radius: var(--yuzi-qq-editor-group-radius);
+    background: var(--yuzi-qq-content-surface);
+}
+
+.yuzi-qq-profile-editor-group,
+.yuzi-qq-conversation-settings-form {
+    gap: var(--yuzi-qq-form-group-gap);
+}
+
+.yuzi-qq-settings-detail-sheet {
+    background: var(--yuzi-qq-settings-group);
+}
+
+.yuzi-qq-settings-detail-view .yuzi-qq-field,
+.yuzi-qq-conversation-settings-view .yuzi-qq-field,
+.yuzi-qq-profile-editor-view .yuzi-qq-field {
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-editor-field-size);
+    font-weight: var(--yuzi-qq-editor-field-weight);
+    line-height: var(--yuzi-qq-editor-field-line-height);
+}
+
+.yuzi-qq-image-library-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--yuzi-qq-avatar-size), 1fr));
+    gap: var(--yuzi-qq-row-gap);
+}
+
+.yuzi-qq-image-library-item {
+    position: relative;
+    display: grid;
+    overflow: hidden;
+    aspect-ratio: 1;
+    place-items: center;
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    border-radius: var(--yuzi-qq-editor-group-radius);
+    background: var(--yuzi-qq-control);
+}
+
+.yuzi-qq-image-library-item > img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+}
+
+.yuzi-qq-image-library-item.is-selected {
+    outline: var(--yuzi-qq-focus-ring-width) solid var(--yuzi-qq-accent);
+    outline-offset: calc(var(--yuzi-qq-focus-ring-width) * -1);
+}
+
+.yuzi-qq-image-library-upload-action {
+    color: var(--yuzi-qq-accent);
+}
+
+.yuzi-qq-image-library-delete-action {
+    color: var(--yuzi-qq-danger);
+}
+
+.yuzi-qq-image-library-header .yuzi-qq-header-actions {
+    gap: 0;
+}
+
+.yuzi-qq-image-library-pack-menu {
+    position: absolute;
+    inset-block-start: calc(var(--yuzi-qq-anchored-menu-top) + var(--yuzi-qq-message-add-menu-offset));
+    inset-inline-end: max(var(--yuzi-qq-page-padding), var(--yuzi-qq-anchored-menu-right));
+    inline-size: min(var(--yuzi-qq-dialog-menu-width), calc(100% - 2 * var(--yuzi-qq-page-padding)));
+    min-block-size: auto;
+    block-size: auto;
+    padding: var(--yuzi-qq-dialog-menu-padding);
+    border-radius: var(--yuzi-qq-dialog-menu-radius);
+    background: var(--yuzi-qq-dialog-surface);
+    box-shadow: var(--yuzi-qq-message-add-menu-shadow);
+}
+
+.yuzi-qq-image-library-pack-menu-item {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--yuzi-qq-dialog-menu-row-height);
+    gap: var(--yuzi-qq-inline-gap);
+}
+
+.yuzi-qq-settings-root-title {
+    margin: 0;
+}
+
+.yuzi-qq-settings-root-sheet {
+    margin-inline: 0;
+}
+
+.yuzi-qq-settings-detail-view {
+    padding-block-start: var(--yuzi-qq-safe-top);
+    padding-inline: 0;
+}
+
+.yuzi-qq-settings-detail-sheet {
+    margin-inline: var(--yuzi-qq-page-padding);
+    margin-block-start: var(--yuzi-qq-settings-detail-scroll-padding-top);
+}
+
+.yuzi-qq-profile-editor-sheet {
+    margin-block-start: var(--yuzi-qq-page-padding);
+}
+
+.yuzi-qq-conversation-settings-form {
+    margin-block-start: var(--yuzi-qq-page-padding);
+}
+
+.yuzi-qq-current-profile-view .yuzi-qq-profile-portrait {
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-accent);
+}
+
+.yuzi-qq-profile-summary {
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-profile-copy-size);
+    font-weight: var(--yuzi-qq-profile-summary-weight);
+    line-height: var(--yuzi-qq-profile-copy-line-height);
+}
+
+.yuzi-qq-profile-signature {
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-profile-copy-size);
+    font-weight: var(--yuzi-qq-profile-signature-weight);
+    line-height: var(--yuzi-qq-profile-copy-line-height);
+}
+
+.yuzi-qq-profile-background {
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+.yuzi-qq-profile-edit-view {
+    padding-block-start: var(--yuzi-qq-safe-top);
+    padding-inline: 0;
+    gap: 0;
+    background: var(--yuzi-qq-deep-page);
+}
+
+.yuzi-qq-profile-edit-card {
+    margin-inline: var(--yuzi-qq-page-padding);
+    padding: var(--yuzi-qq-editor-group-padding-block) var(--yuzi-qq-editor-group-padding-inline);
+    border-radius: var(--yuzi-qq-editor-group-radius);
+    background: var(--yuzi-qq-content-surface);
+}
+
+.yuzi-qq-image-library-card {
+    margin-inline: var(--yuzi-qq-page-padding);
+    padding: var(--yuzi-qq-editor-group-padding-block) var(--yuzi-qq-editor-group-padding-inline);
+    border-radius: var(--yuzi-qq-editor-group-radius);
+    background: var(--yuzi-qq-content-surface);
+}
+
+.yuzi-qq-image-library-view:not(.is-selection-mode) .yuzi-qq-image-library-delete-action {
+    display: none;
+}
+
+.yuzi-qq-image-library-view.is-selection-mode .yuzi-qq-image-library-pack-action {
+    display: none;
+}
+
+.yuzi-qq-image-library-view.is-selection-mode .yuzi-qq-image-library-delete-action {
+    display: inline-grid;
+}
+
+
+/* QQ Figma refinement: current-profile route details. */
+.yuzi-qq-current-profile-view.has-profile-background {
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+.yuzi-qq-current-profile-sheet {
+    background: var(--yuzi-qq-list-surface);
+}
+
+.yuzi-qq-current-profile-hero,
+.yuzi-qq-current-profile-summary-row,
+.yuzi-qq-current-profile-signature-row {
+    display: flex;
+    align-items: center;
+}
+
+.yuzi-qq-current-profile-hero .yuzi-qq-profile-name {
+    text-align: start;
+}
+
+.yuzi-qq-current-profile-summary-row,
+.yuzi-qq-current-profile-signature-row {
+    justify-content: space-between;
+}
+
+.yuzi-qq-profile-summary,
+.yuzi-qq-profile-signature {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    margin: 0;
+    text-align: start;
+}
+
+.yuzi-qq-profile-summary-arrow,
+.yuzi-qq-profile-signature-pencil {
+    flex: 0 0 auto;
+    color: var(--yuzi-qq-icon);
+}
+
+.yuzi-qq-current-profile-actions {
+    grid-template-columns: minmax(var(--yuzi-qq-square-radius), 1fr);
+}
+
+.yuzi-qq-current-profile-editor-form {
+    gap: var(--yuzi-qq-form-group-gap);
+}
+
+.yuzi-qq-current-profile-asset-field {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--yuzi-qq-text);
+}
+
+.yuzi-qq-current-profile-asset-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--yuzi-qq-inline-gap);
+}
+
+/* QQ secondary/chat headers consume the global phone navigation geometry. */
+.yuzi-qq-header.phone-nav-bar,
+.yuzi-qq-chat-header.phone-nav-bar {
+    display: grid;
+    grid-template-columns:
+        var(--yuzi-phone-nav-side-slot-width)
+        minmax(0, 1fr)
+        var(--yuzi-phone-nav-side-slot-width);
+    align-items: center;
+    box-sizing: border-box;
+    flex: 0 0 var(--yuzi-phone-nav-content-height);
+    min-block-size: var(--yuzi-phone-nav-content-height);
+    block-size: var(--yuzi-phone-nav-content-height);
+    padding: 0;
+    gap: 0;
+}
+
+.yuzi-qq-header.phone-nav-bar .phone-nav-leading,
+.yuzi-qq-header.phone-nav-bar .phone-nav-center,
+.yuzi-qq-header.phone-nav-bar .phone-nav-trailing,
+.yuzi-qq-chat-header.phone-nav-bar .phone-nav-leading,
+.yuzi-qq-chat-header.phone-nav-bar .phone-nav-center,
+.yuzi-qq-chat-header.phone-nav-bar .phone-nav-trailing {
+    min-inline-size: 0;
+    block-size: var(--yuzi-phone-nav-content-height);
+}
+
+.yuzi-qq-header.phone-nav-bar .yuzi-qq-header-actions,
+.yuzi-qq-chat-header.phone-nav-bar .yuzi-qq-chat-header-actions {
+    flex: none;
+    min-inline-size: 0;
+}
+
+.yuzi-qq-icon-button.phone-nav-icon-button {
+    inline-size: var(--yuzi-phone-nav-control-size);
+    block-size: var(--yuzi-phone-nav-control-size);
+    min-inline-size: var(--yuzi-phone-nav-control-size);
+    min-block-size: var(--yuzi-phone-nav-control-size);
+    border-radius: var(--yuzi-phone-nav-control-radius);
+    background: transparent;
+}
+
+.yuzi-qq-header.phone-nav-bar .phone-nav-title,
+.yuzi-qq-chat-header.phone-nav-bar .phone-nav-title {
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-phone-nav-title-font-size);
+    line-height: var(--yuzi-phone-nav-title-line-height);
+    font-weight: var(--yuzi-phone-nav-title-font-weight);
+    letter-spacing: 0;
+}
+
+.yuzi-qq-chat-header.phone-nav-bar .yuzi-qq-chat-title {
+    font-size: var(--yuzi-qq-chat-title-size);
+    font-weight: var(--yuzi-qq-chat-title-weight);
+    line-height: var(--yuzi-qq-chat-title-line-height);
+}
+
+.yuzi-qq-profile-editor-header .yuzi-qq-profile-editor-title,
+.yuzi-qq-settings-detail-header .yuzi-qq-settings-detail-title {
+    font-size: var(--yuzi-qq-editor-title-size);
+    font-weight: var(--yuzi-qq-editor-title-weight);
+    line-height: var(--yuzi-qq-editor-title-line-height);
+}
+
+.yuzi-qq-chat-header.phone-nav-bar .yuzi-qq-chat-heading-copy {
+    align-items: center;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    text-align: center;
+}
+
+/* QQ shared secondary/profile/chat layout contract. */
+:where(.yuzi-qq-app) [hidden] {
+    display: none !important;
+}
+
+.yuzi-qq-secondary-page {
+    --yuzi-qq-secondary-row-surface: var(--yuzi-qq-content-surface);
+    block-size: 100%;
+    min-block-size: 0;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    background: var(--yuzi-qq-secondary-top-surface);
+}
+
+.yuzi-qq-settings-detail-view.yuzi-qq-secondary-page {
+    --yuzi-qq-secondary-body-surface: var(--yuzi-qq-settings-page);
+    --yuzi-qq-secondary-row-surface: var(--yuzi-qq-settings-group);
+}
+
+.yuzi-qq-secondary-top {
+    position: relative;
+    z-index: var(--yuzi-qq-nav-z-index);
+    display: flex;
+    flex: 0 0 calc(var(--yuzi-qq-safe-top) + var(--yuzi-qq-secondary-header-height));
+    flex-direction: column;
+    min-block-size: calc(var(--yuzi-qq-safe-top) + var(--yuzi-qq-secondary-header-height));
+    padding-block-start: var(--yuzi-qq-safe-top);
+    background: var(--yuzi-qq-secondary-top-surface);
+}
+
+.yuzi-qq-secondary-top > :is(.yuzi-qq-header, .yuzi-qq-chat-header) {
+    position: static;
+    inset: auto;
+    flex: 0 0 var(--yuzi-qq-secondary-header-height);
+    min-block-size: var(--yuzi-qq-secondary-header-height);
+    block-size: var(--yuzi-qq-secondary-header-height);
+    background: transparent;
+}
+
+.yuzi-qq-secondary-scroll {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-block-size: 0;
+    gap: var(--yuzi-qq-secondary-content-gap);
+    padding: var(--yuzi-qq-secondary-content-padding);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--yuzi-qq-secondary-body-surface);
+}
+
+.yuzi-qq-secondary-content {
+    display: flex;
+    flex-direction: column;
+    inline-size: 100%;
+    min-block-size: min-content;
+    gap: var(--yuzi-qq-secondary-content-gap);
+}
+
+.yuzi-qq-conversation-settings-fields,
+.yuzi-qq-settings-proactive-fields {
+    display: contents;
+}
+
+.yuzi-qq-secondary-scroll > :is(
+    .yuzi-qq-settings-sheet,
+    .yuzi-qq-settings-detail-sheet,
+    .yuzi-qq-conversation-settings-form,
+    .yuzi-qq-profile-editor-sheet,
+    .yuzi-qq-profile-editor-form
+),
+.yuzi-qq-secondary-content > :is(
+    .yuzi-qq-settings-sheet,
+    .yuzi-qq-settings-detail-sheet,
+    .yuzi-qq-conversation-settings-form,
+    .yuzi-qq-profile-editor-sheet,
+    .yuzi-qq-profile-editor-form
+) {
+    inline-size: 100%;
+    margin: 0;
+    padding: 0;
+    gap: var(--yuzi-qq-secondary-content-gap);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.yuzi-qq-secondary-scroll :is(.yuzi-qq-settings-list, .yuzi-qq-settings-detail-list) {
+    gap: var(--yuzi-qq-secondary-content-gap);
+    overflow: visible;
+    border-radius: 0;
+    background: transparent;
+}
+
+.yuzi-qq-field-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: var(--yuzi-qq-secondary-row-min-height);
+    gap: var(--yuzi-qq-inline-gap);
+    padding: var(--yuzi-qq-secondary-row-padding-block) var(--yuzi-qq-secondary-row-padding-inline);
+    border: 0;
+    border-radius: var(--yuzi-qq-secondary-group-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-secondary-row-surface);
+}
+
+.yuzi-qq-field-row.is-control-stacked {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+}
+
+.yuzi-qq-field-label {
+    min-inline-size: 0;
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-editor-field-size);
+    font-weight: var(--yuzi-qq-editor-field-weight);
+    line-height: var(--yuzi-qq-editor-field-line-height);
+}
+
+.yuzi-qq-field-control {
+    justify-self: end;
+    min-inline-size: 0;
+    max-inline-size: var(--yuzi-qq-secondary-control-max-width);
+}
+
+.yuzi-qq-field-row.is-control-stacked .yuzi-qq-field-control {
+    grid-column: 1;
+    justify-self: stretch;
+    inline-size: 100%;
+    max-inline-size: none;
+}
+
+.yuzi-qq-field-row :is(input, select).yuzi-qq-field-control {
+    inline-size: auto;
+    min-block-size: var(--yuzi-qq-editor-field-line-height);
+    padding-block: 0;
+}
+
+.yuzi-qq-field-row.is-control-stacked :is(input, select).yuzi-qq-field-control {
+    inline-size: 100%;
+    min-block-size: var(--yuzi-qq-dialog-input-height);
+    padding: var(--yuzi-qq-inline-gap) var(--yuzi-qq-list-row-padding);
+}
+
+.yuzi-qq-field-row textarea.yuzi-qq-field-control {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    inline-size: 100%;
+    max-inline-size: none;
+    resize: vertical;
+}
+
+.yuzi-qq-field-row.is-checkbox {
+    grid-template-columns: minmax(0, 1fr) var(--yuzi-qq-checkbox-size);
+}
+
+.yuzi-qq-field-row.is-checkbox :is(input[type="checkbox"], .yuzi-qq-field-control) {
+    appearance: auto;
+    flex: 0 0 var(--yuzi-qq-checkbox-size);
+    justify-self: end;
+    inline-size: var(--yuzi-qq-checkbox-size);
+    min-inline-size: var(--yuzi-qq-checkbox-size);
+    max-inline-size: var(--yuzi-qq-checkbox-size);
+    block-size: var(--yuzi-qq-checkbox-size);
+    min-block-size: var(--yuzi-qq-checkbox-size);
+    max-block-size: var(--yuzi-qq-checkbox-size);
+    margin: 0;
+    padding: 0;
+    border-radius: var(--yuzi-qq-checkbox-radius);
+    resize: none;
+    accent-color: var(--yuzi-qq-accent);
+}
+
+.yuzi-qq-image-library-card {
+    display: flex;
+    flex-direction: column;
+    inline-size: 100%;
+    margin: 0;
+    padding: var(--yuzi-qq-secondary-row-padding-inline);
+    gap: var(--yuzi-qq-secondary-content-gap);
+    border-radius: var(--yuzi-qq-secondary-group-radius);
+    background: var(--yuzi-qq-secondary-row-surface);
+}
+
+.yuzi-qq-image-library-heading {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-editor-field-size);
+    font-weight: var(--yuzi-qq-editor-field-weight);
+    line-height: var(--yuzi-qq-editor-field-line-height);
+}
+
+.yuzi-qq-image-library-heading::after {
+    color: var(--yuzi-qq-muted);
+    content: '仓库';
+}
+
+.yuzi-qq-profile-page:not(.yuzi-qq-profile-editor-view) {
+    block-size: 100%;
+    min-block-size: 0;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    background: var(--yuzi-qq-page);
+}
+
+:is(.yuzi-qq-profile-backdrop, .yuzi-qq-profile-top) {
+    position: relative;
+    flex: 0 0 calc(var(--yuzi-qq-profile-cover-height) - var(--yuzi-qq-inline-gap));
+    min-block-size: calc(var(--yuzi-qq-profile-cover-height) - var(--yuzi-qq-inline-gap));
+    background-color: var(--yuzi-qq-page);
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+:is(.yuzi-qq-profile-backdrop, .yuzi-qq-profile-top) :is(
+    .phone-nav-back,
+    .yuzi-qq-profile-back,
+    .yuzi-qq-profile-back-control
+) {
+    position: absolute;
+    inset-block-start: calc(var(--yuzi-qq-safe-top) + (var(--yuzi-qq-secondary-header-height) - var(--yuzi-phone-nav-control-size)) / 2);
+    inset-inline-start: var(--yuzi-phone-nav-padding-inline-start);
+    z-index: var(--yuzi-qq-nav-z-index);
+    inline-size: var(--yuzi-phone-nav-control-size);
+    block-size: var(--yuzi-phone-nav-control-size);
+    color: var(--yuzi-qq-icon);
+    background: transparent;
+}
+
+.yuzi-qq-profile-page > :is(.yuzi-qq-profile-content-sheet, .yuzi-qq-profile-details) {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-block-size: 0;
+    margin: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    gap: var(--yuzi-qq-header-gap);
+    border-radius: var(--yuzi-qq-profile-sheet-radius);
+    color: var(--yuzi-qq-text);
+    background: var(--yuzi-qq-list-surface);
+}
+
+.yuzi-qq-profile-page.yuzi-qq-profile-view > .yuzi-qq-profile-sheet.yuzi-qq-profile-content-sheet:not(.yuzi-qq-profile-editor-sheet) {
+    margin: 0;
+}
+
+.yuzi-qq-profile-content-sheet > .yuzi-qq-profile-details {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    min-block-size: 0;
+    margin: 0;
+    gap: var(--yuzi-qq-header-gap);
+    overflow: visible;
+    border-radius: 0;
+    background: transparent;
+}
+
+.yuzi-qq-profile-page > :is(.yuzi-qq-profile-content-sheet, .yuzi-qq-profile-details) .yuzi-qq-profile-hero {
+    flex: 0 0 auto;
+    min-block-size: var(--yuzi-qq-profile-row-height);
+}
+
+.yuzi-qq-profile-details > :is(
+    .yuzi-qq-profile-detail-row,
+    .yuzi-qq-current-profile-summary-row,
+    .yuzi-qq-current-profile-signature-row
+) {
+    flex: 0 0 auto;
+    min-block-size: var(--yuzi-qq-profile-detail-row-min-height);
+}
+
+.yuzi-qq-profile-details > .yuzi-qq-profile-summary-row {
+    display: flex;
+    align-items: center;
+    min-block-size: calc(
+        var(--yuzi-qq-profile-editor-chevron-size)
+        + var(--yuzi-qq-profile-action-padding-top)
+        + var(--yuzi-qq-profile-action-padding-top)
+    );
+    padding-block: var(--yuzi-qq-profile-action-padding-top);
+    padding-inline: var(--yuzi-qq-profile-row-padding-inline);
+    gap: var(--yuzi-qq-row-gap);
+}
+
+.yuzi-qq-profile-details > .yuzi-qq-profile-signature-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-block-size: calc(
+        var(--yuzi-qq-profile-copy-line-height)
+        + var(--yuzi-qq-profile-action-padding-top)
+        + var(--yuzi-qq-profile-action-padding-top)
+    );
+    padding-block: var(--yuzi-qq-profile-action-padding-top);
+    padding-inline: var(--yuzi-qq-profile-row-padding-inline);
+    gap: 0;
+}
+
+.yuzi-qq-profile-details :is(.yuzi-qq-profile-summary, .yuzi-qq-profile-signature) {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yuzi-qq-profile-details > .yuzi-qq-profile-signature-row .yuzi-qq-profile-signature {
+    flex: 0 1 auto;
+}
+
+.yuzi-qq-profile-summary-arrow,
+.yuzi-qq-profile-signature-pencil {
+    display: grid;
+    place-items: center;
+    color: var(--yuzi-qq-icon);
+}
+
+.yuzi-qq-profile-summary-arrow {
+    flex: 0 0 var(--yuzi-qq-profile-editor-chevron-size);
+    inline-size: var(--yuzi-qq-profile-editor-chevron-size);
+    block-size: var(--yuzi-qq-profile-editor-chevron-size);
+}
+
+.yuzi-qq-profile-signature-pencil {
+    flex: 0 0 var(--yuzi-qq-profile-copy-line-height);
+    inline-size: var(--yuzi-qq-profile-copy-line-height);
+    block-size: var(--yuzi-qq-profile-copy-line-height);
+}
+
+:is(
+    .yuzi-qq-avatar,
+    .yuzi-qq-identity-avatar,
+    .yuzi-qq-profile-portrait
+).has-image,
+:is(
+    .yuzi-qq-avatar,
+    .yuzi-qq-identity-avatar,
+    .yuzi-qq-profile-portrait
+):has(> img),
+.yuzi-qq-current-profile-view .yuzi-qq-profile-portrait.has-image,
+.yuzi-qq-current-profile-view .yuzi-qq-profile-portrait:has(> img) {
+    background: transparent;
+}
+
+:is(.yuzi-qq-avatar, .yuzi-qq-identity-avatar, .yuzi-qq-profile-portrait) > img {
+    background: transparent;
+}
+
+.yuzi-qq-profile-action-bar {
+    align-items: start;
+    flex: 0 0 var(--yuzi-qq-profile-action-content-height);
+    min-block-size: var(--yuzi-qq-profile-action-content-height);
+    block-size: var(--yuzi-qq-profile-action-content-height);
+    margin-block-start: auto;
+    padding: var(--yuzi-qq-profile-action-padding-top)
+        var(--yuzi-qq-profile-action-padding-inline)
+        var(--yuzi-qq-profile-action-padding-bottom);
+    gap: var(--yuzi-qq-profile-action-gap);
+    background: var(--yuzi-qq-content-surface);
+}
+
+.yuzi-qq-profile-action-bar > :is(
+    .yuzi-qq-primary-button,
+    .yuzi-qq-secondary-button,
+    .yuzi-qq-danger-button
+) {
+    block-size: var(--yuzi-qq-profile-action-button-height);
+    min-block-size: var(--yuzi-qq-profile-action-button-height);
+    max-block-size: var(--yuzi-qq-profile-action-button-height);
+    padding-block: var(--yuzi-qq-profile-action-button-padding-block);
+    padding-inline: var(--yuzi-qq-profile-action-button-padding-inline);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yuzi-qq-profile-editor-list {
+    display: flex;
+    flex-direction: column;
+    inline-size: 100%;
+    gap: var(--yuzi-qq-secondary-content-gap);
+    margin: 0;
+    padding: 0;
+}
+
+.yuzi-qq-profile-editor-list .yuzi-qq-profile-editor-group {
+    inline-size: 100%;
+    min-block-size: var(--yuzi-qq-secondary-row-min-height);
+    margin: 0;
+    padding: var(--yuzi-qq-secondary-row-padding-block) var(--yuzi-qq-secondary-row-padding-inline);
+    gap: 0;
+    border: 0;
+    border-radius: var(--yuzi-qq-secondary-group-radius);
+    background: var(--yuzi-qq-content-surface);
+}
+
+:is(
+    .yuzi-qq-profile-asset-control,
+    .yuzi-qq-conversation-background-actions,
+    .yuzi-qq-current-profile-asset-actions
+) {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    justify-self: end;
+    inline-size: auto;
+    max-inline-size: none;
+    gap: var(--yuzi-qq-inline-gap);
+}
+
+:is(
+    .yuzi-qq-profile-asset-upload,
+    .yuzi-qq-profile-asset-delete,
+    .yuzi-qq-conversation-background-upload,
+    .yuzi-qq-conversation-background-delete
+) {
+    flex: 0 0 var(--yuzi-qq-touch-size);
+}
+
+.yuzi-qq-profile-editor-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto) var(--yuzi-qq-profile-editor-chevron-size);
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: var(--yuzi-qq-editor-field-line-height);
+    gap: var(--yuzi-qq-inline-gap);
+    color: var(--yuzi-qq-text);
+    font-size: var(--yuzi-qq-editor-field-size);
+    font-weight: var(--yuzi-qq-editor-field-weight);
+    line-height: var(--yuzi-qq-editor-field-line-height);
+    text-align: start;
+}
+
+.yuzi-qq-profile-editor-row.is-control-stacked {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+}
+
+.yuzi-qq-profile-editor-row.is-control-stacked > :is(.yuzi-qq-field-label, .yuzi-qq-profile-editor-input) {
+    grid-column: 1;
+}
+
+.yuzi-qq-profile-editor-row-value {
+    min-inline-size: 0;
+    overflow: hidden;
+    color: var(--yuzi-qq-muted);
+    text-align: end;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yuzi-qq-profile-editor-row > .yuzi-qq-profile-edit-arrow {
+    display: grid;
+    inline-size: var(--yuzi-qq-profile-editor-chevron-size);
+    block-size: var(--yuzi-qq-profile-editor-chevron-size);
+    place-items: center;
+    color: var(--yuzi-qq-icon);
+}
+
+.yuzi-qq-chat-view {
+    block-size: 100%;
+    min-block-size: 0;
+    padding: var(--yuzi-qq-safe-top) 0 0;
+    gap: 0;
+    overflow: hidden;
+    background: var(--yuzi-qq-chat-header-surface);
+}
+
+.yuzi-qq-chat-header {
+    position: relative;
+    z-index: var(--yuzi-qq-nav-z-index);
+    flex: 0 0 var(--yuzi-qq-secondary-header-height);
+    min-block-size: var(--yuzi-qq-secondary-header-height);
+    block-size: var(--yuzi-qq-secondary-header-height);
+    background: var(--yuzi-qq-chat-header-surface);
+}
+
+.yuzi-qq-chat-header.is-left-aligned .phone-nav-center {
+    justify-content: flex-start;
+    text-align: start;
+}
+
+.yuzi-qq-chat-header.is-left-aligned .yuzi-qq-chat-heading-copy {
+    align-items: flex-start;
+    text-align: start;
+}
+
+.yuzi-qq-chat-header.is-left-aligned :is(.yuzi-qq-chat-title, .yuzi-qq-chat-status) {
+    inline-size: 100%;
+    text-align: start;
+}
+
+.yuzi-qq-message-stream {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.yuzi-qq-message {
+    inline-size: 100%;
+    min-inline-size: 0;
+    align-items: flex-start;
+}
+
+.yuzi-qq-message.is-self {
+    flex-direction: row-reverse;
+}
+
+.yuzi-qq-message-avatar {
+    flex: 0 0 var(--yuzi-qq-chat-avatar-size);
+    inline-size: var(--yuzi-qq-chat-avatar-size);
+    min-inline-size: var(--yuzi-qq-chat-avatar-size);
+    block-size: var(--yuzi-qq-chat-avatar-size);
+}
+
+.yuzi-qq-message-stack {
+    min-inline-size: 0;
+    max-inline-size: min(
+        var(--yuzi-qq-chat-bubble-max-width),
+        calc(100% - var(--yuzi-qq-chat-avatar-size) - var(--yuzi-qq-message-gap))
+    );
+}
+
+.yuzi-qq-composer {
+    inline-size: 100%;
+    min-inline-size: 0;
+    max-inline-size: none;
+    margin: 0;
+    border-inline: 0;
+}
+
+.yuzi-qq-composer-input {
+    inline-size: 100%;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    box-sizing: border-box;
+}
+
+.yuzi-qq-tool-bar {
+    inline-size: 100%;
+    min-inline-size: 0;
+}
+
+/* Private chat production surface: stable viewport, docked composer and typed cards. */
+.yuzi-qq-private-chat-view {
+    position: relative;
+    isolation: isolate;
+}
+
+.yuzi-qq-private-chat-view.has-chat-background::before,
+.yuzi-qq-private-chat-view.has-chat-background::after {
+    position: absolute;
+    inset-block-start: calc(var(--yuzi-qq-safe-top) + var(--yuzi-qq-secondary-header-height));
+    inset-block-end: var(--yuzi-qq-composer-height);
+    inset-inline: 0;
+    z-index: 0;
+    pointer-events: none;
+    content: '';
+}
+
+.yuzi-qq-private-chat-view.has-chat-background::before {
+    background: var(--yuzi-qq-chat-background-image) center / cover no-repeat;
+}
+
+.yuzi-qq-private-chat-view.has-chat-background::after {
+    background: var(--yuzi-qq-background-overlay);
+}
+
+.yuzi-qq-private-chat-view.has-chat-background .yuzi-qq-message-stream {
+    background: transparent;
+}
+
+.yuzi-qq-private-chat-view.has-chat-background .yuzi-qq-message-stream::before,
+.yuzi-qq-private-chat-view.has-chat-background .yuzi-qq-message-stream::after {
+    content: none;
+}
+
+.yuzi-qq-private-message-stream {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.yuzi-qq-private-message-stream::-webkit-scrollbar,
+.yuzi-qq-private-emoji-panel::-webkit-scrollbar {
+    display: none;
+}
+
+.yuzi-qq-private-composer-layer {
+    position: static;
+    flex: 0 0 var(--yuzi-qq-composer-height);
+    min-block-size: var(--yuzi-qq-composer-height);
+}
+
+.yuzi-qq-private-chat-composer {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: var(--yuzi-qq-overlay-z-index);
+    min-block-size: var(--yuzi-qq-composer-height);
+    padding: var(--yuzi-qq-inline-gap) var(--yuzi-qq-composer-padding-inline) 0;
+    transition: none;
+}
+
+.yuzi-qq-private-chat-view.has-emoji-panel .yuzi-qq-private-chat-composer {
+    inset-block-end: var(--yuzi-qq-private-emoji-panel-height);
+}
+
+.yuzi-qq-composer-input-row {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: flex-end;
+    inline-size: 100%;
+    min-inline-size: 0;
+    gap: var(--yuzi-qq-inline-gap);
+}
+
+.yuzi-qq-composer-input-row .yuzi-qq-composer-input {
+    flex: 1 1 auto;
+    inline-size: auto;
+}
+
+.yuzi-qq-stop-generation-button {
+    display: grid;
+    flex: 0 0 var(--yuzi-qq-private-stop-size);
+    inline-size: var(--yuzi-qq-private-stop-size);
+    block-size: var(--yuzi-qq-private-stop-size);
+    place-items: center;
+    border-radius: var(--yuzi-qq-radius-8);
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-danger);
+    font-size: var(--yuzi-qq-private-stop-icon-size);
+}
+
+.yuzi-qq-private-chat-tools {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(var(--yuzi-qq-private-tool-slot-min), 1fr));
+    min-block-size: var(--yuzi-qq-private-tool-hit-size);
+    block-size: var(--yuzi-qq-private-tool-hit-size);
+    justify-content: initial;
+    gap: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.yuzi-qq-private-chat-tool {
+    justify-self: center;
+    inline-size: var(--yuzi-qq-private-tool-hit-size);
+    block-size: var(--yuzi-qq-private-tool-hit-size);
+}
+
+.yuzi-qq-private-chat-tools::-webkit-scrollbar {
+    display: none;
+}
+
+.yuzi-qq-private-emoji-panel {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    z-index: var(--yuzi-qq-overlay-z-index);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--yuzi-qq-private-emoji-column-min)), 1fr));
+    align-content: start;
+    inline-size: 100%;
+    block-size: var(--yuzi-qq-private-emoji-panel-height);
+    min-block-size: 0;
+    max-block-size: none;
+    padding: var(--yuzi-qq-private-emoji-panel-padding-block) var(--yuzi-qq-composer-padding-inline);
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-block-start: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    background: var(--yuzi-qq-composer-surface);
+    box-shadow: none;
+    scrollbar-width: none;
+}
+
+.yuzi-qq-private-emoji-panel .yuzi-qq-emoji-item {
+    display: grid;
+    min-inline-size: 0;
+    min-block-size: var(--yuzi-qq-private-emoji-item-size);
+    aspect-ratio: 1;
+    place-items: center;
+    overflow: hidden;
+    border-radius: var(--yuzi-qq-radius-8);
+    background: transparent;
+}
+
+.yuzi-qq-emoji-image,
+.yuzi-qq-image-library-sticker {
+    display: grid;
+    inline-size: 100%;
+    block-size: 100%;
+    place-items: center;
+}
+
+.yuzi-qq-emoji-image > img,
+.yuzi-qq-image-library-sticker > img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: contain;
+}
+
+.yuzi-qq-emoji-upload-item {
+    border: var(--yuzi-qq-line-width) dashed var(--yuzi-qq-weak);
+    color: var(--yuzi-qq-muted);
+    background: var(--yuzi-qq-control) !important;
+    font-size: var(--yuzi-qq-tool-icon-size);
+}
+
+.yuzi-qq-private-chat-jump-bubble {
+    display: grid;
+    inline-size: var(--yuzi-qq-jump-width);
+    block-size: var(--yuzi-qq-jump-height);
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-accent);
+    box-shadow: var(--yuzi-qq-shadow);
+    font-size: var(--yuzi-qq-caption-size);
+    font-weight: 600;
+    line-height: 1;
+}
+
+.yuzi-qq-private-chat-jump-bubble::after {
+    position: absolute;
+    inset-inline-end: var(--yuzi-qq-private-jump-tail-inline-end);
+    inset-block-end: var(--yuzi-qq-private-jump-tail-bottom);
+    inline-size: var(--yuzi-qq-private-jump-tail-size);
+    block-size: var(--yuzi-qq-private-jump-tail-size);
+    background: var(--yuzi-qq-accent);
+    clip-path: polygon(100% 20%, 0 0, 68% 100%);
+    content: '';
+}
+
+.yuzi-qq-private-chat-view.has-emoji-panel .yuzi-qq-private-chat-jump-bubble {
+    inset-block-end: calc(
+        var(--yuzi-qq-private-emoji-panel-height)
+        + var(--yuzi-qq-composer-height)
+        + var(--yuzi-qq-composer-padding-inline)
+    );
+}
+
+.yuzi-qq-voice-message {
+    min-inline-size: var(--yuzi-qq-private-voice-min-width);
+}
+
+.yuzi-qq-voice-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--yuzi-qq-private-voice-summary-gap);
+}
+
+.yuzi-qq-voice-original {
+    padding-block-start: var(--yuzi-qq-inline-gap);
+    border-block-start: var(--yuzi-qq-line-width) solid color-mix(in srgb, currentColor 20%, transparent);
+    white-space: pre-wrap;
+}
+
+.yuzi-qq-narrative-card,
+.yuzi-qq-transfer-card {
+    display: grid;
+    grid-template-columns: var(--yuzi-qq-private-card-icon-size) minmax(0, 1fr);
+    align-items: center;
+    min-inline-size: min(var(--yuzi-qq-private-card-min-width), var(--yuzi-qq-chat-bubble-content-max-width));
+    text-align: start;
+}
+
+.yuzi-qq-narrative-visual,
+.yuzi-qq-transfer-icon {
+    display: grid;
+    inline-size: var(--yuzi-qq-private-card-icon-size);
+    block-size: var(--yuzi-qq-private-card-icon-size);
+    place-items: center;
+    border-radius: var(--yuzi-qq-radius-8);
+    color: var(--yuzi-qq-on-accent);
+    background: var(--yuzi-qq-accent);
+    font-size: var(--yuzi-qq-private-card-icon-font-size);
+}
+
+.yuzi-qq-narrative-card.is-video .yuzi-qq-narrative-visual {
+    background: var(--yuzi-qq-success);
+}
+
+.yuzi-qq-transfer-card .yuzi-qq-transfer-icon {
+    background: var(--yuzi-qq-transfer-accent);
+}
+
+.yuzi-qq-narrative-copy,
+.yuzi-qq-transfer-copy {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    gap: var(--yuzi-qq-private-card-copy-gap);
+}
+
+.yuzi-qq-narrative-description,
+.yuzi-qq-transfer-note,
+.yuzi-qq-transfer-status {
+    overflow: hidden;
+    color: inherit;
+    opacity: 0.76;
+    font-size: var(--yuzi-qq-caption-size);
+    text-overflow: ellipsis;
+}
+
+.yuzi-qq-narrative-description {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+}
+
+.yuzi-qq-transfer-note,
+.yuzi-qq-transfer-status {
+    white-space: nowrap;
+}
+
+.yuzi-qq-sticker-message {
+    inline-size: var(--yuzi-qq-private-sticker-size);
+    block-size: var(--yuzi-qq-private-sticker-size);
+    padding: 0;
+    overflow: hidden;
+    background: transparent !important;
+}
+
+.yuzi-qq-sticker-message > img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: contain;
+}

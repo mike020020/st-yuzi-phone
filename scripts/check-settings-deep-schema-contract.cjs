@@ -12,144 +12,72 @@ async function loadSchema() {
     return import(toModuleUrl('modules/settings/schema.js'));
 }
 
-async function testPhoneChatDeepNormalization() {
-    const { validateSetting, validateSettings, PHONE_CHAT_NUMERIC_LIMITS } = await loadSchema();
-
-    const result = validateSetting('phoneChat', {
-        useStoryContext: 'false',
-        storyContextTurns: '999',
-        apiPresetName: '  preset A  ',
-        maxHistoryMessages: -3,
-        maxReplyTokens: 'bad-number',
-        requestTimeoutMs: 1,
-        worldbookMaxEntries: Infinity,
-        worldbookMaxChars: '250000',
-        unknownKey: 'must-drop',
-    });
-
-    assert.equal(result.valid, true);
-    assert.deepEqual(Object.keys(result.value).sort(), [
-        'apiPresetName',
-        'maxHistoryMessages',
-        'maxReplyTokens',
-        'requestTimeoutMs',
-        'storyContextTurns',
-        'useStoryContext',
-        'worldbookMaxChars',
-        'worldbookMaxEntries',
-    ].sort());
-    assert.equal(result.value.useStoryContext, false);
-    assert.equal(result.value.storyContextTurns, PHONE_CHAT_NUMERIC_LIMITS.storyContextTurns.max);
-    assert.equal(result.value.apiPresetName, 'preset A');
-    assert.equal(result.value.maxHistoryMessages, PHONE_CHAT_NUMERIC_LIMITS.maxHistoryMessages.min);
-    assert.equal(result.value.maxReplyTokens, 900);
-    assert.equal(result.value.requestTimeoutMs, PHONE_CHAT_NUMERIC_LIMITS.requestTimeoutMs.min);
-    assert.equal(result.value.worldbookMaxEntries, 24);
-    assert.equal(result.value.worldbookMaxChars, PHONE_CHAT_NUMERIC_LIMITS.worldbookMaxChars.max);
-
-    const settings = validateSettings({ phoneChat: [] });
-    assert.deepEqual(settings.phoneChat, {
-        useStoryContext: true,
-        storyContextTurns: 3,
-        apiPresetName: '',
-        maxHistoryMessages: 12,
-        maxReplyTokens: 900,
-        requestTimeoutMs: 90000,
-        worldbookMaxEntries: 24,
-        worldbookMaxChars: 6000,
-    });
-}
-
-async function testPhoneAiInstructionDeepNormalization() {
-    const { validateSetting } = await loadSchema();
-
-    const result = validateSetting('phoneAiInstruction', {
-        currentPresetName: 'broken-current',
-        lastOpenedPresetName: 'Preset 1',
-        migratedLegacyTemplates: true,
-        presets: [
-            {
-                id: ' preset id ',
-                name: 'Preset 1',
-                description: '  desc  ',
-                updatedAt: '123.8',
-                mediaMarkers: {
-                    imagePrefix: '',
-                },
-                segments: [
-                    {
-                        id: 's1',
-                        name: 'Seg 1',
-                        role: 'ADMIN',
-                        content: 123,
-                        isMain2: true,
-                        unknownSegmentKey: 'drop',
-                    },
-                ],
-            },
-        ],
-        extraRootKey: 'drop',
-    });
-
-    assert.equal(result.valid, true);
-    assert.equal(result.value.currentPresetName, 'Preset 1');
-    assert.equal(result.value.lastOpenedPresetName, 'Preset 1');
-    assert.equal(result.value.migratedLegacyTemplates, true);
-    assert.equal(result.value.presets.length, 1);
-    assert.deepEqual(Object.keys(result.value.presets[0]).sort(), [
-        'description',
-        'id',
-        'mediaMarkers',
-        'name',
-        'promptGroup',
-        'scope',
-        'updatedAt',
-    ].sort());
-    assert.equal(result.value.presets[0].mediaMarkers.imagePrefix, '');
-    assert.equal(result.value.presets[0].mediaMarkers.videoPrefix, '[视频]');
-    assert.equal(result.value.presets[0].promptGroup[0].role, 'system');
-    assert.equal(result.value.presets[0].promptGroup[0].content, '123');
-    assert.equal(result.value.presets[0].promptGroup[0].mainSlot, 'B');
-    assert.equal(Object.prototype.hasOwnProperty.call(result.value.presets[0].promptGroup[0], 'unknownSegmentKey'), false);
-}
-
-async function testWorldbookSelectionDeepNormalization() {
+async function testRemovedLegacyPhoneChatSetting() {
     const { validateSetting, validateSettings } = await loadSchema();
-
-    const result = validateSetting('worldbookSelection', {
-        sourceMode: 'unknown-mode',
-        selectedWorldbook: '  世界书 A  ',
-        entries: {
-            ' 世界书 A ': {
-                1: true,
-                2: false,
-                3: 'true',
-                empty: null,
-            },
-            Invalid: ['bad'],
-            '': { 1: true },
-        },
-        extraRootKey: 'drop',
+    const settings = validateSettings({
+        phoneChat: { apiPresetName: 'legacy-preset' },
+        phoneAiInstruction: { currentPresetName: 'legacy-preset' },
     });
 
-    assert.equal(result.valid, true);
-    assert.deepEqual(result.value, {
-        sourceMode: 'manual',
-        selectedWorldbook: '世界书 A',
-        entries: {
-            '世界书 A': {
-                1: true,
-                2: false,
-            },
+    assert.equal(Object.prototype.hasOwnProperty.call(settings, 'phoneChat'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(settings, 'phoneAiInstruction'), false);
+    assert.deepEqual(validateSetting('phoneChat', {}), { valid: true, value: undefined, removed: true });
+    assert.deepEqual(validateSetting('phoneAiInstruction', {}), { valid: true, value: undefined, removed: true });
+}
+
+async function testRemovedWorldbookWorkbenchSetting() {
+    const { defaultSettings, validateSetting, validateSettings } = await loadSchema();
+    const settings = validateSettings({
+        worldbookSelection: {
+            sourceMode: 'manual',
+            selectedWorldbook: '旧工作台数据',
+            entries: { '旧工作台数据': { 1: true } },
         },
     });
 
-    const settings = validateSettings({ worldbookSelection: null });
-    assert.deepEqual(settings.worldbookSelection, {
-        sourceMode: 'manual',
-        selectedWorldbook: '',
-        entries: {},
+    assert.equal(Object.prototype.hasOwnProperty.call(defaultSettings, 'worldbookSelection'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(settings, 'worldbookSelection'), false);
+    assert.deepEqual(validateSetting('worldbookSelection', {}), { valid: true, value: undefined, removed: true });
+}
+
+async function testRemovedLegacyDatabasePresetSettingsArePersisted() {
+    const {
+        defaultSettings,
+        REMOVED_SETTING_KEYS,
+        validateSetting,
+        validateSettings,
+    } = await loadSchema();
+    const { migrateLegacyPhoneSettingsWith } = await import(toModuleUrl('modules/settings/migration.js'));
+    let saveCount = 0;
+    const context = {
+        extensionSettings: {
+            YuziPhone: {
+                enabled: false,
+                dbConfigPresets: [{ name: '旧数据库配置' }],
+                activeDbConfigPreset: '旧数据库配置',
+            },
+        },
+        saveSettingsDebounced() {
+            saveCount += 1;
+        },
+    };
+
+    migrateLegacyPhoneSettingsWith({
+        getContext: () => context,
+        extensionName: 'YuziPhone',
+        defaultSettings,
+        removedSettingKeys: REMOVED_SETTING_KEYS,
+        clone: (value) => JSON.parse(JSON.stringify(value)),
+        validateSettings,
     });
+
+    const settings = context.extensionSettings.YuziPhone;
+    assert.equal(settings.enabled, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(settings, 'dbConfigPresets'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(settings, 'activeDbConfigPreset'), false);
+    assert.deepEqual(validateSetting('dbConfigPresets', []), { valid: true, value: undefined, removed: true });
+    assert.deepEqual(validateSetting('activeDbConfigPreset', ''), { valid: true, value: undefined, removed: true });
+    assert.equal(saveCount, 1, '清理已有用户设置后必须持久保存一次');
 }
 
 async function testAppearanceResourcePoolDeepNormalization() {
@@ -399,10 +327,7 @@ async function testAppearanceFontLibraryDeepNormalization() {
 
 async function testSharedNormalizersAreExported() {
     const schema = await loadSchema();
-    assert.equal(typeof schema.normalizePhoneChatSettings, 'function');
-    assert.equal(typeof schema.normalizePhoneAiInstructionSettings, 'function');
-    assert.equal(typeof schema.normalizePhoneAiInstructionMediaMarkers, 'function');
-    assert.equal(typeof schema.normalizeWorldbookSelectionSettings, 'function');
+    assert.equal(Object.prototype.hasOwnProperty.call(schema, 'normalizeWorldbookSelectionSettings'), false);
     assert.equal(typeof schema.normalizeAppearanceResourcePoolSettings, 'function');
     assert.equal(typeof schema.normalizeAppearanceFontLibrarySettings, 'function');
 }
@@ -427,15 +352,41 @@ async function testAppearanceActivePackIdNormalization() {
     assert.equal(settings.appearanceActivePackId, '');
 }
 
+async function testAppIconOriginsNormalization() {
+    const { normalizeAppIconOriginsSettings, validateSetting, validateSettings } = await loadSchema();
+    const raw = {
+        '  table:one  ': '  appearance_pack_one  ',
+        empty: '   ',
+        constructor: 'appearance_pack_bad',
+        prototype: 'appearance_pack_bad',
+        valid: 'p'.repeat(200),
+    };
+
+    assert.deepEqual(normalizeAppIconOriginsSettings(raw), {
+        'table:one': 'appearance_pack_one',
+        valid: 'p'.repeat(160),
+    });
+    assert.deepEqual(validateSetting('appIconOrigins', []), {
+        valid: false,
+        value: {},
+        error: 'appIconOrigins 必须是对象',
+    });
+    assert.deepEqual(validateSettings({ appIconOrigins: raw }).appIconOrigins, {
+        'table:one': 'appearance_pack_one',
+        valid: 'p'.repeat(160),
+    });
+}
+
 async function main() {
     const tests = [
-        ['phoneChat 字段级归一化覆盖错误数字和未知字段', testPhoneChatDeepNormalization],
-        ['phoneAiInstruction 字段级归一化保留旧槽位兼容与空媒体前缀', testPhoneAiInstructionDeepNormalization],
-        ['worldbookSelection 字段级归一化覆盖异常 entries 结构', testWorldbookSelectionDeepNormalization],
+        ['已删除旧消息记录表设置不会重新进入设置事实源', testRemovedLegacyPhoneChatSetting],
+        ['旧世界书工作台设置不会重新进入设置事实源', testRemovedWorldbookWorkbenchSetting],
+        ['旧数据库预设设置会从已有用户设置中清理并持久保存', testRemovedLegacyDatabasePresetSettingsArePersisted],
         ['appearanceResourcePool 字段级归一化覆盖坏图片、重复资源和未知字段', testAppearanceResourcePoolDeepNormalization],
         ['appearanceFontLibrary 字段级归一化覆盖坏字体、重复字体和回退默认', testAppearanceFontLibraryDeepNormalization],
         ['settings schema 暴露共享嵌套 normalizer', testSharedNormalizersAreExported],
         ['appearanceActivePackId 默认值与长度限制校验', testAppearanceActivePackIdNormalization],
+        ['appIconOrigins 只保留有效图标位与来源包 id', testAppIconOriginsNormalization],
     ];
 
     for (const [, run] of tests) {

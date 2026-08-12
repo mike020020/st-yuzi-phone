@@ -18,7 +18,7 @@ for (const operation of ['replacePresetRecord', 'deletePresetRecord']) {
     assert.ok(body.includes('removePresetBindings(tx,'), `${operation} 必须在事务内清理引用绑定`);
 }
 assert.ok(workshop.includes('async deletePreset(presetId)'));
-assert.ok(workshop.includes('() => deletePresetRecord(presetId)'));
+assert.ok(workshop.includes('() => runtimeDeps.deletePresetRecord(presetId)'));
 assert.ok(workshop.includes('metadata.delete(result.presetId)'));
 assert.ok(workshop.includes('result.affectedSheetKeys.forEach(key => activeByTable.delete(key))'));
 assert.ok(behavior.includes('service.deletePreset(presetId)'));

@@ -11,6 +11,24 @@ function deepFreeze(value, seen = new WeakSet()) {
     return value;
 }
 
+export function createPresetStateSnapshot(options = {}) {
+    const table = createTableSnapshot(options.rawData, options.sheetKey);
+    if (!table) return null;
+    const navigation = options.navigationState || {};
+    const previous = navigation.previous || {};
+    const next = navigation.next || {};
+    return deepFreeze({
+        version: Number.isFinite(options.version) ? options.version :0,
+        sheetKey: table.sheetKey,
+        tableName: table.tableName,
+        headers: table.headers,
+        rows: table.rows,
+        route: String(options.route || ''),
+        canPrevious: previous.disabled !== true && !!previous.target,
+        canNext: next.disabled !== true && !!next.target,
+    });
+}
+
 export function createTableSnapshot(rawData, sheetKey) {
     const key = String(sheetKey ?? '').trim();
     const sheet = rawData?.[key];

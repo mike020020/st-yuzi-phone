@@ -8,6 +8,7 @@ const FILES = {
     background: 'modules/settings-app/services/appearance-settings/background-service.js',
     iconUpload: 'modules/settings-app/services/appearance-settings/icon-upload-service.js',
     iconSlots: 'modules/settings-app/services/appearance-settings/icon-slots.js',
+    qqAppDefinition: 'modules/qq-v2/app-definition.js',
     resourcePack: 'modules/settings-app/services/appearance-settings/resource-pack-service.js',
     fontLibrary: 'modules/settings-app/services/appearance-settings/font-library-service.js',
     visibility: 'modules/settings-app/services/appearance-settings/visibility-settings.js',
@@ -71,8 +72,11 @@ function main() {
         && has(contents.facade, 'export async function importAppearancePackToRepository(')
         && has(contents.facade, 'export async function applyAppearancePackFromRepository(')
         && has(contents.facade, 'export async function deleteAppearancePackFromRepository('));
-    check(results, 'facade', '删除当前仓库激活包只清 appearanceActivePackId', has(contents.facade, "savePhoneSettingsPatch({ appearanceActivePackId: '' })")
-        && !has(contents.facade, "backgroundImage: ''") && !has(contents.facade, 'appIcons: {}'));
+    check(results, 'facade', '删除仓库包只清来源绑定图标并保留当前背景', has(contents.facade, 'buildPackIconOriginCleanup(settings, targetPackId)')
+        && has(contents.facade, "if (activeCleared) patch.appearanceActivePackId = '';")
+        && has(contents.facade, 'appIcons: iconCleanup.appIcons')
+        && has(contents.facade, 'appIconOrigins: iconCleanup.appIconOrigins')
+        && !has(contents.facade, "backgroundImage: ''"));
     check(results, 'facade', '保留旧资源清理兼容 alias', has(contents.facade, 'export function clearAppearanceResourcePoolIcons('));
     check(results, 'facade', '暴露字体库视图和操作服务', has(contents.facade, 'export function getAppearanceFontLibraryViewModel(')
         && has(contents.facade, 'export function importAppearanceFontFile(')
@@ -97,10 +101,15 @@ function main() {
         && has(contents.iconUpload, 'phone-icon-cleanup-row')
         && has(contents.iconUpload, 'phone-icon-delete-current-btn')
         && has(contents.iconUpload, '隐藏旧图标 / 无当前图标位'));
-    check(results, 'iconUpload', '自定义图标删除使用复制对象避免直接突变设置引用', has(contents.iconUpload, 'const icons = { ...(getPhoneSettings().appIcons || {}) };')
-        && has(contents.iconUpload, 'delete icons[key];')
+    check(results, 'iconUpload', '自定义图标删除通过共享状态函数同步清理来源', has(contents.iconUpload, 'buildAppIconRemoval(getPhoneSettings(), key)')
+        && has(contents.iconUpload, 'savePhoneSettingsPatch(nextState)')
         && !has(contents.iconUpload, 'const icons = getPhoneSettings().appIcons || {};\n                    delete icons[key];'));
     check(results, 'iconSlots', '存在共享图标位枚举函数', has(contents.iconSlots, 'export function collectAppearanceIconSlots('));
+    check(results, 'qqAppDefinition', 'QQ 提供外观设置可复用的系统 App 定义', has(contents.qqAppDefinition, 'export const QQ_APP = Object.freeze({')
+        && has(contents.qqAppDefinition, "id: '__qq__'")
+        && has(contents.qqAppDefinition, "name: 'QQ'"));
+    check(results, 'iconSlots', '共享图标位枚举登记 QQ 系统 App', has(contents.iconSlots, "from '../../../qq-v2/app-definition.js'")
+        && has(contents.iconSlots, "{ key: QQ_APP.id, name: QQ_APP.name, type: 'system' }"));
     check(results, 'resourcePack', '存在外观资源包格式常量', has(contents.resourcePack, "APPEARANCE_PACK_FORMAT = 'yuzi-phone-appearance-pack'"));
     check(results, 'resourcePack', '存在外观资源包导入导出函数', has(contents.resourcePack, 'export function importAppearanceResourcePackFromData(')
         && has(contents.resourcePack, 'export function exportAppearanceResourcePack('));
@@ -246,6 +255,8 @@ function main() {
         && exists('assets/fonts/chill-round-f/LICENSE.txt'));
     check(results, 'visibility', '存在 setupAppearanceToggles()', has(contents.visibility, 'export function setupAppearanceToggles('));
     check(results, 'visibility', '存在 renderHiddenTableAppsList()', has(contents.visibility, 'export function renderHiddenTableAppsList('));
+    check(results, 'visibility', '隐藏 App 列表登记 QQ 系统 App', has(contents.visibility, "from '../../../qq-v2/app-definition.js'")
+        && has(contents.visibility, '{ key: QQ_APP.id, name: QQ_APP.name }'));
     check(results, 'layout', '存在 setupIconLayoutSettings()', has(contents.layout, 'export function setupIconLayoutSettings('));
     check(results, 'layout', '存在 getLayoutValue()', has(contents.layout, 'export function getLayoutValue('));
     check(results, 'homeLabelColor', '存在首页 App 名称颜色读取与绑定服务', has(contents.homeLabelColor, 'export function getHomeAppLabelColorModeValue()')

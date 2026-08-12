@@ -52,8 +52,6 @@ async function main() {
     const debugSql = mod.buildChronicleInvalidTimeSpanDebugSql();
     const currentStatusSignatureSql = mod.buildChronicleTodayRelationSignatureSql('current_status');
     const currentStatusUpdateSql = mod.buildChronicleTodayRelationUpdateSql('current_status');
-    const anchorSql = mod.buildChronicleTodayRelationAnchorTableSql();
-    const schemaGateSql = mod.buildChronicleTodayRelationSchemaGateSql();
     const allSql = `${signatureSql}\n${updateSql}\n${debugSql}\n${currentStatusSignatureSql}\n${currentStatusUpdateSql}`;
 
     assert.ok(Array.isArray(mod.CHRONICLE_TODAY_RELATION_ANCHOR_TABLES), 'SQL builder 必须导出集中 today anchor 表白名单数组');
@@ -67,20 +65,14 @@ async function main() {
         ['row_id', 'cur_time'],
         'today anchor 统一 schema 要求必须集中声明 row_id/cur_time',
     );
-    assert.deepStrictEqual(mod.CHRONICLE_TODAY_RELATION_REQUIRED_COLUMNS, ['row_id', 'time_span', 'today_relation'], 'chronicle 完整 gate 必需列必须集中声明');
-    ['schema_ok', 'anchor_table', 'missing_requirements', 'schema_fingerprint', 'sqlite_master', 'pragma_table_info', 'chronicle', 'global_state', 'current_status'].forEach((needle) => {
-        assertIncludes(schemaGateSql, needle, `schema gate 必须包含 ${needle}`);
-    });
-    assert.ok(!/;\s*\S/.test(schemaGateSql), 'schema gate SQL 禁止分号串多语句');
-    assertNotIncludes(schemaGateSql.toUpperCase(), 'ALTER TABLE', 'schema gate 禁止 ALTER TABLE');
-    assertNotIncludes(schemaGateSql.toUpperCase(), 'UPDATE ', 'schema gate 必须只读');
-    assertNotIncludes(schemaGateSql.toUpperCase(), 'INSERT ', 'schema gate 必须只读');
-    assertNotIncludes(schemaGateSql.toUpperCase(), 'DELETE ', 'schema gate 必须只读');
-    assertIncludes(anchorSql, "VALUES ('global_state', 0), ('current_status', 1)", 'anchor SQL 必须由集中配置生成 global_state/current_status 候选 VALUES');
-    assertIncludes(anchorSql, 'candidate_anchor_tables', 'anchor SQL 必须只从候选白名单选表，不得扫描全部 cur_time 表');
-    assertIncludes(anchorSql, 'sqlite_master', 'anchor SQL 必须检查候选表存在');
-    mod.CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS.forEach((columnName) => {
-        assertIncludes(anchorSql, `WHERE name = '${columnName}'`, `anchor SQL 必须从统一 required columns 配置生成 ${columnName} schema 检查`);
+    assert.deepStrictEqual(mod.CHRONICLE_TODAY_RELATION_REQUIRED_COLUMNS, ['row_id', 'time_span', 'today_relation'], 'chronicle 逻辑表必需列必须集中声明');
+    [
+        'buildChronicleTodayRelationSchemaGateSql',
+        'buildChronicleTodayRelationAnchorTableSql',
+        'sqlite_master',
+        'pragma_table_info',
+    ].forEach((needle) => {
+        assertNotIncludes(builderSource, needle, `SQL builder 不得保留旧物理 schema gate：${needle}`);
     });
 
     ['WITH', 'UPDATE chronicle', 'today_relation', 'global_state', 'current_status', 'cur_time', 'time_span', 'julianday', 'new_relation IS NOT NULL', 'source_signature', 'input_signature', 'pending_update_count'].forEach((needle) => {
@@ -109,8 +101,11 @@ async function main() {
         assertIncludes(allSql, needle, `SQL builder 必须覆盖文案 ${needle}`);
     });
 
-    assertNotIncludes(allSql, 'UPDATE FROM', 'SQL builder 禁止 UPDATE FROM');
-    assertNotIncludes(allSql, 'UPDATE ... FROM', 'SQL builder 禁止 UPDATE FROM 变体');
+    assertIncludes(updateSql, 'row_id AS target_row_id', 'chronicle mutation 必须为计算结果声明稳定目标行身份');
+    assertIncludes(updateSql, 'SET today_relation = computed_relation.new_relation', 'chronicle mutation 必须直接消费单次计算结果');
+    assertIncludes(updateSql, 'FROM computed_relation', 'chronicle mutation 必须通过 UPDATE ... FROM 一次连接计算结果');
+    assertIncludes(updateSql, 'WHERE row_id = computed_relation.target_row_id', 'chronicle mutation 必须通过无表名前缀的 row_id 对号写回');
+    assertNotIncludes(updateSql, 'chronicle.row_id', 'chronicle mutation 不得把逻辑表名硬编码为目标行限定符');
     assert.ok(!/;\s*\S/.test(signatureSql), 'signature SQL 禁止分号串多语句');
     assert.ok(!/;\s*\S/.test(updateSql), 'update SQL 禁止分号串多语句');
     assert.ok(!/;\s*\S/.test(debugSql), 'debug SQL 禁止分号串多语句');
@@ -173,7 +168,7 @@ async function main() {
         assert.strictEqual(actual, expected, `diffDays=${diffDays} 文案必须为 ${expected}`);
     });
 
-    console.log('[通过] 纪要 today_relation SQL 合同：集中锚点表白名单、global_state/current_status、批量 UPDATE、无多语句、文案桶正负方向通过');
+    console.log('[通过] 纪要 today_relation SQL 合同：无旧 schema gate、集中逻辑表列契约、复杂 signature/批量 UPDATE、文案桶正负方向通过');
 }
 
 main().catch((error) => {

@@ -1,7 +1,8 @@
 import { Logger } from '../error-handler.js';
-import { getSheetKeys, getTableData } from '../phone-core/data-api.js';
+import { getTableData } from '../phone-core/data-api.js';
 import { navigateTo } from '../phone-core/routing.js';
 import { defaultSettings, extensionName } from '../settings.js';
+import { buildTableNavigationCatalog } from '../table-navigation/catalog.js';
 import { DOM_IDS, resetPhoneTogglePosition } from './toggle-button.js';
 
 const logger = Logger.withScope({ scope: 'bootstrap/command-registry', feature: 'slash' });
@@ -27,14 +28,12 @@ function getAvailableTableEntries(rawData = getTableData()) {
         return [];
     }
 
-    return getSheetKeys(rawData)
-        .map((sheetKey) => {
-            const sheet = rawData[sheetKey];
-            const tableName = normalizeCommandText(sheet?.name) || sheetKey;
+    return buildTableNavigationCatalog(rawData)
+        .map((catalogEntry) => {
+            const sheet = rawData[catalogEntry.sheetKey];
             const content = Array.isArray(sheet?.content) ? sheet.content : [];
             return {
-                sheetKey,
-                tableName,
+                ...catalogEntry,
                 rowCount: Math.max(0, content.length - 1),
             };
         })
@@ -103,13 +102,25 @@ function resolveTableEntry(rawQuery, entries = getAvailableTableEntries()) {
     };
 }
 
-function openTableInPhone(tableName, togglePhone) {
-    const resolved = resolveTableEntry(tableName);
+function openTableInPhone(tableName, togglePhone, deps = {}) {
+    const readAvailableTableEntries = deps.getAvailableTableEntries || getAvailableTableEntries;
+    const navigate = deps.navigateTo || navigateTo;
+    const resolved = resolveTableEntry(tableName, readAvailableTableEntries());
     if (!resolved.ok) {
         return resolved;
     }
 
     const entry = resolved.entry;
+    const route = normalizeCommandText(entry.route);
+    if (!route) {
+        return {
+            ok: false,
+            code: 'route_unavailable',
+            message: `表格「${entry.tableName}」没有可用导航路由`,
+            sheetKey: entry.sheetKey,
+            tableName: entry.tableName,
+        };
+    }
     const visible = typeof togglePhone === 'function' ? togglePhone(true) : false;
     if (visible === false) {
         return {
@@ -121,7 +132,7 @@ function openTableInPhone(tableName, togglePhone) {
         };
     }
 
-    navigateTo(`app:${entry.sheetKey}`);
+    navigate(route);
     return {
         ok: true,
         code: 'opened',
@@ -129,6 +140,15 @@ function openTableInPhone(tableName, togglePhone) {
         sheetKey: entry.sheetKey,
         tableName: entry.tableName,
     };
+}
+
+export function __test__createOpenTableInPhone(deps = {}) {
+    const readTableData = typeof deps.getTableData === 'function' ? deps.getTableData : getTableData;
+    const navigate = typeof deps.navigateTo === 'function' ? deps.navigateTo : navigateTo;
+    return (tableName, togglePhone) => openTableInPhone(tableName, togglePhone, {
+        getAvailableTableEntries: () => getAvailableTableEntries(readTableData()),
+        navigateTo: navigate,
+    });
 }
 
 function listAvailableTables() {

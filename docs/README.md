@@ -5,6 +5,7 @@
 ## 入口
 
 - [`architecture-guide.md`](./architecture-guide.md) — 玉子手机当前稳定架构事实、模块边界、调用链与新增功能检查清单。
+- [`phone-ui-variables.md`](./phone-ui-variables.md) — 小手机公共视觉 token、主界面 Figma 映射与禁止硬编码规则。
 - [`review-issue-ledger.md`](./review-issue-ledger.md) — 深挖审查阶段的问题、风险、修复记录、验证方式与回退方式台账。
 - [`../BUILD.md`](../BUILD.md) — 构建、检查、发布与 `dist/` 提交规则。
 - [`reference/`](./reference) — SillyTavern 宿主、数据库 API、模板语法和数据样本参考资料。

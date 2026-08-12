@@ -1,0 +1,186 @@
+{
+  "format": "yuzi-beautify-workflow",
+  "version": 1,
+  "projectId": "zi-yong-biao-ge",
+  "phase": "confirmed",
+  "tables": {
+    "originalFile": "tables/original/imported.json",
+    "sourceDir": "tables/source",
+    "generatedFile": "tables/generated/tables.json",
+    "originalSha256": "542efafc95cc522e919f77c5f7c967dc104a6eb8e27c73abb52a287e4195b025",
+    "generatedSha256": "e31b851aee0b9090fcbdee2e11ae478ed67a271fd77fd20d2c6aa839487c0aca"
+  },
+  "queue": [
+    {
+      "sheetKey": "sheet_summary",
+      "tableName": "纪要表",
+      "headers": [
+        "row_id",
+        "编码索引",
+        "时间跨度",
+        "与今天的关系",
+        "概览",
+        "纪要",
+        "重要对话"
+      ],
+      "schemaHash": "ef5b2c3ad6c7a1466497359cff67a27ec73470a2e8be5c7e8de14eb3c379bdd1",
+      "status": "completed",
+      "itemId": "chronicle",
+      "fields": [
+        "编码索引",
+        "时间跨度",
+        "与今天的关系",
+        "概览",
+        "纪要",
+        "重要对话"
+      ],
+      "skipReason": null,
+      "completedAt": "2026-08-10T12:41:31.216Z",
+      "preview": {
+        "status": "passed",
+        "recordedAt": "2026-08-10T12:41:31.217Z",
+        "notes": "Codex 浏览器预览通过：自动新增 AM0002 测试行并实时显示；弹窗读取正确；Runtime 清理、重建、重新挂载和切表返回正常；320/375/430px 无横向溢出；无控制台错误或重复事件。"
+      }
+    },
+    {
+      "sheetKey": "sheet_global_data",
+      "tableName": "全局数据表",
+      "headers": [
+        "row_id",
+        "当前时间",
+        "上轮场景时间",
+        "经过的时间",
+        "当前位置"
+      ],
+      "schemaHash": "925bc1b5799a25ce974177da94f9c0812c37dff59b113ac373fa5e29340e1f3e",
+      "status": "completed",
+      "itemId": "global-state",
+      "fields": [
+        "当前时间",
+        "上轮场景时间",
+        "经过的时间",
+        "当前位置"
+      ],
+      "skipReason": null,
+      "completedAt": "2026-08-10T13:20:44.802Z",
+      "preview": {
+        "status": "passed",
+        "recordedAt": "2026-08-10T13:20:44.803Z",
+        "notes": "调整内容区纵向位置：大时间上移约12px，地点与时间变化区上移约24px；320/375/430px无横向溢出；清理重挂载后Mock数据保留；单次动作仅响应一次，日志无WARN或ERROR。"
+      }
+    },
+    {
+      "sheetKey": "sheet_protagonist",
+      "tableName": "主角信息",
+      "headers": [
+        "row_id",
+        "姓名",
+        "性别",
+        "年龄",
+        "外貌特征",
+        "身份",
+        "近况",
+        "基础属性",
+        "特有属性"
+      ],
+      "schemaHash": "8ad94569f20e0416377763dd5dc8b3098fd8182e2279eb356b93a0c34727954d",
+      "status": "completed",
+      "itemId": "protagonist-dossier",
+      "fields": [
+        "姓名",
+        "性别",
+        "年龄",
+        "外貌特征",
+        "身份",
+        "近况",
+        "基础属性",
+        "特有属性"
+      ],
+      "skipReason": null,
+      "completedAt": "2026-08-10T18:35:48.047Z",
+      "preview": {
+        "status": "passed",
+        "recordedAt": "2026-08-10T18:35:48.048Z",
+        "notes": "制作期模拟通过：自动新增一行完整主角资料并实时显示；六维基础属性图、特有属性刻度条、320/375/430px 布局及四个导航动作正常；内容区独立滚动时标题栏位置保持不变，手机内部滚动条已隐藏；切换相邻表后 Runtime 正确清理并重新挂载，控制台无错误或重复事件。头像上传与预设内长期保存按用户决定暂缓，待小手机 presetAssets 接口接通后再验。"
+      }
+    },
+    {
+      "sheetKey": "sheet_important_npc",
+      "tableName": "重要角色表",
+      "headers": [
+        "row_id",
+        "姓名",
+        "角色类型",
+        "性别",
+        "年龄",
+        "一句话介绍",
+        "外貌特征",
+        "穿着打扮",
+        "基础属性",
+        "特有属性",
+        "所在地点",
+        "在场状态",
+        "人际关系"
+      ],
+      "schemaHash": "d00dffddcfa88468ea6ef74c4973f246944259ce4764e995dfbbcb13fc485834",
+      "status": "completed",
+      "itemId": "important-characters",
+      "fields": [
+        "姓名",
+        "角色类型",
+        "性别",
+        "年龄",
+        "一句话介绍",
+        "外貌特征",
+        "穿着打扮",
+        "基础属性",
+        "特有属性",
+        "所在地点",
+        "在场状态",
+        "人际关系"
+      ],
+      "skipReason": null,
+      "completedAt": "2026-08-10T20:38:45.875Z",
+      "preview": {
+        "status": "passed",
+        "recordedAt": "2026-08-10T20:38:45.876Z",
+        "notes": "制作期模拟通过：内存 Mock 新增六名完整角色，验证在场/离场分组、三列人物弹窗、弹窗内外关闭、人物切换、当前 row_id 保持、实时更新、动态雷达图、一两项基础属性刻度条、特有属性与人际关系展示；320/375/430px 无横向溢出；清理并重新挂载后无重复事件，生命周期日志和浏览器控制台无新警告或错误。按用户决定未测试头像上传与 presetAssets 长期保存。"
+      }
+    },
+    {
+      "sheetKey": "sheet_OptionsNew",
+      "tableName": "选项表",
+      "headers": [
+        "row_id",
+        "选项一",
+        "选项二",
+        "选项三",
+        "选项四",
+        "选项五"
+      ],
+      "schemaHash": "2b38312286ca69c4438d757f0bcd1d6e9fa19bf031bd4748ab3e4acea327f1b2",
+      "status": "completed",
+      "itemId": "options",
+      "fields": [
+        "选项一",
+        "选项二",
+        "选项三",
+        "选项四",
+        "选项五"
+      ],
+      "skipReason": null,
+      "completedAt": "2026-08-11T09:40:41.256Z",
+      "preview": {
+        "status": "passed",
+        "recordedAt": "2026-08-11T09:40:41.257Z",
+        "notes": "修改后制作期预览通过：移除“选择一个行动方向”说明，五个按钮整体上移；点击成功不再显示“已追加到酒馆输入框”；追加、焦点与末尾光标仍正常；空白选项隐藏、长文本换行、320/375/430px无内部横向溢出；清理/重新挂载无重复事件；控制台无error/warn。真实SillyTavern宿主仍未验证。"
+      }
+    }
+  ],
+  "currentTable": null,
+  "confirmation": {
+    "confirmed": true,
+    "confirmedAt": "2026-08-11T09:56:05.748Z",
+    "summaryHash": "42e4685368d1682324df58d2e8fa2b153d80041356cc42a0da36082e5b290bed"
+  }
+}

@@ -1,205 +1,99 @@
 const assert = require('assert');
-const { spawnSync } = require('child_process');
-const { pathToFileURL } = require('url');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..');
 const SOURCE_PATH = path.join(ROOT, 'modules', 'phone-core', 'derived-fields', 'chronicle-today-relation.js');
+const SQL_BUILDER_PATH = path.join(ROOT, 'modules', 'phone-core', 'derived-fields', 'chronicle-today-relation-sql.js');
 
-const PYTHON_CANDIDATES = [
-    { command: 'python', args: [] },
-    { command: 'python3', args: [] },
-    { command: 'py', args: ['-3'] },
-];
+function success() {
+    return { ok: true, code: 'ok', rows: [], columns: [], values: [], rowCount: 0 };
+}
 
-function runPython(candidate, code, input) {
-    return spawnSync(candidate.command, [...candidate.args, '-c', code], {
-        cwd: ROOT,
-        encoding: 'utf8',
-        input,
-        stdio: ['pipe', 'pipe', 'pipe'],
+function failure(code, message = code) {
+    return { ok: false, code, message, rows: [], columns: [], values: [], rowCount: 0 };
+}
+
+async function runResolver(resolveContext, responses) {
+    const calls = [];
+    const result = await resolveContext({
+        queryTableRows: async (options) => {
+            calls.push({ ...options, columns: [...(options.columns || [])] });
+            const response = responses[options.tableName];
+            return typeof response === 'function' ? response(options, calls) : response;
+        },
     });
+    return { result, calls };
 }
 
-function findPython() {
-    const probe = 'import sqlite3, sys; print(sqlite3.sqlite_version)';
-    for (const candidate of PYTHON_CANDIDATES) {
-        const result = runPython(candidate, probe, '');
-        if (result.status === 0) return { ...candidate, sqliteVersion: String(result.stdout || '').trim() };
-    }
-    return null;
-}
-
-function loadNodeSqlite() {
-    const originalEmitWarning = process.emitWarning;
-    process.emitWarning = function emitWarningFiltered(warning, ...args) {
-        const message = typeof warning === 'string' ? warning : warning?.message;
-        const type = typeof args[0] === 'string' ? args[0] : warning?.name;
-        if (type === 'ExperimentalWarning' && String(message || '').includes('SQLite')) {
-            return undefined;
-        }
-        return originalEmitWarning.call(this, warning, ...args);
-    };
-
-    try {
-        return require('node:sqlite');
-    } catch (_) {
-        return null;
-    } finally {
-        process.emitWarning = originalEmitWarning;
-    }
-}
-
-function findSqliteEngine() {
-    const python = findPython();
-    if (python) {
-        return { type: 'python', python };
-    }
-
-    const nodeSqlite = loadNodeSqlite();
-    if (nodeSqlite?.DatabaseSync) {
-        return { type: 'node', nodeSqlite };
-    }
-
-    return null;
-}
-
-function runNodeSqlite(nodeSqlite, sql, scenarios) {
-    const { DatabaseSync } = nodeSqlite;
-    const versionDb = new DatabaseSync(':memory:');
-    let sqliteVersion = '';
-    try {
-        sqliteVersion = String(versionDb.prepare('SELECT sqlite_version() AS version').get().version || '');
-    } finally {
-        versionDb.close();
-    }
-
-    const results = scenarios.map((scenario) => {
-        const connection = new DatabaseSync(':memory:');
-        try {
-            scenario.setup.forEach((statement) => {
-                connection.exec(statement);
-            });
-            const rows = connection.prepare(sql).all();
-            return { name: scenario.name, rows };
-        } catch (error) {
-            return { name: scenario.name, error: String(error?.message || error) };
-        } finally {
-            connection.close();
-        }
-    });
-
-    return { sqliteVersion, results };
+function assertQueryCall(call, tableName, columns) {
+    assert.deepStrictEqual(call, {
+        tableName,
+        columns,
+        limit: 1,
+    }, `${tableName} 必须通过 queryTableRows 按逻辑表名和集中列契约检查`);
 }
 
 async function main() {
-    const sqliteEngine = findSqliteEngine();
-    const python = sqliteEngine?.python || null;
-    assert.ok(sqliteEngine, '执行级 SQL 合同需要 Python sqlite3 或 Node node:sqlite；当前环境缺少可用 python/python3/py -3/node:sqlite，不能伪装通过');
+    const sourceModule = await import(pathToFileURL(SOURCE_PATH).href);
+    const sqlModule = await import(pathToFileURL(SQL_BUILDER_PATH).href);
+    const resolveContext = sourceModule.resolveChronicleTodayRelationContext;
 
-    const mod = await import(pathToFileURL(SOURCE_PATH).href);
-    assert.strictEqual(typeof mod.ANCHOR_TABLE_SQL, 'string', '派生器必须导出 ANCHOR_TABLE_SQL 供执行级合同复用');
-    assert.ok(Array.isArray(mod.CHRONICLE_TODAY_RELATION_ANCHOR_TABLES), '派生器必须转出集中 today anchor 表白名单配置');
+    assert.strictEqual(typeof resolveContext, 'function', '纪要派生器必须导出 context resolver');
     assert.deepStrictEqual(
-        mod.CHRONICLE_TODAY_RELATION_ANCHOR_TABLES,
+        sqlModule.CHRONICLE_TODAY_RELATION_ANCHOR_TABLES,
         ['global_state', 'current_status'],
-        '执行级合同必须覆盖集中英文物理表名白名单中的 global_state/current_status 优先级',
+        '锚点优先级必须保持 global_state -> current_status',
     );
 
-
-    const scenarios = [
-        {
-            name: 'global_state 与 current_status 都完整时优先 global_state',
-            expected: 'global_state',
-            setup: [
-                'CREATE TABLE global_state (row_id INTEGER PRIMARY KEY, cur_time TEXT)',
-                "INSERT INTO global_state (cur_time) VALUES ('2026-06-13 12:00')",
-                'CREATE TABLE current_status (row_id INTEGER PRIMARY KEY, cur_time TEXT)',
-                "INSERT INTO current_status (cur_time) VALUES ('2026-06-14 12:00')",
-            ],
-        },
-        {
-            name: '仅 current_status 完整时选择 current_status',
-            expected: 'current_status',
-            setup: [
-                'CREATE TABLE current_status (row_id INTEGER PRIMARY KEY, cur_time TEXT)',
-                "INSERT INTO current_status (cur_time) VALUES ('2026-06-14 12:00')",
-            ],
-        },
-        {
-            name: 'global_state 缺 cur_time 时回退 current_status',
-            expected: 'current_status',
-            setup: [
-                'CREATE TABLE global_state (row_id INTEGER PRIMARY KEY)',
-                'CREATE TABLE current_status (row_id INTEGER PRIMARY KEY, cur_time TEXT)',
-                "INSERT INTO current_status (cur_time) VALUES ('2026-06-14 12:00')",
-            ],
-        },
-        {
-            name: 'global_state 缺 row_id 时回退 current_status',
-            expected: 'current_status',
-            setup: [
-                'CREATE TABLE global_state (cur_time TEXT)',
-                'CREATE TABLE current_status (row_id INTEGER PRIMARY KEY, cur_time TEXT)',
-                "INSERT INTO current_status (cur_time) VALUES ('2026-06-14 12:00')",
-            ],
-        },
-        {
-            name: '两者都不完整时返回空结果',
-            expected: '',
-            setup: [
-                'CREATE TABLE global_state (row_id INTEGER PRIMARY KEY)',
-                'CREATE TABLE current_status (cur_time TEXT)',
-            ],
-        },
-        {
-            name: '中文行号表不能被误选为 today anchor',
-            expected: '',
-            setup: [
-                'CREATE TABLE "行号" (row_id INTEGER PRIMARY KEY, cur_time TEXT)',
-            ],
-        },
-    ];
-
-    const pythonCode = `
-import json
-import sqlite3
-import sys
-
-payload = json.loads(sys.stdin.read())
-sql = payload['sql']
-results = []
-for scenario in payload['scenarios']:
-    connection = sqlite3.connect(':memory:')
-    try:
-        cursor = connection.cursor()
-        for statement in scenario['setup']:
-            cursor.execute(statement)
-        cursor.execute(sql)
-        columns = [item[0] for item in cursor.description]
-        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        results.append({'name': scenario['name'], 'rows': rows})
-    except Exception as error:
-        results.append({'name': scenario['name'], 'error': str(error)})
-    finally:
-        connection.close()
-print(json.dumps({'sqliteVersion': sqlite3.sqlite_version, 'results': results}, ensure_ascii=False))
-`;
-
-    const report = sqliteEngine.type === 'python'
-        ? (() => {
-            const result = runPython(python, pythonCode, JSON.stringify({ sql: mod.ANCHOR_TABLE_SQL, scenarios }));
-            assert.strictEqual(result.status, 0, `Python sqlite3 执行 ANCHOR_TABLE_SQL 失败：${result.stderr || result.stdout}`);
-            return JSON.parse(result.stdout);
-        })()
-        : runNodeSqlite(sqliteEngine.nodeSqlite, mod.ANCHOR_TABLE_SQL, scenarios);
-    report.results.forEach((item, index) => {
-        assert.ok(!item.error, `${item.name} 不应执行失败：${item.error}`);
-        const actual = item.rows?.[0]?.anchor_table || '';
-        assert.strictEqual(actual, scenarios[index].expected, `${item.name} 应返回 ${scenarios[index].expected || '空结果'}`);
+    const preferred = await runResolver(resolveContext, {
+        chronicle: success(),
+        global_state: success(),
+        current_status: success(),
     });
+    assert.deepStrictEqual(preferred.result, { status: 'ready', context: { anchorTable: 'global_state' } }, '两个锚点都可用时必须优先 global_state');
+    assert.strictEqual(preferred.calls.length, 2, '命中 global_state 后不得继续探测 current_status');
+    assertQueryCall(preferred.calls[0], 'chronicle', [...sqlModule.CHRONICLE_TODAY_RELATION_REQUIRED_COLUMNS]);
+    assertQueryCall(preferred.calls[1], 'global_state', [...sqlModule.CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS]);
 
-    console.log(`[通过] 纪要 today_relation anchor SQL 执行合同：SQLite ${report.sqliteVersion} 真实执行 schema 锚点选择通过 (${sqliteEngine.type})`);
+    const fallback = await runResolver(resolveContext, {
+        chronicle: success(),
+        global_state: failure('column_not_resolved', 'global_state.cur_time missing'),
+        current_status: success(),
+    });
+    assert.deepStrictEqual(fallback.result, { status: 'ready', context: { anchorTable: 'current_status' } }, 'global_state 结构不完整时必须回退 current_status');
+    assert.deepStrictEqual(fallback.calls.map(call => call.tableName), ['chronicle', 'global_state', 'current_status'], '锚点探测顺序必须稳定');
+    assertQueryCall(fallback.calls[2], 'current_status', [...sqlModule.CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS]);
+
+    const blocked = await runResolver(resolveContext, {
+        chronicle: success(),
+        global_state: failure('table_not_found', 'global_state missing'),
+        current_status: failure('alias_conflict', 'current_status ambiguous'),
+    });
+    assert.strictEqual(blocked.result.status, 'completed', '两个锚点都结构不可用时必须安全跳过');
+    assert.strictEqual(blocked.result.warning?.action, 'chronicle-today-relation.schema-blocked', '结构阻断必须给出稳定 warning action');
+    assert.deepStrictEqual(blocked.result.warning?.context?.failures?.map(item => item.tableName), ['global_state', 'current_status'], '结构 warning 必须保留全部锚点失败顺序');
+
+    const chronicleMissing = await runResolver(resolveContext, {
+        chronicle: failure('table_not_found', 'chronicle missing'),
+    });
+    assert.strictEqual(chronicleMissing.result.status, 'completed', 'chronicle 逻辑表缺失时必须安全跳过');
+    assert.deepStrictEqual(chronicleMissing.calls.map(call => call.tableName), ['chronicle'], 'chronicle 结构不满足时不得继续检查锚点');
+
+    const runtimeNotReady = await runResolver(resolveContext, {
+        chronicle: failure('runtime_not_ready', 'runtime warming'),
+    });
+    assert.deepStrictEqual(runtimeNotReady.result, { status: 'runtime-not-ready' }, 'runtime 暂不可用必须交给共享服务做有界等待');
+
+    const transientFailure = failure('query_failed', 'temporary read failure');
+    const queryFailed = await runResolver(resolveContext, {
+        chronicle: success(),
+        global_state: transientFailure,
+    });
+    assert.strictEqual(queryFailed.result.status, 'query-failed', '非结构读取失败必须进入查询重试语义');
+    assert.strictEqual(queryFailed.result.result, transientFailure, '查询失败必须保留 repository 归一化结果');
+
+    console.log('[通过] 纪要 today_relation context resolver 执行合同：逻辑表列检查、空表成功、锚点优先/回退、结构阻断与暂时失败分流通过');
 }
 
 main().catch((error) => {

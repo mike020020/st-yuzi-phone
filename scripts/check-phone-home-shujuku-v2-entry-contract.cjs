@@ -83,10 +83,11 @@ function main() {
     check(results, 'panelActions', 'panel-actions 通过 bridge 打开数据库 UI', has(contents.panelActions, "import { openDatabaseUi, openDatabaseVisualizerUi } from './database-ui-bridge.js'"));
     check(results, 'panelActions', 'panel-actions 暴露 openDatabaseUiWithStatus()', has(contents.panelActions, 'export async function openDatabaseUiWithStatus('));
     check(results, 'panelActions', 'openDatabaseSettingsWithStatus 保留兼容 wrapper 并标注语义迁移', has(contents.panelActions, 'export async function openDatabaseSettingsWithStatus(') && has(contents.panelActions, 'return openDatabaseUiWithStatus(options);') && has(contents.panelActions, '实际语义已迁移为“打开数据库 UI”'));
-    check(results, 'panelActions', 'triggerManualUpdate 仍使用旧 getDB 主链', has(contents.panelActions, 'const api = getDB();') && has(contents.panelActions, 'warmDatabaseSettingsRuntimeBeforeManualUpdate(api)'));
+    check(results, 'panelActions', 'panel-actions 不再承载手动更新链', !has(contents.panelActions, 'triggerManualUpdate') && !has(contents.panelActions, 'manualUpdate'));
 
     check(results, 'dataApi', 'data-api 导出 openDatabaseUiWithStatus', has(contents.dataApi, 'openDatabaseUiWithStatus'));
     check(results, 'dataApi', 'data-api 保留 openDatabaseSettingsWithStatus 导出', has(contents.dataApi, 'openDatabaseSettingsWithStatus'));
+    check(results, 'dataApi', 'data-api 不再导出 triggerManualUpdate', !has(contents.dataApi, 'triggerManualUpdate'));
 
     check(results, 'homeRender', '主页 render 注入 openDatabaseUiWithStatus', has(contents.homeRender, 'openDatabaseUiWithStatus'));
     check(results, 'homeData', '数据库 Dock 文案指向数据库界面', has(contents.homeData, "pendingMessage: '正在打开数据库界面...'"));

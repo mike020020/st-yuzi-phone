@@ -18,32 +18,39 @@
 
 import {
     getTableData,
-    getSheetKeys,
     openVisualizerWithStatus,
     openDatabaseUiWithStatus,
 } from '../phone-core/data-api.js';
 import { navigateTo } from '../phone-core/routing.js';
-import { getPhoneSettings } from '../settings.js';
+import { defaultSettings, getPhoneSettings } from '../settings.js';
 import { escapeHtmlAttr } from '../utils/dom-escape.js';
 import { clampNumber } from '../utils/object.js';
 import { buildHomeScreenViewModel } from './view-model.js';
+import { ensureQQHomeUnreadProjection } from './qq-unread.js';
 import { bindHomeDockInteractions, bindHomeGridInteractions } from './interactions.js';
 import { buildHomeShellStyleText, buildHomeShellHtml, buildHomeAppItemHtml, buildDockItemHtml, buildStatusBarHtml } from './templates.js';
 import { ensureHomeInteractionRuntime } from './runtime.js';
 import { resolveStatusBarData } from './status-bar-data.js';
+import { getQQV2Facade } from '../qq-v2/runtime/default-runtime.js';
 
 function resolveHomeAppLabelColorTokens(mode) {
     if (mode === 'black') {
         return {
-            color: 'rgba(20, 24, 28, 0.92)',
-            shadow: '0 1px 3px rgba(255, 255, 255, 0.45)',
+            color: 'var(--yuzi-phone-home-app-label-color-on-light)',
+            shadow: 'var(--yuzi-phone-home-app-label-shadow-on-light)',
         };
     }
 
     return {
-        color: 'rgba(255, 255, 255, 0.96)',
-        shadow: '0 1px 3px rgba(0, 0, 0, 0.32)',
+        color: 'var(--yuzi-phone-home-app-label-color-on-dark)',
+        shadow: 'var(--yuzi-phone-home-app-label-shadow-on-dark)',
     };
+}
+
+function clampHomeGridGap(value) {
+    const parsed = Number(value);
+    const resolved = Number.isFinite(parsed) ? parsed : defaultSettings.appGridGap;
+    return Math.max(8, Math.min(24, resolved));
 }
 
 /**
@@ -121,14 +128,18 @@ export function patchHomeGrid(grid, apps = []) {
 export function patchHomeDock(dock, dockApps = []) {
     if (!(dock instanceof HTMLElement)) return;
 
+    const material = document.createElement('div');
+    material.className = 'phone-dock-material';
     dock.replaceChildren();
+    dock.appendChild(material);
 
     dockApps.forEach((app) => {
         const el = document.createElement('div');
         el.className = `phone-dock-item phone-dock-item-${app.safeAppIdClass}`;
         el.innerHTML = buildDockItemHtml(app.iconHtml, app.name);
         el.dataset.dockAppId = app.id;
-        dock.appendChild(el);
+        el.setAttribute('aria-label', String(app.name || ''));
+        material.appendChild(el);
     });
 }
 
@@ -142,11 +153,11 @@ export function renderHomeScreen(container) {
     const rawData = getTableData();
     const phoneSettings = getPhoneSettings();
 
-    const appIconSize = clampNumber(phoneSettings.appIconSize, 40, 88, 60);
-    const appIconRadius = clampNumber(phoneSettings.appIconRadius, 6, 26, 14);
-    const appGridColumns = clampNumber(phoneSettings.appGridColumns, 3, 6, 4);
-    const appGridGap = clampNumber(phoneSettings.appGridGap, 8, 24, 12);
-    const dockIconSize = clampNumber(phoneSettings.dockIconSize, 32, 72, 48);
+    const appIconSize = clampNumber(phoneSettings.appIconSize, 40, 88, defaultSettings.appIconSize);
+    const appIconRadius = clampNumber(phoneSettings.appIconRadius, 6, 26, defaultSettings.appIconRadius);
+    const appGridColumns = clampNumber(phoneSettings.appGridColumns, 3, 6, defaultSettings.appGridColumns);
+    const appGridGap = clampHomeGridGap(phoneSettings.appGridGap);
+    const dockIconSize = clampNumber(phoneSettings.dockIconSize, 32, 72, defaultSettings.dockIconSize);
     const { color: homeAppLabelColor, shadow: homeAppLabelShadow } = resolveHomeAppLabelColorTokens(phoneSettings.homeAppLabelColorMode);
 
     const bgStyle = phoneSettings.backgroundImage
@@ -166,15 +177,29 @@ export function renderHomeScreen(container) {
 
     const interactionRuntime = ensureHomeInteractionRuntime(container);
     const shell = ensureHomeShell(container, homeShellStyle);
+    if (shell.root instanceof HTMLElement) {
+        shell.root.dataset.homeAppLabelColorMode = phoneSettings.homeAppLabelColorMode === 'black' ? 'black' : 'white';
+    }
     const grid = shell.grid;
     const dock = shell.dock;
-    const viewModel = buildHomeScreenViewModel(rawData, phoneSettings, { getSheetKeys });
+    const patchGridForQQUnread = (qqUnreadTotal = 0) => {
+        if (interactionRuntime.isDisposed()) return null;
+        const viewModel = buildHomeScreenViewModel(getTableData(), getPhoneSettings(), { qqUnreadTotal });
+        patchHomeGrid(grid, viewModel.apps);
+        bindHomeGridInteractions(grid, { navigateTo, runtime: interactionRuntime });
+        return viewModel;
+    };
+    const unreadProjection = ensureQQHomeUnreadProjection({
+        container,
+        facade: getQQV2Facade(),
+        runtime: interactionRuntime,
+        onChange: patchGridForQQUnread,
+    });
+    const viewModel = patchGridForQQUnread(unreadProjection?.getTotal() || 0)
+        || buildHomeScreenViewModel(rawData, phoneSettings);
 
     const statusBarData = resolveStatusBarData(rawData);
     patchStatusBar(shell.statusBar, statusBarData, shell.root);
-
-    patchHomeGrid(grid, viewModel.apps);
-    bindHomeGridInteractions(grid, { navigateTo, runtime: interactionRuntime });
 
     patchHomeDock(dock, viewModel.dockApps);
     bindHomeDockInteractions(dock, viewModel.dockApps, container, {

@@ -1,6 +1,5 @@
 import { getSheetKeys } from '../phone-core/data-api.js';
 import { resolveTheaterSceneBySheetKey } from '../phone-theater/data.js';
-import { detectSpecialTableType } from '../table-viewer/special/runtime.js';
 
 export const TABLE_ROUTE_PREFIX = 'table:';
 
@@ -26,18 +25,6 @@ function buildCatalogEntry(rawData, sheetKey, orderIndex) {
             orderIndex,
             presentation: 'theater',
             sceneId: theaterScene.id,
-            route: buildTableRoute(sheetKey),
-        });
-    }
-
-    const specialType = detectSpecialTableType(tableName);
-    if (specialType) {
-        return Object.freeze({
-            sheetKey,
-            tableName,
-            orderIndex,
-            presentation: 'special',
-            specialType,
             route: buildTableRoute(sheetKey),
         });
     }

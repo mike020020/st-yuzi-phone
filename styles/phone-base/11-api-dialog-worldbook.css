@@ -144,6 +144,53 @@
     background: linear-gradient(180deg, rgba(91, 122, 106, 0.96), rgba(75, 102, 88, 0.98)) !important;
 }
 
+/* ===== QQ API 预设 ===== */
+
+.phone-api-preset-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.phone-api-preset-select {
+    width: 100%;
+    max-width: none;
+}
+
+.phone-api-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.phone-api-preset-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.phone-api-preset-field > span {
+    font-size: 12px;
+    color: var(--yuzi-settings-text-secondary, #7A7772);
+}
+
+.phone-api-preset-field-wide {
+    grid-column: 1 / -1;
+}
+
+.phone-api-preset-hint {
+    display: block;
+    color: var(--yuzi-settings-text-faint, #9A9790);
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.phone-api-preset-actions .phone-settings-btn {
+    min-width: 108px;
+}
+
 /* ===== 确认弹窗样式 ===== */
 
 .phone-confirm-dialog-overlay {
@@ -283,9 +330,9 @@
 }
 
 .phone-ai-preset-segment-card {
-    border: 1px solid var(--yuzi-phone-border-default, rgba(255, 255, 255, 0.1));
-    border-radius: var(--yuzi-phone-radius-lg, 12px);
-    background: var(--yuzi-phone-bg-overlay-soft, rgba(0, 0, 0, 0.18));
+    border: 1px solid var(--yuzi-settings-border-strong, rgba(58, 55, 49, 0.12));
+    border-radius: var(--yuzi-phone-radius-md, 8px);
+    background: var(--yuzi-settings-surface-soft, rgba(245, 243, 239, 0.6));
     padding: 12px;
     display: flex;
     flex-direction: column;
@@ -320,8 +367,8 @@
     align-items: center;
     justify-content: center;
     border-radius: 3px;
-    background: rgba(91, 122, 106, 0.1);
-    color: #5B7A6A;
+    background: var(--yuzi-settings-accent-soft, rgba(91, 122, 106, 0.1));
+    color: var(--yuzi-settings-accent, #5B7A6A);
     font-size: 12px;
     font-weight: 700;
 }
@@ -344,14 +391,51 @@
 
 .phone-ai-preset-segment-field > span {
     font-size: 12px;
-    color: var(--yuzi-phone-color-text-muted, rgba(255, 255, 255, 0.68));
+    color: var(--yuzi-settings-text-secondary, #7A7772);
 }
 
 .phone-ai-preset-segment-content-input {
     min-height: 132px;
 }
 
+.phone-ai-preset-placeholder-note {
+    margin-top: 12px;
+    overflow-wrap: anywhere;
+}
+
+.phone-ai-preset-placeholder-note code {
+    color: var(--yuzi-settings-accent-strong, #4B6648);
+    background: var(--yuzi-settings-accent-soft, rgba(91, 122, 106, 0.1));
+}
+
+.phone-ai-instruction-presets-section .phone-settings-section-side {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 430px) {
+    .phone-ai-instruction-presets-section .phone-settings-section-head {
+        flex-wrap: wrap;
+    }
+
+    .phone-ai-instruction-presets-section .phone-settings-section-side {
+        flex: 1 1 100%;
+    }
+
+    .phone-ai-instruction-presets-section .phone-settings-action {
+        justify-content: flex-start;
+    }
+}
+
 @media screen and (max-width: 720px) {
+    .phone-api-preset-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .phone-api-preset-field-wide {
+        grid-column: auto;
+    }
+
     .phone-ai-preset-segment-config {
         grid-template-columns: 1fr;
     }

@@ -1,0 +1,20 @@
+{
+  "format": "yuzi-beautify-workflow",
+  "version": 1,
+  "projectId": "",
+  "phase": "empty",
+  "tables": {
+    "originalFile": null,
+    "sourceDir": null,
+    "generatedFile": null,
+    "originalSha256": null,
+    "generatedSha256": null
+  },
+  "queue": [],
+  "currentTable": null,
+  "confirmation": {
+    "confirmed": false,
+    "confirmedAt": null,
+    "summaryHash": null
+  }
+}

@@ -60,7 +60,7 @@ assertOrdered(deleteBody, [
     'const execution = await executeTheaterDeletionPlans(scene, deletionPlans);',
     'const refreshed = execution.results.length > 0',
     '&& execution.results.every((result) => result.refreshed !== false);',
-    'notifiedSheetKeys.forEach(sheetKey => dispatchPhoneTableUpdated(sheetKey));',
+    'notifiedSheetKeys.forEach(sheetKey => dispatchTableUpdated(sheetKey));',
     'message: refreshed ? `已删除 ${execution.deletedCount} 条相关数据` : `已删除 ${execution.deletedCount} 条相关数据，但刷新投影失败`,',
     'refreshed,',
 ], 'deleteTheaterEntities 必须汇总底层 mutation 刷新状态并返回失败文案');

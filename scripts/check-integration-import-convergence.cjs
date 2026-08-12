@@ -18,8 +18,6 @@ const FILES = {
     phoneFusionRender: 'modules/phone-fusion/render.js',
     settings: 'modules/settings.js',
     slashActions: 'modules/slash-commands/command-actions.js',
-    worldbookSelection: 'modules/settings-app/services/worldbook-selection.js',
-    chatSupportSettingsContext: 'modules/phone-core/chat-support/settings-context.js',
 };
 
 const FACADE_RELATIVE_PATH = 'modules/integration.js';
@@ -53,6 +51,11 @@ function main() {
         description: 'integration façade 已删除',
         ok: !exists(FACADE_RELATIVE_PATH),
     });
+    results.push({
+        file: 'modules/phone-core/chat-support/settings-context.js',
+        description: '旧消息记录表 settings-context 已删除，QQ 不再通过 chat-support 接入宿主能力',
+        ok: !exists('modules/phone-core/chat-support/settings-context.js'),
+    });
 
     // 子模块 API 表面继续保持
     check(results, 'eventBridge', 'event-bridge 暴露 EventTypes', has(contents.eventBridge, 'export const EventTypes'));
@@ -79,12 +82,11 @@ function main() {
     check(results, 'slashActions', 'slash command actions 直接从 toast-bridge 导入 showNotification()', has(contents.slashActions, "from '../integration/toast-bridge.js';"));
     check(results, 'slashActions', 'slash command actions 不再从 integration façade 导入', !has(contents.slashActions, "from '../integration.js';"));
 
-    check(results, 'worldbookSelection', 'worldbook-selection 直接从 event-bridge 导入 onWorldInfoUpdated()', has(contents.worldbookSelection, "from '../../integration/event-bridge.js';"));
-    check(results, 'worldbookSelection', 'worldbook-selection 直接从 tavern-helper-bridge 导入世界书能力', has(contents.worldbookSelection, "from '../../integration/tavern-helper-bridge.js';"));
-    check(results, 'worldbookSelection', 'worldbook-selection 不再从 integration façade 导入', !has(contents.worldbookSelection, "from '../../integration.js';"));
-
-    check(results, 'chatSupportSettingsContext', 'chat-support settings-context 直接从 tavern-helper-bridge 导入角色与世界书能力', has(contents.chatSupportSettingsContext, "from '../../integration/tavern-helper-bridge.js';"));
-    check(results, 'chatSupportSettingsContext', 'chat-support settings-context 不再从 integration façade 导入', !has(contents.chatSupportSettingsContext, "from '../../integration.js';"));
+    results.push({
+        file: 'modules/settings-app/services/worldbook-selection.js',
+        description: '旧世界书选择服务已删除，不再保留宿主世界书读取链',
+        ok: !exists('modules/settings-app/services/worldbook-selection.js'),
+    });
 
     const failed = results.filter(item => !item.ok);
     if (failed.length > 0) {

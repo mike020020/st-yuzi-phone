@@ -45,8 +45,11 @@ import {
     getPhoneThemeModeValue as getPhoneThemeModeValueImpl,
     setupPhoneThemeModeSettings as setupPhoneThemeModeSettingsImpl,
 } from './appearance-settings/theme-settings.js';
+import { buildPackIconOriginCleanup } from './appearance-settings/icon-selection-state.js';
 
-const { renderIconUploadList: renderIconUploadListImpl } = createIconUploadService();
+const { renderIconUploadList: renderIconUploadListImpl } = createIconUploadService({
+    getAppearancePack: getAppearancePackImpl,
+});
 
 export function setupBgUpload(container, options = {}) {
     return setupBgUploadImpl(container, options);
@@ -116,47 +119,46 @@ export async function deleteAppearancePackFromRepository(id) {
     const settings = getPhoneSettings();
     const activePackId = String(settings?.appearanceActivePackId || '').trim();
     const targetPackId = String(id || '').trim();
+    const activeCleared = Boolean(activePackId && activePackId === targetPackId);
+    const iconCleanup = buildPackIconOriginCleanup(settings, targetPackId);
+    const settingsChanged = activeCleared || iconCleanup.removedKeys.length > 0;
+    const settingsBackup = {
+        appearanceActivePackId: activePackId,
+        appIcons: { ...(settings?.appIcons || {}) },
+        appIconOrigins: { ...(settings?.appIconOrigins || {}) },
+    };
 
-    if (activePackId && activePackId === targetPackId) {
-        const clearResult = savePhoneSettingsPatch({ appearanceActivePackId: '' });
-        if (!clearResult) {
-            return {
-                success: false,
-                message: '删除失败：当前激活标记清理失败，仓库包未删除；当前外观未被清空',
-                deletedId: '',
-                activeCleared: false,
-            };
-        }
-        const flushResult = flushPhoneSettingsSave();
-        if (!flushResult) {
-            savePhoneSettingsPatch({ appearanceActivePackId: activePackId });
+    if (settingsChanged) {
+        const patch = {
+            appIcons: iconCleanup.appIcons,
+            appIconOrigins: iconCleanup.appIconOrigins,
+        };
+        if (activeCleared) patch.appearanceActivePackId = '';
+
+        const saved = savePhoneSettingsPatch(patch);
+        if (!saved || !flushPhoneSettingsSave()) {
+            savePhoneSettingsPatch(settingsBackup);
             flushPhoneSettingsSave();
             return {
                 success: false,
-                message: '删除失败：当前激活标记无法持久化，仓库包未删除；当前外观未被清空',
+                message: '删除失败：相关图标设置无法持久化，仓库包未删除；当前外观未被清空',
                 deletedId: '',
                 activeCleared: false,
             };
         }
-
-        const deleteResult = await deleteAppearancePackImpl(id);
-        if (!deleteResult?.success) {
-            savePhoneSettingsPatch({ appearanceActivePackId: activePackId });
-            const restoreFlushResult = flushPhoneSettingsSave();
-            if (!restoreFlushResult) {
-                return { ...deleteResult, message: `${deleteResult.message || '删除失败'}；当前激活标记恢复保存失败`, activeCleared: false };
-            }
-            return { ...deleteResult, activeCleared: false };
-        }
-        return { ...deleteResult, activeCleared: true };
     }
 
-    const deleteResult = await deleteAppearancePackImpl(id);
+    const deleteResult = await deleteAppearancePackImpl(targetPackId);
     if (!deleteResult?.success) {
-        return deleteResult;
+        if (!settingsChanged) return deleteResult;
+
+        const restored = savePhoneSettingsPatch(settingsBackup) && flushPhoneSettingsSave();
+        return restored
+            ? { ...deleteResult, activeCleared: false }
+            : { ...deleteResult, message: `${deleteResult.message || '删除失败'}；相关图标设置恢复保存失败`, activeCleared: false };
     }
 
-    return { ...deleteResult, activeCleared: false };
+    return { ...deleteResult, activeCleared };
 }
 
 export function exportAppearanceResourcePack(options = {}) {

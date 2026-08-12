@@ -1,13 +1,19 @@
+import {
+    buildPhoneBackButton,
+    buildPhoneNavBar,
+    buildPhoneNavTitleSwitcher,
+} from '../phone-core/navigation-ui.js';
 import { PHONE_ICONS } from '../phone-home/icons.js';
 import { escapeHtml, escapeHtmlAttr } from '../utils/dom-escape.js';
 
 export function buildFusionPageHtml() {
+    const navigationHtml = buildPhoneNavBar({
+        leadingHtml: buildPhoneBackButton(),
+        centerHtml: buildPhoneNavTitleSwitcher({ title: '模板缝合' }),
+    });
     return `
         <div class="phone-app-page phone-fusion-page">
-            <div class="phone-nav-bar">
-                <button type="button" class="phone-nav-back">${PHONE_ICONS.back}<span>返回</span></button>
-                <span class="phone-nav-title">模板缝合</span>
-            </div>
+            ${navigationHtml}
             <div class="phone-app-body phone-fusion-body">
                 <div class="phone-fusion-desc">
                     从内置模板、本地 JSON 或当前数据库表格中选择区块，自动合并为新模板

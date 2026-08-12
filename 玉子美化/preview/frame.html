@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN" data-yuzi-preview-frame="true">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>预设沙箱</title>
+  <style>
+    *{box-sizing:border-box}html,body{height:100%;min-height:0;margin:0;overflow:hidden;background:#f8f4ee;color:#28231f;font-family:system-ui,sans-serif}body{display:flex;flex-direction:column}
+    #frame-status{position:relative;z-index:1000;flex:0 0 auto;padding:7px 12px;background:#28231f;color:#fff;font-size:12px}
+    #frame-status[data-tone="success"]{background:#315c46}#frame-status[data-tone="warning"]{background:#8a632f}#frame-status[data-tone="error"]{background:#8b3942}
+    #mount-root{flex:1 1 auto;min-height:0;overflow:hidden}.frame-placeholder{margin:28px 18px;padding:28px 18px;border:1px dashed #b8aa9a;border-radius:18px;text-align:center;color:#75685d}
+  </style>
+</head>
+<body>
+  <div id="frame-status" data-tone="neutral">等待面板数据</div>
+  <div id="mount-root"></div>
+  <script type="module" src="./runtime-v1.js"></script>
+</body>
+</html>

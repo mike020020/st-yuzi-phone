@@ -3,6 +3,10 @@
  * 使用项目现有的 phone-nav-bar / phone-app-page / phone-app-body 结构
  */
 
+import {
+    buildPhoneBackButton,
+    buildPhoneNavBar,
+} from '../phone-core/navigation-ui.js';
 import { escapeHtml, escapeHtmlAttr } from '../utils/dom-escape.js';
 
 /**
@@ -11,35 +15,44 @@ import { escapeHtml, escapeHtmlAttr } from '../utils/dom-escape.js';
 export function buildVariableManagerPageHtml(messageId, isMvu) {
     const floorLabel = messageId >= 0 ? `第${messageId}楼` : '无数据';
     const mvuBadge = isMvu ? '<span class="vm-mvu-badge">MVU</span>' : '';
+    const navigationHtml = buildPhoneNavBar({
+        className: 'vm-navbar',
+        leadingHtml: buildPhoneBackButton({
+            className: 'vm-nav-back',
+            attributes: { 'data-vm-action': 'nav-back' },
+        }),
+        centerHtml: `
+            <div class="phone-nav-title vm-nav-title">
+                <span class="vm-nav-title-text">变量管理器</span>
+                ${mvuBadge}
+            </div>
+        `,
+        trailingHtml: `
+            <div class="vm-nav-right-group">
+                <span class="vm-floor-label">${escapeHtml(floorLabel)}</span>
+                <button type="button" class="vm-nav-refresh" data-vm-action="refresh" aria-label="刷新">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16">
+                        <path d="M1 4v6h6"/><path d="M23 20v-6h-6"/>
+                        <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+                    </svg>
+                </button>
+            </div>
+        `,
+    });
 
     return `
         <div class="phone-app-page vm-page">
-            <div class="phone-nav-bar vm-navbar">
-                <button type="button" class="phone-nav-back vm-nav-back" data-vm-action="nav-back" aria-label="返回">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M15 19l-7-7 7-7"/></svg>
-                    <span>返回</span>
-                </button>
-                <div class="phone-nav-title vm-nav-title">变量管理器 ${mvuBadge}</div>
-                <div class="vm-nav-right-group">
-                    <span class="vm-floor-label">${escapeHtml(floorLabel)}</span>
-                    <button type="button" class="vm-nav-refresh" data-vm-action="refresh" aria-label="刷新">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16">
-                            <path d="M1 4v6h6"/><path d="M23 20v-6h-6"/>
-                            <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
+            ${navigationHtml}
             <div class="phone-app-body vm-body">
                 <div class="vm-content"></div>
             </div>
-            <div class="vm-footer">
+            <div class="vm-footer" data-phone-bottom-bar>
                 <button type="button" class="vm-add-btn" data-vm-action="add-variable">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     <span>添加变量</span>
                 </button>
             </div>
-            <div class="vm-delete-bar vm-delete-bar-hidden">
+            <div class="vm-delete-bar vm-delete-bar-hidden" data-phone-bottom-bar>
                 <button type="button" class="vm-delete-cancel-btn" data-vm-action="exit-delete-mode">完成</button>
                 <button type="button" class="vm-delete-confirm-btn" data-vm-action="confirm-delete">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>

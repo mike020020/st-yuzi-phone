@@ -1,1 +1,7 @@
-.character-card { padding: 16px; color: #f7f7fb; background: #242438; border-radius: 14px; }
+.character-page { min-height: 100%; padding: 16px; color: #f7f7fb; background: #242438; }
+.character-toolbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.character-toolbar h2 { margin: 0; text-align: center; }
+.character-toolbar button { padding: 8px 12px; color: inherit; background: #3a3a56; border: 1px solid #66668c; border-radius: 8px; }
+.character-toolbar button:disabled { opacity: 0.45; }
+.character-status { min-height: 1.5em; color: #c8c8e8; }
+.character-rows { margin: 0; padding: 12px; overflow: auto; white-space: pre-wrap; background: #1b1b2b; border-radius: 10px; }

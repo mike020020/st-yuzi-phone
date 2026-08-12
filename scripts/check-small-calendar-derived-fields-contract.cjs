@@ -27,11 +27,13 @@ function assertNotIncludes(source, needle, message) {
 async function main() {
     const liveSource = read(LIVE_PATH);
     const diarySource = read(DIARY_PATH);
+    const sqlSource = read(SQL_PATH);
     const runtimeSource = read(RUNTIME_PATH);
     const serviceSource = read(SERVICE_PATH);
     const backgroundServicesSource = read(BACKGROUND_SERVICES_PATH);
     const lifecycleSource = read(LIFECYCLE_PATH);
     const sqlMod = await import(pathToFileURL(SQL_PATH).href);
+    const runtimeMod = await import(pathToFileURL(RUNTIME_PATH).href);
 
     ['状态标签', '当前状态', '乐子强度', '主推角色/阵营', '正在直播', '正常滚动', "'Stage'", '>Stage<'].forEach((needle) => {
         assertNotIncludes(liveSource, needle, `直播页不得继续包含旧字段或假兜底：${needle}`);
@@ -52,20 +54,24 @@ async function main() {
     );
     assert.strictEqual(sqlMod.SMALL_CALENDAR_DERIVED_FIELDS_TABLE, 'small_calendar_days', '小日历派生字段必须使用英文物理表名');
 
-    const availabilitySql = sqlMod.buildSmallCalendarDerivedFieldsAvailabilitySql();
     const signatureSql = sqlMod.buildSmallCalendarDerivedFieldsSignatureSql();
     const updateSql = sqlMod.buildSmallCalendarDerivedFieldsUpdateSql();
-    const allSql = `${availabilitySql}\n${signatureSql}\n${updateSql}`;
+    const allSql = `${signatureSql}\n${updateSql}`;
 
 
     ['small_calendar_days', 'date_text', 'weekday_text', 'month_days', '星期一', '星期日', 'source_signature', 'input_signature', 'pending_update_count'].forEach((needle) => {
         assertIncludes(allSql, needle, `小日历 SQL 必须包含派生字段合同片段：${needle}`);
     });
-    ['sqlite_master', 'pragma_table_info', 'date(TRIM(date_text)) = TRIM(date_text)', 'strftime'].forEach((needle) => {
-        assertIncludes(allSql, needle, `小日历 SQL 必须包含可用性/日期校验片段：${needle}`);
+    ['date(TRIM(date_text)) = TRIM(date_text)', 'strftime'].forEach((needle) => {
+        assertIncludes(allSql, needle, `小日历 SQL 必须保留日期校验/复杂计算片段：${needle}`);
     });
-    assertNotIncludes(updateSql, 'UPDATE FROM', '小日历 SQL 禁止 UPDATE FROM');
-    assert.ok(!/;\s*\S/.test(availabilitySql), 'availability SQL 禁止分号串多语句');
+    ['sqlite_master', 'pragma_table_info', 'buildSmallCalendarDerivedFieldsAvailabilitySql'].forEach((needle) => {
+        assertNotIncludes(sqlSource, needle, `小日历 SQL builder 不得保留旧物理 schema gate：${needle}`);
+    });
+    assertIncludes(updateSql, 'row_id AS target_row_id', '小日历 mutation 必须为计算结果声明稳定目标行身份');
+    assertIncludes(updateSql, 'FROM computed_calendar_fields', '小日历 mutation 必须通过 UPDATE ... FROM 一次连接计算结果');
+    assertIncludes(updateSql, 'WHERE row_id = computed_calendar_fields.target_row_id', '小日历 mutation 必须通过无表名前缀的 row_id 对号写回');
+    assertNotIncludes(updateSql, 'small_calendar_days.row_id', '小日历 mutation 不得把逻辑表名硬编码为目标行限定符');
     assert.ok(!/;\s*\S/.test(signatureSql), 'signature SQL 禁止分号串多语句');
     assert.ok(!/;\s*\S/.test(updateSql), 'update SQL 禁止分号串多语句');
 
@@ -82,9 +88,15 @@ async function main() {
         'createDerivedFieldService',
         'readDerivedField',
         'querySqlViaApi',
-        'probeSqliteCapabilityViaApi',
+        'queryTableRowsViaApi',
         'executeSqlMutationViaApi',
         'subscribeTableUpdate',
+        'subscribeTableFillStart',
+        'resolveSmallCalendarDerivedFieldsContext',
+        'resolveContext: resolveSmallCalendarDerivedFieldsContext',
+        'tableName: SMALL_CALENDAR_DERIVED_FIELDS_TABLE',
+        'columns: SMALL_CALENDAR_DERIVED_FIELDS_REQUIRED_COLUMNS',
+        'limit: 1',
         "readDerivedField(result, 'source_signature', 0)",
         "readDerivedField(result, 'input_signature', 1)",
         "readDerivedField(result, 'pending_update_count', 4)",
@@ -109,6 +121,44 @@ async function main() {
     ].forEach((needle) => {
         assertIncludes(serviceSource, needle, `共享派生服务必须包含小日历调度合同：${needle}`);
     });
+    assertIncludes(serviceSource, "typeof config.resolveContext === 'function'", '共享派生服务必须支持异步 context resolver');
+    assertIncludes(serviceSource, 'await config.resolveContext(deps, {', '共享派生服务必须等待 context resolver 完成并传入暂停检查');
+
+    const readyCalls = [];
+    const ready = await runtimeMod.resolveSmallCalendarDerivedFieldsContext({
+        queryTableRows: async (options) => {
+            readyCalls.push({ ...options, columns: [...options.columns] });
+            return { ok: true, code: 'ok', rows: [], columns: [], values: [], rowCount: 0 };
+        },
+    });
+    assert.deepStrictEqual(ready, { status: 'ready', context: null }, '小日历空表只要逻辑表列可访问就必须进入 ready');
+    assert.deepStrictEqual(readyCalls, [{
+        tableName: sqlMod.SMALL_CALENDAR_DERIVED_FIELDS_TABLE,
+        columns: [...sqlMod.SMALL_CALENDAR_DERIVED_FIELDS_REQUIRED_COLUMNS],
+        limit: 1,
+    }], '小日历 context resolver 必须通过 queryTableRows 检查集中逻辑列契约');
+
+    const structural = await runtimeMod.resolveSmallCalendarDerivedFieldsContext({
+        queryTableRows: async () => ({ ok: false, code: 'column_not_resolved', message: 'month_days missing' }),
+    });
+    assert.strictEqual(structural.status, 'completed', '小日历结构缺失必须安全跳过');
+    assert.strictEqual(structural.warning?.action, 'small-calendar-derived-fields.schema-blocked', '小日历结构阻断必须使用稳定 warning action');
+
+    const runtimeNotReady = await runtimeMod.resolveSmallCalendarDerivedFieldsContext({
+        queryTableRows: async () => ({ ok: false, code: 'runtime_not_ready', message: 'runtime warming' }),
+    });
+    assert.deepStrictEqual(runtimeNotReady, { status: 'runtime-not-ready' }, '小日历 runtime 暂不可用必须交给共享服务等待');
+
+    const transientFailure = { ok: false, code: 'query_failed', message: 'temporary read failure' };
+    const queryFailed = await runtimeMod.resolveSmallCalendarDerivedFieldsContext({
+        queryTableRows: async () => transientFailure,
+    });
+    assert.strictEqual(queryFailed.status, 'query-failed', '小日历非结构读取失败必须进入查询重试语义');
+    assert.strictEqual(queryFailed.result, transientFailure, '小日历查询失败必须保留 repository 归一化结果');
+
+    ['sqlite_master', 'pragma_table_info', 'probeSqliteCapabilityViaApi'].forEach((needle) => {
+        assertNotIncludes(`${runtimeSource}\n${sqlSource}`, needle, `小日历派生链路不得保留旧物理 schema 探测：${needle}`);
+    });
 
     ['startSmallCalendarDerivedFieldsInjection', 'stopSmallCalendarDerivedFieldsInjection', './derived-fields/small-calendar-derived-fields.js'].forEach((needle) => {
         assertIncludes(backgroundServicesSource, needle, `后台服务必须接入小日历派生字段启动/停止：${needle}`);
@@ -117,7 +167,7 @@ async function main() {
         assertNotIncludes(lifecycleSource, needle, `UI lifecycle 不得直接拥有后台小日历派生器：${needle}`);
     });
 
-    console.log('[check-small-calendar-derived-fields-contract] 小日历派生字段 / 直播旧字段 / 小日记 PS 合同检查通过');
+    console.log('[check-small-calendar-derived-fields-contract] 小日历 queryTableRows context resolver / 复杂 SQL 派生 / 直播旧字段 / 小日记 PS 合同检查通过');
 }
 
 main().catch((error) => {

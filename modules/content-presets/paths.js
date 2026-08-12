@@ -6,9 +6,12 @@ export function stripReferenceSuffix(value) {
 }
 
 export function normalizePackagePath(value) {
-    const raw = stripReferenceSuffix(value).trim();
+    if (typeof value !== 'string' || value !== value.trim()) {
+        throw new Error('包路径必须是无首尾空白的字符串');
+    }
+    const raw = value;
     if (!raw) throw new Error('包路径不能为空');
-    if (raw.includes('\\')) throw new Error(`包路径不得包含反斜杠：${raw}`);
+    if (/[\\?#\0-\x1f\x7f]/.test(raw)) throw new Error(`包路径包含非法字符：${raw}`);
     if (raw.startsWith('/') || DRIVE_PATTERN.test(raw) || SCHEME_PATTERN.test(raw)) {
         throw new Error(`包路径必须是相对路径：${raw}`);
     }

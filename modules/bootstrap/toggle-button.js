@@ -1,6 +1,7 @@
 import { PHONE_ICONS } from '../phone-home/icons.js';
 import { applyAppearanceFontLibrary } from '../settings-app/services/appearance-settings.js';
 import {
+    defaultSettings,
     getPhoneSettings,
     savePhoneSetting,
     getDefaultPhoneTogglePosition,
@@ -163,8 +164,8 @@ export function createPhoneContainer() {
     container.className = 'yuzi-phone-standalone';
 
     const settings = getPhoneSettings();
-    const defaultWidth = 320;
-    const defaultHeight = 640;
+    const defaultWidth = defaultSettings.phoneContainerWidth;
+    const defaultHeight = defaultSettings.phoneContainerHeight;
 
     const savedWidth = Number(settings.phoneContainerWidth);
     const savedHeight = Number(settings.phoneContainerHeight);

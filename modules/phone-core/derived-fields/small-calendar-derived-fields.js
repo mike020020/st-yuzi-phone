@@ -1,12 +1,19 @@
 import { Logger } from '../../error-handler.js';
-import { executeSqlMutationViaApi, probeSqliteCapabilityViaApi, querySqlViaApi } from '../data-api.js';
-import { subscribeTableUpdate } from '../callbacks.js';
+import { executeSqlMutationViaApi, querySqlViaApi, queryTableRowsViaApi } from '../data-api.js';
+import { subscribeTableFillStart, subscribeTableUpdate } from '../callbacks.js';
 import { createDerivedFieldService, readDerivedField } from './derived-field-service.js';
 import {
-    buildSmallCalendarDerivedFieldsAvailabilitySql,
+    SMALL_CALENDAR_DERIVED_FIELDS_REQUIRED_COLUMNS,
+    SMALL_CALENDAR_DERIVED_FIELDS_TABLE,
     buildSmallCalendarDerivedFieldsSignatureSql,
     buildSmallCalendarDerivedFieldsUpdateSql,
 } from './small-calendar-derived-fields-sql.js';
+
+const STRUCTURAL_QUERY_FAILURE_CODES = new Set([
+    'alias_conflict',
+    'table_not_found',
+    'column_not_resolved',
+]);
 
 const defaultLogger = Logger.withScope({
     scope: 'phone-core/derived-fields/small-calendar-derived-fields',
@@ -16,8 +23,9 @@ const defaultLogger = Logger.withScope({
 const defaultDeps = Object.freeze({
     setTimeout: (...args) => globalThis.setTimeout(...args),
     clearTimeout: (...args) => globalThis.clearTimeout(...args),
-    subscribe: subscribeTableUpdate,
-    probe: probeSqliteCapabilityViaApi,
+    subscribeUpdate: subscribeTableUpdate,
+    subscribeFillStart: subscribeTableFillStart,
+    queryTableRows: queryTableRowsViaApi,
     query: querySqlViaApi,
     mutation: executeSqlMutationViaApi,
     logger: defaultLogger,
@@ -33,18 +41,37 @@ function normalizeSignature(result) {
     };
 }
 
+export async function resolveSmallCalendarDerivedFieldsContext(deps, runtime = {}) {
+    const result = await deps.queryTableRows({
+        tableName: SMALL_CALENDAR_DERIVED_FIELDS_TABLE,
+        columns: SMALL_CALENDAR_DERIVED_FIELDS_REQUIRED_COLUMNS,
+        limit: 1,
+    });
+    if (runtime.shouldPause?.()) return { status: 'fill-active' };
+    if (result?.ok) return { status: 'ready', context: null };
+    if (result?.code === 'runtime_not_ready') return { status: 'runtime-not-ready' };
+    if (!STRUCTURAL_QUERY_FAILURE_CODES.has(result?.code)) {
+        return { status: 'query-failed', result };
+    }
+
+    return {
+        status: 'completed',
+        warning: {
+            key: `${result.code}:${result.message || ''}`,
+            action: 'small-calendar-derived-fields.schema-blocked',
+            message: '当前小日历表缺少相关字段，已跳过日期派生，不影响其他表格功能',
+            context: { code: result.code, message: result.message },
+        },
+    };
+}
+
 const service = createDerivedFieldService({
     actionPrefix: 'small-calendar-derived-fields',
     defaultDeps,
     maxMutationAttempts: 2,
     mutationRetryDelayMs: 2000,
     maxSignatureRetry: 1,
-    buildContextSql: buildSmallCalendarDerivedFieldsAvailabilitySql,
-    normalizeContext(result) {
-        return Number(readDerivedField(result, 'is_available', 0)) === 1
-            ? { status: 'ready', context: null }
-            : { status: 'completed' };
-    },
+    resolveContext: resolveSmallCalendarDerivedFieldsContext,
     buildSignatureSql: buildSmallCalendarDerivedFieldsSignatureSql,
     normalizeSignature,
     buildMutationSql: buildSmallCalendarDerivedFieldsUpdateSql,
@@ -68,7 +95,6 @@ const service = createDerivedFieldService({
         mutationCircuitOpen: '小日历同一日期输入已连续写入失败两次，已暂停继续写入，等待日期、聊天或启用状态变化',
         sourceChanged: '小日历派生字段写入期间日期源发生变化，将进行一次有界签名重跑',
         signatureRetryExhausted: '小日历派生字段未能在有界重跑内确认日期源稳定',
-        probeFailed: '小日历 SQLite 能力探测失败，派生字段本轮跳过',
         runError: '小日历派生字段 SQL 回填异常',
     },
 });

@@ -16,6 +16,7 @@ export function pickImageFile(callback, options = {}) {
     const maxHeight = clampNumber(options.maxHeight, 128, 4096, 1440);
     const quality = clampNumber(options.quality, 0.5, 0.92, 0.82);
     const runtime = options.runtime || options.pageRuntime || null;
+    const skipCrop = options.skipCrop === true;
     const isDisposed = () => !!runtime?.isDisposed?.();
 
     const input = document.createElement('input');
@@ -67,7 +68,9 @@ export function pickImageFile(callback, options = {}) {
                 return;
             }
 
-            const croppedDataUrl = await openImageCropDialog(rawDataUrl, options);
+            const croppedDataUrl = skipCrop
+                ? rawDataUrl
+                : await openImageCropDialog(rawDataUrl, options);
             if (isDisposed()) return;
             if (!croppedDataUrl) {
                 cleanup();
@@ -97,7 +100,12 @@ export function pickImageFile(callback, options = {}) {
                 return;
             }
 
-            await Promise.resolve(callback(best));
+            await Promise.resolve(callback(best, Object.freeze({
+                file,
+                name: String(file.name || ''),
+                type: String(file.type || ''),
+                size: Number(file.size) || 0,
+            })));
         } catch (error) {
             onError?.(error?.message || '图片处理失败');
         } finally {

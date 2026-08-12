@@ -26,6 +26,29 @@ function normalizeOptions(options) {
     return options && typeof options === 'object' && !Array.isArray(options) ? { ...options } : {};
 }
 
+function normalizeReadDiagnostic(api, methodName, startedAt) {
+    if (typeof api?.getLastSqlApiError !== 'function') return null;
+
+    try {
+        const diagnostic = api.getLastSqlApiError();
+        if (!diagnostic || typeof diagnostic !== 'object' || Array.isArray(diagnostic)) return null;
+        if (String(diagnostic.method || '') !== methodName) return null;
+        if (!Number.isFinite(Number(diagnostic.at)) || Number(diagnostic.at) < startedAt) return null;
+
+        const code = String(diagnostic.code || '').trim();
+        const message = String(diagnostic.message || '').trim();
+        if (!code || !message) return null;
+        return {
+            method: methodName,
+            code,
+            message,
+            at: Number(diagnostic.at),
+        };
+    } catch {
+        return null;
+    }
+}
+
 function buildFailure(code, message, extra = {}) {
     return {
         ok: false,
@@ -60,9 +83,9 @@ function normalizeRowCount(result, rows, values) {
     return 0;
 }
 
-function normalizeQueryResult(result) {
+function normalizeQueryResult(result, nullFailure = null) {
     if (result === null) {
-        return buildFailure('sqlite_unavailable', 'SQLite SQL 查询不可用或数据库 API 返回 null');
+        return nullFailure || buildFailure('query_failed', '数据库只读查询返回 null');
     }
     if (!result || typeof result !== 'object' || Array.isArray(result)) {
         return buildFailure('query_failed', 'SQL 查询返回值不是对象', { rawResult: result });
@@ -89,49 +112,65 @@ export async function querySqlViaApi(sqlOrOptions, params = [], options = {}) {
     const api = getDB();
     if (!api) return buildFailure('api_unavailable', '数据库 API 不可用');
 
-    const methodName = typeof api.querySql === 'function'
+    const querySql = api.querySql;
+    const executeSqlQuery = api.executeSqlQuery;
+    const methodName = typeof querySql === 'function'
         ? 'querySql'
-        : (typeof api.executeSqlQuery === 'function' ? 'executeSqlQuery' : '');
-    if (!methodName) return buildFailure('method_missing', '数据库 API 缺少 querySql / executeSqlQuery');
+        : (typeof executeSqlQuery === 'function' ? 'executeSqlQuery' : '');
+    const method = methodName === 'querySql' ? querySql : executeSqlQuery;
+    if (!methodName) {
+        return buildFailure('runtime_not_ready', 'SQLite 只读 runtime 尚未就绪');
+    }
 
     try {
+        const startedAt = Date.now();
         const result = await callApiWithTimeout(
-            () => api[methodName](sqlOrOptions, normalizeParams(params), normalizeOptions(options)),
+            () => method.call(api, sqlOrOptions, normalizeParams(params), normalizeOptions(options)),
             DEFAULT_API_TIMEOUT,
             `querySqlViaApi.${methodName}`,
         );
-        return normalizeQueryResult(result);
+        const diagnostic = result === null
+            ? normalizeReadDiagnostic(api, methodName, startedAt)
+            : null;
+        return normalizeQueryResult(result, diagnostic
+            ? buildFailure(diagnostic.code, diagnostic.message, { sqlApiError: diagnostic })
+            : null);
     } catch (error) {
         logger.warn({ action: 'query-sql.error', message: 'SQL 查询调用异常', error });
         return buildFailure('query_failed', error?.message || 'SQL 查询调用异常', { errors: [error] });
     }
 }
 
-function readProbeScalar(result) {
-    const row = Array.isArray(result?.rows) ? result.rows[0] : null;
-    if (row && typeof row === 'object' && !Array.isArray(row)) return row.ok;
-    if (Array.isArray(row)) return row[0];
-    const valuesRow = Array.isArray(result?.values) ? result.values[0] : null;
-    return Array.isArray(valuesRow) ? valuesRow[0] : undefined;
-}
-
-/**
- * Narrow SQLite capability probe. This deliberately does not expose a global
- * readiness cache: callers own retry timing and must treat every result as a
- * point-in-time capability observation.
- */
-export async function probeSqliteCapabilityViaApi() {
-    const result = await querySqlViaApi('SELECT 1 AS ok');
-    if (!result?.ok) {
-        return {
-            ok: false,
-            code: result?.code || 'probe_unconfirmed',
-            message: result?.message || 'SQLite capability result was not confirmed',
-        };
+export async function queryTableRowsViaApi(options = {}) {
+    if (!options || typeof options !== 'object' || Array.isArray(options)) {
+        return buildFailure('invalid_options', '表格查询失败：options 必须是对象');
     }
-    return readProbeScalar(result) === 1
-        ? { ok: true, code: 'ok' }
-        : { ok: false, code: 'probe_unconfirmed', message: 'SQLite capability result did not contain scalar 1' };
+
+    const api = getDB();
+    if (!api) return buildFailure('api_unavailable', '数据库 API 不可用');
+
+    const method = api.queryTableRows;
+    if (typeof method !== 'function') {
+        return buildFailure('runtime_not_ready', 'SQLite 表格只读 runtime 尚未就绪');
+    }
+
+    try {
+        const startedAt = Date.now();
+        const result = await callApiWithTimeout(
+            () => method.call(api, normalizeOptions(options)),
+            DEFAULT_API_TIMEOUT,
+            'queryTableRowsViaApi.queryTableRows',
+        );
+        const diagnostic = result === null
+            ? normalizeReadDiagnostic(api, 'queryTableRows', startedAt)
+            : null;
+        return normalizeQueryResult(result, diagnostic
+            ? buildFailure(diagnostic.code, diagnostic.message, { sqlApiError: diagnostic })
+            : null);
+    } catch (error) {
+        logger.warn({ action: 'query-table-rows.error', message: '表格只读查询调用异常', error });
+        return buildFailure('query_failed', error?.message || '表格只读查询调用异常', { errors: [error] });
+    }
 }
 
 export async function executeSqlMutationViaApi(sqlOrOptions, params = [], options = {}) {

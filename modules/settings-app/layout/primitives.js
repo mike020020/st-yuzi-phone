@@ -1,4 +1,8 @@
-import { PHONE_ICONS } from '../../phone-home/icons.js';
+import {
+    buildPhoneBackButton,
+    buildPhoneNavBar,
+    buildPhoneNavTitleSwitcher,
+} from '../../phone-core/navigation-ui.js';
 import { escapeHtml, escapeHtmlAttr } from '../../utils/dom-escape.js';
 
 export const SETTINGS_ENTRY_META = {
@@ -23,26 +27,19 @@ export const SETTINGS_ENTRY_META = {
         tone: 'is-button',
         badge: '交互',
     },
-    database: {
-        glyph: '数',
-        title: '数据与同步',
-        description: '管理预设、更新策略与同步范围',
-        tone: 'is-database',
-        badge: '同步',
+    api_presets: {
+        glyph: 'API',
+        title: 'API 预设',
+        description: '管理 QQ 使用的接口、模型与生成参数',
+        tone: 'is-api',
+        badge: '接口',
     },
     ai_instruction_presets: {
-        glyph: '指',
+        glyph: '令',
         title: 'AI 指令预设',
-        description: '管理实时回复预设仓库、分段结构与导入导出',
+        description: '管理 QQ 聊天回复与主动消息的分段提示词',
         tone: 'is-ai',
-        badge: '预设',
-    },
-    api_prompt_config: {
-        glyph: '文',
-        title: 'AI 上下文与世界书',
-        description: '管理聊天 API、正文上下文与世界书注入策略',
-        tone: 'is-ai',
-        badge: '上下文',
+        badge: '提示词',
     },
 };
 
@@ -149,13 +146,16 @@ export function buildSettingsPageFrame({
     heroHtml = '',
 }) {
     const resolvedBodyClass = String(bodyClass || 'phone-app-body phone-settings-scroll').trim() || 'phone-app-body phone-settings-scroll';
+    const navigationHtml = buildPhoneNavBar({
+        leadingHtml: buildPhoneBackButton(),
+        centerHtml: buildPhoneNavTitleSwitcher({ title }),
+        trailingHtml: rightActionHtml
+            ? `<div class="phone-settings-nav-side">${rightActionHtml}</div>`
+            : '',
+    });
     return `
         <div class="phone-app-page phone-settings-page">
-            <div class="phone-nav-bar">
-                <button type="button" class="phone-nav-back">${PHONE_ICONS.back}<span>返回</span></button>
-                <span class="phone-nav-title">${escapeHtml(title || '')}</span>
-                <div class="phone-settings-nav-side${rightActionHtml ? '' : ' phone-settings-nav-side-empty'}">${rightActionHtml || ''}</div>
-            </div>
+            ${navigationHtml}
             <div class="${resolvedBodyClass}">
                 <div class="phone-settings-page-stack">
                     ${heroHtml || ''}
@@ -166,7 +166,18 @@ export function buildSettingsPageFrame({
     `;
 }
 
-export function buildSettingsHomeItemHtml({ entry, title, description = '', quickHtml = '', badge = '', tags = [], toneClass = '' }) {
+export function buildSettingsHomeItemHtml({ entry, title, description = '', quickHtml = '', badge = '', tags = [], toneClass = '', variant = 'rich' }) {
+    if (variant === 'profile-action') {
+        return `
+            <div class="phone-settings-profile-action-item">
+                <button type="button" class="phone-settings-home-trigger phone-settings-profile-action-trigger" data-entry="${escapeHtmlAttr(entry || '')}">
+                    <span class="phone-settings-profile-action-title">${escapeHtml(title || '')}</span>
+                    <span class="phone-settings-profile-action-chevron" aria-hidden="true">›</span>
+                </button>
+            </div>
+        `;
+    }
+
     const entryMeta = SETTINGS_ENTRY_META[entry] || {};
     const resolvedToneClass = String(toneClass || entryMeta.tone || '').trim();
     const resolvedGlyph = String(entryMeta.glyph || title || '设').trim();

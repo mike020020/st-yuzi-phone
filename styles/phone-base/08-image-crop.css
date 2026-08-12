@@ -1,24 +1,22 @@
 .phone-image-crop-overlay {
-    position: fixed;
+    position: absolute;
     inset: 0;
-    z-index: 10020;
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    min-height: 100vh;
-    min-height: 100dvh;
-    padding: 14px;
+    min-height: 100%;
+    padding: var(--yuzi-phone-crop-overlay-padding);
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-    background: rgba(0, 0, 0, 0.72);
-    opacity: 0;
-    transition: opacity 0.18s ease;
+    background: var(--yuzi-qq-overlay);
+    opacity: var(--yuzi-phone-crop-overlay-hidden-opacity);
+    transition: opacity var(--yuzi-qq-transition) var(--yuzi-phone-crop-transition-timing);
 }
 
 .phone-image-crop-overlay.is-visible {
-    opacity: 1;
+    opacity: var(--yuzi-phone-crop-overlay-visible-opacity);
 }
 
 .phone-image-crop-overlay.is-dragging,
@@ -27,67 +25,61 @@
 }
 
 .phone-image-crop-dialog {
-    width: min(92vw, 380px);
-    max-height: min(calc(100vh - 28px), 720px);
-    max-height: min(calc(100dvh - 28px), 720px);
+    width: min(var(--yuzi-phone-crop-dialog-inline-size), var(--yuzi-phone-crop-dialog-max-width));
+    max-height: min(calc(100% - var(--yuzi-phone-crop-dialog-gutter)), var(--yuzi-phone-crop-dialog-max-height));
     box-sizing: border-box;
-    padding: 14px;
+    padding: var(--yuzi-qq-dialog-padding);
     overflow-y: auto;
     overscroll-behavior: contain;
-    border-radius: 16px;
-    background: rgba(22, 24, 30, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    border-radius: var(--yuzi-qq-radius-dialog);
+    background: var(--yuzi-qq-dialog-surface);
+    box-shadow: var(--yuzi-qq-shadow-dialog);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--yuzi-qq-dialog-gap);
 }
 
 .phone-image-crop-head {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--yuzi-qq-dialog-gap);
 }
 
 .phone-image-crop-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.96);
+    font-size: var(--yuzi-qq-title-size);
+    font-weight: var(--yuzi-qq-title-weight);
+    color: var(--yuzi-qq-text);
 }
 
 .phone-image-crop-desc,
 .phone-image-crop-meta {
-    font-size: 12px;
-    line-height: 1.5;
-    color: rgba(255, 255, 255, 0.7);
+    font-size: var(--yuzi-qq-caption-size);
+    line-height: var(--yuzi-qq-caption-line-height);
+    color: var(--yuzi-qq-muted);
 }
 
 .phone-image-crop-stage-wrap {
-    border-radius: 14px;
-    background: rgba(0, 0, 0, 0.24);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 10px;
+    border: var(--yuzi-qq-line-width) solid var(--yuzi-qq-line);
+    border-radius: var(--yuzi-qq-radius);
+    background: var(--yuzi-qq-dialog-muted);
+    padding: var(--yuzi-qq-dialog-gap);
 }
 
 .phone-image-crop-stage {
     position: relative;
-    min-height: 260px;
+    min-height: var(--yuzi-phone-crop-stage-min-height);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    border-radius: 12px;
-    background:
-        linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%),
-        linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%),
-        rgba(8, 10, 14, 0.72);
-    background-position: 0 0, 8px 8px, 0 0;
-    background-size: 16px 16px;
+    border-radius: var(--yuzi-qq-radius);
+    background: var(--yuzi-qq-dialog-muted);
 }
 
 .phone-image-crop-image {
     max-width: 100%;
-    max-height: 320px;
+    max-height: var(--yuzi-phone-crop-image-max-height);
     display: block;
     pointer-events: none;
     user-select: none;
@@ -95,9 +87,9 @@
 
 .phone-image-crop-box {
     position: absolute;
-    border: 2px solid rgba(255, 255, 255, 0.96);
-    border-radius: 12px;
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.48);
+    border: var(--yuzi-qq-focus-ring-width) solid var(--yuzi-phone-color-white);
+    border-radius: var(--yuzi-qq-radius);
+    box-shadow: var(--yuzi-phone-crop-box-overlay-shadow);
     cursor: move;
     touch-action: none;
 }
@@ -114,45 +106,45 @@
 
 .phone-image-crop-guideline {
     position: absolute;
-    background: rgba(255, 255, 255, 0.44);
+    background: var(--yuzi-phone-color-white);
 }
 
 .phone-image-crop-guideline.is-vertical {
     top: 0;
     bottom: 0;
-    width: 1px;
+    width: var(--yuzi-qq-line-width);
 }
 
 .phone-image-crop-guideline.is-horizontal {
     left: 0;
     right: 0;
-    height: 1px;
+    height: var(--yuzi-qq-line-width);
 }
 
 .phone-image-crop-guideline.is-vertical.is-one {
-    left: 33.333%;
+    left: var(--yuzi-phone-crop-grid-first-line-position);
 }
 
 .phone-image-crop-guideline.is-vertical.is-two {
-    left: 66.666%;
+    left: var(--yuzi-phone-crop-grid-second-line-position);
 }
 
 .phone-image-crop-guideline.is-horizontal.is-one {
-    top: 33.333%;
+    top: var(--yuzi-phone-crop-grid-first-line-position);
 }
 
 .phone-image-crop-guideline.is-horizontal.is-two {
-    top: 66.666%;
+    top: var(--yuzi-phone-crop-grid-second-line-position);
 }
 
 .phone-image-crop-handle {
     position: absolute;
-    width: 14px;
-    height: 14px;
-    border-radius: 999px;
-    border: 2px solid rgba(255, 255, 255, 0.96);
-    background: rgba(77, 182, 172, 0.96);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+    width: var(--yuzi-phone-crop-handle-size);
+    height: var(--yuzi-phone-crop-handle-size);
+    border-radius: var(--yuzi-phone-radius-pill);
+    border: var(--yuzi-qq-focus-ring-width) solid var(--yuzi-phone-color-white);
+    background: var(--yuzi-qq-accent);
+    box-shadow: var(--yuzi-phone-shadow-soft);
 }
 
 .phone-image-crop-handle[data-handle="nw"] {
@@ -215,17 +207,17 @@
 .phone-image-crop-actions-main,
 .phone-image-crop-actions-secondary {
     display: flex;
-    gap: 8px;
+    gap: var(--yuzi-qq-dialog-gap);
     align-items: center;
 }
 
 .phone-image-crop-actions {
     position: sticky;
     bottom: 0;
-    z-index: 2;
-    padding-top: 8px;
+    z-index: var(--yuzi-phone-crop-action-z-index);
+    padding-top: var(--yuzi-qq-dialog-gap);
     justify-content: space-between;
-    background: rgba(22, 24, 30, 0.98);
+    background: var(--yuzi-qq-dialog-surface);
 }
 
 .phone-image-crop-actions-main,
@@ -239,8 +231,8 @@
     }
 
     .phone-settings-home-quick-select {
-        min-width: 84px;
-        max-width: 104px;
+        min-width: var(--yuzi-phone-settings-home-quick-select-min-width);
+        max-width: var(--yuzi-phone-settings-home-quick-select-max-width);
     }
 
     .phone-settings-toggle-size-row {
@@ -250,26 +242,25 @@
     .phone-image-crop-overlay {
         align-items: flex-start;
         padding:
-            max(10px, env(safe-area-inset-top))
-            max(10px, env(safe-area-inset-right))
-            max(10px, env(safe-area-inset-bottom))
-            max(10px, env(safe-area-inset-left));
+            max(var(--yuzi-phone-crop-overlay-padding), env(safe-area-inset-top))
+            max(var(--yuzi-phone-crop-overlay-padding), env(safe-area-inset-right))
+            max(var(--yuzi-phone-crop-overlay-padding), env(safe-area-inset-bottom))
+            max(var(--yuzi-phone-crop-overlay-padding), env(safe-area-inset-left));
     }
 
     .phone-image-crop-dialog {
-        width: min(95vw, 360px);
-        max-height: calc(100vh - 20px);
-        max-height: calc(100dvh - 20px);
-        padding: 12px;
+        width: min(var(--yuzi-phone-crop-dialog-compact-inline-size), var(--yuzi-phone-crop-dialog-max-width));
+        max-height: calc(100% - var(--yuzi-phone-crop-dialog-gutter));
+        padding: var(--yuzi-qq-dialog-padding);
     }
 
     .phone-image-crop-stage {
-        min-height: 220px;
+        min-height: var(--yuzi-phone-crop-stage-compact-min-height);
     }
 
     .phone-image-crop-handle {
-        width: 18px;
-        height: 18px;
+        width: var(--yuzi-phone-crop-handle-compact-size);
+        height: var(--yuzi-phone-crop-handle-compact-size);
     }
 
     .phone-image-crop-actions {

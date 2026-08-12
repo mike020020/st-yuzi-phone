@@ -50,7 +50,7 @@ function main() {
     check(results, 'constants', '审核 App 常量固定 app id', has(contents.constants, "TABLE_UPDATE_REVIEW_APP_ID = 'table-update-review'"));
     check(results, 'constants', '审核 App 常量固定 route', has(contents.constants, "TABLE_UPDATE_REVIEW_ROUTE = 'table-update-review'"));
     check(results, 'constants', '审核 App 常量固定显示名称和文字图标', has(contents.constants, "TABLE_UPDATE_REVIEW_APP_NAME = '审核'") && has(contents.constants, "TABLE_UPDATE_REVIEW_APP_ICON_TEXT = '审'"));
-    check(results, 'constants', '审核跳转继续使用 table-generic 路由前缀', has(contents.constants, "TABLE_GENERIC_ROUTE_PREFIX = 'table-generic:'"));
+    check(results, 'constants', '审核常量不再暴露 table-generic 旁路', !has(contents.constants, 'TABLE_GENERIC_ROUTE_PREFIX'));
     check(results, 'constants', '审核页字段摘要不再保留数量截断常量', !has(contents.constants, 'TABLE_UPDATE_REVIEW_MAX_VISIBLE_FIELDS'));
 
     check(results, 'routeRenderer', 'route-renderer 在 app: 分支前处理审核 route', appearsBefore(contents.routeRenderer, "route === 'table-update-review'", "route.startsWith('app:')"));
@@ -145,15 +145,15 @@ function main() {
     check(results, 'interactions', '审核导航决策拒绝删除与空 sheetKey 后读取统一目录', has(contents.interactions, "changeType === 'delete'")
         && has(contents.interactions, "reason: 'missing_sheet_key'")
         && has(contents.interactions, 'const target = resolveTarget(readTableData(), sheetKey);'));
-    check(results, 'interactions', '审核导航决策 Theater 分流发生在写 intent 前并保留物理表锚点', has(contents.interactions, "target?.presentation === 'theater'")
-        && has(contents.interactions, 'navigate(target.route);')
-        && appearsBefore(contents.interactions, "target?.presentation === 'theater'", 'const intentAccepted = setIntent({'));
-    check(results, 'interactions', '审核页 Theater 分支不清理既有全局 intent', !has(contents.interactions, 'clearPendingTableReviewNavigationIntent'));
-    check(results, 'interactions', '审核导航决策非 Theater 写入一次性 intent 后进入 table-generic',
-        has(contents.interactions, 'const intentAccepted = setIntent({')
+    check(results, 'interactions', '审核导航统一在写入带 attemptId 的 intent 后进入正常 table 路由',
+        has(contents.interactions, 'const attemptId = createAttemptId();')
+        && has(contents.interactions, 'const intentAccepted = setIntent({')
+        && has(contents.interactions, 'attemptId, sheetKey,')
         && has(contents.interactions, 'sheetKey,')
-        && has(contents.interactions, 'const route = `${TABLE_GENERIC_ROUTE_PREFIX}${sheetKey}`;')
-        && appearsBefore(contents.interactions, 'const intentAccepted = setIntent({', 'navigate(route);'));
+        && has(contents.interactions, 'navigate(target.route, { reviewNavigationAttemptId: attemptId });')
+        && appearsBefore(contents.interactions, 'const intentAccepted = setIntent({', 'navigate(target.route, { reviewNavigationAttemptId: attemptId });'));
+    check(results, 'interactions', '审核导航不保留 table-generic 旁路或无 attempt 导航', !has(contents.interactions, 'TABLE_GENERIC_ROUTE_PREFIX')
+        && !has(contents.interactions, 'navigate(target.route);'));
 
     check(results, 'service', '审核服务使用 subscribeTableUpdate 订阅表格更新', has(contents.service, "import { subscribeTableUpdate } from '../phone-core/callbacks.js';")
         && has(contents.service, 'const unsubscribe = subscribeTableUpdate((event) => {'));
@@ -203,16 +203,20 @@ function main() {
         && has(contents.templates, 'const rowLabel = `第 ${formatCount(change.rowIndex) + 1} 行`;')
         && !has(contents.templates, 'ID ${change.rowId}'));
 
-    check(results, 'navigationIntent', '审核导航 intent 暴露 set/peek/clear/consume API', has(contents.navigationIntent, 'export function setPendingTableReviewNavigationIntent(')
+    check(results, 'navigationIntent', '审核导航 intent 暴露 attempt 创建、set/peek/clear/consume/discard API', has(contents.navigationIntent, 'export function createTableReviewNavigationAttemptId()')
+        && has(contents.navigationIntent, 'export function setPendingTableReviewNavigationIntent(')
         && has(contents.navigationIntent, 'export function peekPendingTableReviewNavigationIntent()')
         && has(contents.navigationIntent, 'export function clearPendingTableReviewNavigationIntent()')
-        && has(contents.navigationIntent, 'export function consumePendingTableReviewNavigationIntent(sheetKey)'));
-    check(results, 'navigationIntent', '审核导航 intent 校验 sheetKey 并规范 rowIndex', has(contents.navigationIntent, "const sheetKey = String(intent.sheetKey || '').trim();")
-        && has(contents.navigationIntent, 'if (!sheetKey) return null;')
+        && has(contents.navigationIntent, 'export function discardPendingTableReviewNavigationIntent(sheetKey, attemptId)')
+        && has(contents.navigationIntent, 'export function consumePendingTableReviewNavigationIntent(sheetKey, attemptId)'));
+    check(results, 'navigationIntent', '审核导航 intent 校验 sheetKey 与 attemptId 并规范 rowIndex', has(contents.navigationIntent, "const sheetKey = String(intent.sheetKey || '').trim();")
+        && has(contents.navigationIntent, "const attemptId = String(intent.attemptId || '').trim();")
+        && has(contents.navigationIntent, 'if (!sheetKey || !attemptId) return null;')
         && has(contents.navigationIntent, 'Number.isInteger(rowIndex) && rowIndex >= 0 ? rowIndex : -1'));
     check(results, 'navigationIntent', '审核导航 intent 保留 changeType 并可防御 delete', has(contents.navigationIntent, 'changeType:')
         && has(contents.navigationIntent, "String(intent.changeType || '').trim()"));
-    check(results, 'navigationIntent', '审核导航 intent 消费时必须匹配 sheetKey 并清理 pendingIntent', has(contents.navigationIntent, "if (!pendingIntent || pendingIntent.sheetKey !== key) return null;")
+    check(results, 'navigationIntent', '审核导航 intent 消费与丢弃必须同时匹配 sheetKey 和 attemptId', has(contents.navigationIntent, "pendingIntent?.sheetKey !== key || pendingIntent?.attemptId !== attempt")
+        && has(contents.navigationIntent, "if (!pendingIntent || pendingIntent.sheetKey !== key || pendingIntent.attemptId !== attempt) return null;")
         && has(contents.navigationIntent, 'pendingIntent = null;')
         && has(contents.navigationIntent, 'return { ...intent };'));
 

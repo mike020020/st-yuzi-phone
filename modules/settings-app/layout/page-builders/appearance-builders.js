@@ -185,7 +185,7 @@ export function buildAppearancePageHtml({
                     </label>
                     <label class="phone-settings-field-inline">
                         <span>图标间距</span>
-                        <input type="number" min="8" max="24" id="phone-app-grid-gap" class="phone-settings-input" value="${escapeHtmlAttr(layoutValues.appGridGap)}">
+                        <input type="number" min="8" max="24" step="0.001" id="phone-app-grid-gap" class="phone-settings-input" value="${escapeHtmlAttr(layoutValues.appGridGap)}">
                     </label>
                     <label class="phone-settings-field-inline">
                         <span>Dock 图标大小</span>

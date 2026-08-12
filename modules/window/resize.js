@@ -1,5 +1,6 @@
 import { PHONE_CONTAINER_SIZE_LIMITS, constrainPosition, savePhoneSetting } from '../settings.js';
 import { RESIZE_BOUND_ATTR, getWindowInteractionRuntime } from './runtime.js';
+import { clearPhoneTemporaryLayers } from '../phone-core/shell-temporary-layer-host.js';
 
 const resizeDeps = {
     constrainPosition,
@@ -57,6 +58,8 @@ export function initPhoneShellResize() {
         function onPointerDown(event) {
             event.preventDefault();
             event.stopPropagation();
+            window.dispatchEvent(new CustomEvent('yuzi-phone-resize-start'));
+            clearPhoneTemporaryLayers();
 
             dir = handle.getAttribute('data-dir') || '';
             const rect = phoneEl.getBoundingClientRect();

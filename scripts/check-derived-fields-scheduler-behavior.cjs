@@ -73,47 +73,26 @@ function okSignature({ source = 'source-a', input = 'input-a', pending = 0 } = {
     };
 }
 
-function okGate() {
-    return {
-        ok: true,
-        rows: [{
-            schema_ok: 1,
-            anchor_table: 'global_state',
-            missing_requirements: '',
-            schema_fingerprint: 'ok',
-        }],
-    };
-}
-
-function isContextSql(kind, sql) {
-    return kind === 'chronicle' ? sql.includes('schema_ok') : sql.includes('is_available');
-}
-
-function contextResult(kind) {
-    return kind === 'chronicle'
-        ? okGate()
-        : { ok: true, rows: [{ is_available: 1 }] };
-}
-
 function createHarness(mod, kind, options = {}) {
     const clock = new FakeClock();
-    const subscribers = new Set();
+    const updateSubscribers = new Set();
+    const fillStartSubscribers = new Set();
     const warnings = [];
     const state = {
-        probeCalls: 0,
+        availabilityCalls: 0,
         queryCalls: 0,
         signatureCalls: 0,
         mutationCalls: 0,
         concurrent: 0,
         maxConcurrent: 0,
     };
-    let probe = async () => ({ ok: true });
-    let query = async (sql) => (isContextSql(kind, sql) ? contextResult(kind) : okSignature());
+    let availability = async () => ({ ok: true });
+    let query = async () => okSignature();
     let mutation = async () => ({ ok: true });
 
     const wrap = (name, getter) => async (...args) => {
         state[`${name}Calls`] += 1;
-        if (name === 'query' && !isContextSql(kind, args[0])) {
+        if (name === 'query') {
             state.signatureCalls += 1;
         }
         state.concurrent += 1;
@@ -128,11 +107,15 @@ function createHarness(mod, kind, options = {}) {
     mod.__test__setDeps({
         setTimeout: clock.setTimeout.bind(clock),
         clearTimeout: clock.clearTimeout.bind(clock),
-        subscribe: options.subscribe || ((fn) => {
-            subscribers.add(fn);
-            return () => subscribers.delete(fn);
+        subscribeUpdate: options.subscribeUpdate || ((fn) => {
+            updateSubscribers.add(fn);
+            return () => updateSubscribers.delete(fn);
         }),
-        probe: wrap('probe', () => probe),
+        subscribeFillStart: options.subscribeFillStart || ((fn) => {
+            fillStartSubscribers.add(fn);
+            return () => fillStartSubscribers.delete(fn);
+        }),
+        queryTableRows: wrap('availability', () => availability),
         query: wrap('query', () => query),
         mutation: wrap('mutation', () => mutation),
         logger: { warn: (entry) => warnings.push(entry) },
@@ -142,13 +125,19 @@ function createHarness(mod, kind, options = {}) {
         clock,
         state,
         warnings,
-        notify(count = 1) {
+        notifyUpdate(count = 1) {
             for (let index = 0; index < count; index += 1) {
-                subscribers.forEach((fn) => fn());
+                updateSubscribers.forEach((fn) => fn());
             }
         },
-        subscriberCount: () => subscribers.size,
-        setProbe: (fn) => { probe = fn; },
+        notifyFillStart(count = 1) {
+            for (let index = 0; index < count; index += 1) {
+                fillStartSubscribers.forEach((fn) => fn());
+            }
+        },
+        updateSubscriberCount: () => updateSubscribers.size,
+        fillStartSubscriberCount: () => fillStartSubscribers.size,
+        setAvailability: (fn) => { availability = fn; },
         setQuery: (fn) => { query = fn; },
         setMutation: (fn) => { mutation = fn; },
         start: kind === 'small'
@@ -162,38 +151,39 @@ function createHarness(mod, kind, options = {}) {
     };
 }
 
-async function testProbeRetriesAreFinite(mod, kind) {
+async function testRuntimeAvailabilityWaitsSilently(mod, kind) {
     const h = createHarness(mod, kind);
-    h.setProbe(async () => ({ ok: false, code: 'not-ready', message: 'booting' }));
+    h.setAvailability(async () => ({ ok: false, code: 'runtime_not_ready', message: 'booting' }));
     h.start();
     assert.deepStrictEqual(h.clock.delays(), [600]);
     await h.clock.tick(600);
-    assert.deepStrictEqual(h.clock.delays(), [1000]);
-    await h.clock.tick(1000);
-    assert.deepStrictEqual(h.clock.delays(), [2000]);
-    await h.clock.tick(2000);
-    assert.deepStrictEqual(h.clock.delays(), [5000]);
-    await h.clock.tick(5000);
-    assert.strictEqual(h.clock.tasks.size, 0, `${kind}: probe 预算耗尽后必须停止`);
-    assert.strictEqual(h.state.probeCalls, 4);
+    assert.strictEqual(h.state.availabilityCalls, 1, `${kind}: 初始 debounce 后必须检查运行时可用性`);
+    assert.deepStrictEqual(h.clock.delays(), [1000], `${kind}: 运行时未发布时必须静默短周期等待`);
+    assert.strictEqual(h.getState().hasAvailabilityTimer, true);
+    assert.strictEqual(Object.hasOwn(h.getState(), 'hasProbeTimer'), false, `${kind}: 状态不得残留 probe timer`);
+    assert.strictEqual(h.warnings.length, 0, `${kind}: runtime_not_ready 不得输出故障警告`);
 
-    h.notify(1000);
-    assert.deepStrictEqual(h.clock.delays(), [600], `${kind}: 通知风暴只能合并成一个脏标记`);
-    await h.clock.tick(600);
-    assert.strictEqual(h.state.probeCalls, 5, `${kind}: 新通知只允许一次新的能力观察`);
-    assert.strictEqual(h.clock.tasks.size, 0, `${kind}: 普通通知不得重新灌满 probe 重试预算`);
+    h.notifyUpdate(1000);
+    assert.deepStrictEqual(h.clock.delays(), [1000], `${kind}: 等待可用性期间通知风暴不得抢占等待 timer`);
+    await h.clock.tick(1000);
+    assert.strictEqual(h.state.availabilityCalls, 2);
+    assert.strictEqual(h.state.queryCalls, 0, `${kind}: runtime 未发布时不得执行签名 SQL`);
+    assert.strictEqual(h.state.mutationCalls, 0, `${kind}: runtime 未发布时不得执行写入 SQL`);
+    assert.deepStrictEqual(h.clock.delays(), [1000]);
+    assert.strictEqual(h.warnings.length, 0, `${kind}: 重复等待仍须静默`);
+
+    h.setAvailability(async () => ({ ok: true }));
+    await h.clock.tick(1000);
+    assert.strictEqual(h.state.queryCalls, 1, `${kind}: SQL runtime 发布后必须恢复真实派生查询`);
+    assert.strictEqual(h.clock.tasks.size, 0, `${kind}: runtime 恢复且数据干净后不得残留等待 timer`);
+    assert.strictEqual(h.warnings.some((entry) => String(entry?.action || '').includes('probe')), false);
     h.stop();
     h.reset();
 }
 
 async function testQueryRetriesAreFinite(mod, kind) {
     const h = createHarness(mod, kind);
-    h.setQuery(async (sql) => {
-        if (isContextSql(kind, sql)) {
-            return { ok: false, code: 'timeout', message: 'timeout' };
-        }
-        return okSignature();
-    });
+    h.setAvailability(async () => ({ ok: false, code: 'timeout', message: 'timeout' }));
     h.start();
     await h.clock.tick(600);
     assert.deepStrictEqual(h.clock.delays(), [1000]);
@@ -203,30 +193,31 @@ async function testQueryRetriesAreFinite(mod, kind) {
     assert.deepStrictEqual(h.clock.delays(), [5000]);
     await h.clock.tick(5000);
     assert.strictEqual(h.clock.tasks.size, 0, `${kind}: query 失败必须有限停止`);
-    assert.strictEqual(h.state.queryCalls, 4);
+    assert.strictEqual(h.state.availabilityCalls, 4);
     assert.strictEqual(h.warnings.filter((entry) => entry.action?.includes('context-query-failed')).length, 1, `${kind}: 同类 query 错误只记录一次`);
     h.stop();
     h.reset();
 }
 
-async function testInFlightProbeNotificationKeepsRetryBackoff(mod, kind) {
+async function testInFlightAvailabilityNotificationKeepsRetryWait(mod, kind) {
     const h = createHarness(mod, kind);
     const blocked = deferred();
-    h.setProbe(async () => blocked.promise);
+    h.setAvailability(async () => blocked.promise);
 
     h.start();
     await h.clock.tick(600);
-    assert.strictEqual(h.state.probeCalls, 1, `${kind}: 初始 debounce 后必须进入 probe`);
+    assert.strictEqual(h.state.availabilityCalls, 1, `${kind}: 初始 debounce 后必须进入运行时可用性检查`);
 
-    h.notify(1000);
-    blocked.resolve({ ok: false, code: 'not-ready', message: 'booting' });
+    h.notifyUpdate(1000);
+    blocked.resolve({ ok: false, code: 'runtime_not_ready', message: 'booting' });
     await flush();
 
     assert.deepStrictEqual(
         h.clock.delays(),
         [1000],
-        `${kind}: in-flight probe 期间的新通知不得把失败退避抢占成 600ms debounce`,
+        `${kind}: in-flight 可用性检查期间的新通知不得把静默等待抢占成 600ms debounce`,
     );
+    assert.strictEqual(h.warnings.length, 0, `${kind}: 可用性等待不得产生警告`);
     h.stop();
     h.reset();
 }
@@ -234,13 +225,13 @@ async function testInFlightProbeNotificationKeepsRetryBackoff(mod, kind) {
 async function testInFlightQueryNotificationKeepsRetryBackoff(mod, kind) {
     const h = createHarness(mod, kind);
     const blocked = deferred();
-    h.setQuery(async (sql) => (isContextSql(kind, sql) ? blocked.promise : okSignature()));
+    h.setQuery(async () => blocked.promise);
 
     h.start();
     await h.clock.tick(600);
     assert.strictEqual(h.state.queryCalls, 1, `${kind}: 初始 debounce 后必须进入 context query`);
 
-    h.notify(1000);
+    h.notifyUpdate(1000);
     blocked.resolve({ ok: false, code: 'query_timeout', message: 'query unavailable' });
     await flush();
 
@@ -255,12 +246,10 @@ async function testInFlightQueryNotificationKeepsRetryBackoff(mod, kind) {
 
 async function testPendingZeroNeverMutates(mod, kind) {
     const h = createHarness(mod, kind);
-    h.setQuery(async (sql) => (isContextSql(kind, sql)
-        ? contextResult(kind)
-        : okSignature({ source: 'stable', input: 'stable', pending: 0 })));
+    h.setQuery(async () => okSignature({ source: 'stable', input: 'stable', pending: 0 }));
     h.start();
     await h.clock.tick(600);
-    h.notify(1000);
+    h.notifyUpdate(1000);
     await h.clock.tick(600);
     assert.strictEqual(h.state.mutationCalls, 0, `${kind}: pending_update_count=0 时禁止调用 mutation`);
     h.stop();
@@ -269,23 +258,21 @@ async function testPendingZeroNeverMutates(mod, kind) {
 
 async function testConfirmedMutationFailureRetriesExactlyOnce(mod, kind) {
     const h = createHarness(mod, kind);
-    h.setQuery(async (sql) => (isContextSql(kind, sql)
-        ? contextResult(kind)
-        : okSignature({ source: 'source-fail', input: 'dirty', pending: 1 })));
+    h.setQuery(async () => okSignature({ source: 'source-fail', input: 'dirty', pending: 1 }));
     h.setMutation(async () => ({ ok: false, code: 'mutation_failed', message: 'confirmed failure' }));
     h.start();
     await h.clock.tick(600);
     assert.strictEqual(h.state.mutationCalls, 1);
     assert.deepStrictEqual(h.clock.delays(), [2000], `${kind}: 明确失败后只能安排一次补试`);
 
-    h.notify(1000);
+    h.notifyUpdate(1000);
     assert.deepStrictEqual(h.clock.delays(), [2000], `${kind}: 普通通知不得清空同源 mutation 预算`);
     await h.clock.tick(2000);
     assert.strictEqual(h.state.mutationCalls, 2, `${kind}: 同一 source signature 总写入次数必须为 2`);
     assert.strictEqual(h.clock.tasks.size, 0, `${kind}: 第二次明确失败后必须熔断`);
     assert.strictEqual(h.getState().mutationCircuitOpen, true);
 
-    h.notify(1000);
+    h.notifyUpdate(1000);
     await h.clock.tick(600);
     assert.strictEqual(h.state.mutationCalls, 2, `${kind}: 熔断后通知风暴不得增加真实写调用`);
     assert.ok(h.warnings.some((entry) => entry.action?.includes('mutation-circuit-open')), `${kind}: 熔断必须留下单次诊断`);
@@ -297,13 +284,11 @@ async function testConfirmedSuccessCannotRearmSameSourceBudget(mod, kind) {
     const h = createHarness(mod, kind);
     let dirty = true;
     let revision = 1;
-    h.setQuery(async (sql) => (isContextSql(kind, sql)
-        ? contextResult(kind)
-        : okSignature({
-            source: 'stable-source',
-            input: `revision-${revision}-${dirty ? 'dirty' : 'clean'}`,
-            pending: dirty ? 1 : 0,
-        })));
+    h.setQuery(async () => okSignature({
+        source: 'stable-source',
+        input: `revision-${revision}-${dirty ? 'dirty' : 'clean'}`,
+        pending: dirty ? 1 : 0,
+    }));
     h.setMutation(async () => {
         dirty = false;
         return { ok: true };
@@ -316,14 +301,14 @@ async function testConfirmedSuccessCannotRearmSameSourceBudget(mod, kind) {
 
     revision += 1;
     dirty = true;
-    h.notify();
+    h.notifyUpdate();
     await h.clock.tick(600);
     assert.strictEqual(h.state.mutationCalls, 2, `${kind}: 同源成功后只允许唯一一次后续真实写入`);
     assert.strictEqual(h.getState().mutationAttempts, 2, `${kind}: 第二次成功确认后预算必须保持耗尽`);
 
     revision += 1;
     dirty = true;
-    h.notify(1000);
+    h.notifyUpdate(1000);
     await h.clock.tick(600);
     assert.strictEqual(h.state.mutationCalls, 2, `${kind}: 同源第三次漂移不得因历史成功重新获得预算`);
     assert.strictEqual(h.getState().mutationCircuitOpen, true, `${kind}: 同源两次真实写入后必须打开熔断`);
@@ -334,9 +319,7 @@ async function testConfirmedSuccessCannotRearmSameSourceBudget(mod, kind) {
 async function testSourceChangeRearmsMutationBudget(mod, kind) {
     const h = createHarness(mod, kind);
     let source = 'source-a';
-    h.setQuery(async (sql) => (isContextSql(kind, sql)
-        ? contextResult(kind)
-        : okSignature({ source, input: `${source}-dirty`, pending: 1 })));
+    h.setQuery(async () => okSignature({ source, input: `${source}-dirty`, pending: 1 }));
     h.setMutation(async () => ({ ok: false, code: 'mutation_failed', message: 'confirmed failure' }));
     h.start();
     await h.clock.tick(600);
@@ -345,7 +328,7 @@ async function testSourceChangeRearmsMutationBudget(mod, kind) {
     assert.strictEqual(h.getState().mutationCircuitOpen, true);
 
     source = 'source-b';
-    h.notify();
+    h.notifyUpdate();
     await h.clock.tick(600);
     assert.strictEqual(h.state.mutationCalls, 3, `${kind}: source signature 变化必须重新武装预算`);
     assert.strictEqual(h.getState().mutationSourceSignature, 'source-b');
@@ -353,55 +336,128 @@ async function testSourceChangeRearmsMutationBudget(mod, kind) {
     h.reset();
 }
 
+async function testFillStartPausesUntilTableUpdate(mod, kind) {
+    const h = createHarness(mod, kind);
+    h.setAvailability(async () => ({ ok: false, code: 'runtime_not_ready', message: 'booting' }));
+
+    assert.strictEqual(h.start(), true);
+    assert.strictEqual(h.updateSubscriberCount(), 1, `${kind}: 必须订阅 table-update`);
+    assert.strictEqual(h.fillStartSubscriberCount(), 1, `${kind}: 必须订阅 table-fill-start`);
+    await h.clock.tick(600);
+    assert.strictEqual(h.state.availabilityCalls, 1);
+    assert.deepStrictEqual(h.clock.delays(), [1000]);
+
+    h.notifyFillStart();
+    assert.strictEqual(h.getState().fillActive, true, `${kind}: fill-start 必须立即进入暂停态`);
+    assert.strictEqual(h.clock.tasks.size, 0, `${kind}: fill-start 必须清除当前可用性等待 timer`);
+
+    h.setAvailability(async () => ({ ok: true }));
+    await h.clock.tick(10_000);
+    assert.strictEqual(h.state.availabilityCalls, 1, `${kind}: 填表期间不得继续读取 SQL runtime`);
+    assert.strictEqual(h.state.queryCalls, 0, `${kind}: 填表期间不得执行派生查询`);
+
+    h.notifyUpdate();
+    assert.strictEqual(h.getState().fillActive, false, `${kind}: 后续 table-update 必须解除暂停`);
+    assert.deepStrictEqual(h.clock.delays(), [600], `${kind}: 恢复后仍通过 debounce 合并执行`);
+    await h.clock.tick(600);
+    assert.strictEqual(h.state.queryCalls, 1, `${kind}: table-update 后必须恢复派生查询`);
+
+    h.stop();
+    assert.strictEqual(h.updateSubscriberCount(), 0, `${kind}: stop 必须清理 table-update 订阅`);
+    assert.strictEqual(h.fillStartSubscriberCount(), 0, `${kind}: stop 必须清理 table-fill-start 订阅`);
+    h.reset();
+}
+
 async function testLifecycleFailuresRollbackCompletely(mod, kind) {
-    const thrown = createHarness(mod, kind, {
-        subscribe() {
-            throw new Error('subscribe exploded');
+    const fillStartThrown = createHarness(mod, kind, {
+        subscribeFillStart() {
+            throw new Error('fill-start subscribe exploded');
         },
     });
-    assert.strictEqual(thrown.start(), false, `${kind}: subscribe 抛错必须返回 false`);
-    assert.strictEqual(thrown.getState().started, false, `${kind}: subscribe 抛错不得残留 started`);
-    assert.strictEqual(thrown.getState().notificationVersion, 0, `${kind}: subscribe 抛错不得残留脏版本`);
-    assert.strictEqual(thrown.clock.tasks.size, 0, `${kind}: subscribe 抛错不得残留 timer`);
-    assert.ok(thrown.warnings.some((entry) => entry.action?.includes('start-failed')), `${kind}: 启动失败必须记录结构化警告`);
+    assert.strictEqual(fillStartThrown.start(), false, `${kind}: fill-start subscribe 抛错必须返回 false`);
+    assert.strictEqual(fillStartThrown.getState().started, false, `${kind}: subscribe 抛错不得残留 started`);
+    assert.strictEqual(fillStartThrown.getState().notificationVersion, 0, `${kind}: subscribe 抛错不得残留脏版本`);
+    assert.strictEqual(fillStartThrown.clock.tasks.size, 0, `${kind}: subscribe 抛错不得残留 timer`);
+    assert.ok(fillStartThrown.warnings.some((entry) => entry.action?.includes('start-failed')), `${kind}: 启动失败必须记录结构化警告`);
+
+    let rollbackFillStartDisposerCalls = 0;
+    const updateThrown = createHarness(mod, kind, {
+        subscribeFillStart() {
+            return () => { rollbackFillStartDisposerCalls += 1; };
+        },
+        subscribeUpdate() {
+            throw new Error('update subscribe exploded');
+        },
+    });
+    assert.strictEqual(updateThrown.start(), false, `${kind}: update subscribe 抛错必须返回 false`);
+    assert.strictEqual(rollbackFillStartDisposerCalls, 1, `${kind}: 第二个订阅失败时必须回滚第一个订阅`);
+    assert.strictEqual(updateThrown.clock.tasks.size, 0);
 
     const recovered = createHarness(mod, kind);
     assert.strictEqual(recovered.start(), true, `${kind}: 启动失败并替换合法依赖后必须能够重新启动`);
     assert.strictEqual(recovered.getState().started, true);
     assert.deepStrictEqual(recovered.clock.delays(), [600]);
     recovered.stop();
+    assert.strictEqual(recovered.updateSubscriberCount(), 0);
+    assert.strictEqual(recovered.fillStartSubscriberCount(), 0);
     recovered.reset();
 
-    const invalidDisposer = createHarness(mod, kind, {
-        subscribe(callback) {
+    const invalidFillStartDisposer = createHarness(mod, kind, {
+        subscribeFillStart(callback) {
             callback();
             return null;
         },
     });
-    assert.strictEqual(invalidDisposer.start(), false, `${kind}: 无效 disposer 必须使启动失败`);
-    assert.strictEqual(invalidDisposer.getState().started, false);
-    assert.strictEqual(invalidDisposer.getState().notificationVersion, 0, `${kind}: 同步回调产生的脏版本必须回滚`);
-    assert.strictEqual(invalidDisposer.clock.tasks.size, 0, `${kind}: 同步回调创建的 timer 必须回滚`);
-    invalidDisposer.reset();
+    assert.strictEqual(invalidFillStartDisposer.start(), false, `${kind}: 无效 fill-start disposer 必须使启动失败`);
+    assert.strictEqual(invalidFillStartDisposer.getState().started, false);
+    assert.strictEqual(invalidFillStartDisposer.getState().fillActive, false, `${kind}: 同步 fill-start 状态必须回滚`);
+    assert.strictEqual(invalidFillStartDisposer.getState().notificationVersion, 0);
+    assert.strictEqual(invalidFillStartDisposer.clock.tasks.size, 0);
+    invalidFillStartDisposer.reset();
 
-    let disposerCalls = 0;
+    let invalidUpdateRollbackCalls = 0;
+    const invalidUpdateDisposer = createHarness(mod, kind, {
+        subscribeFillStart() {
+            return () => { invalidUpdateRollbackCalls += 1; };
+        },
+        subscribeUpdate(callback) {
+            callback();
+            return null;
+        },
+    });
+    assert.strictEqual(invalidUpdateDisposer.start(), false, `${kind}: 无效 update disposer 必须使启动失败`);
+    assert.strictEqual(invalidUpdateRollbackCalls, 1, `${kind}: 无效第二个 disposer 必须清理第一个订阅`);
+    assert.strictEqual(invalidUpdateDisposer.getState().notificationVersion, 0, `${kind}: 同步 update 脏版本必须回滚`);
+    assert.strictEqual(invalidUpdateDisposer.clock.tasks.size, 0, `${kind}: 同步 update timer 必须回滚`);
+    invalidUpdateDisposer.reset();
+
+    let updateDisposerCalls = 0;
+    let fillStartDisposerCalls = 0;
     const throwingDisposer = createHarness(mod, kind, {
-        subscribe() {
+        subscribeUpdate() {
             return () => {
-                disposerCalls += 1;
-                throw new Error('dispose exploded');
+                updateDisposerCalls += 1;
+                throw new Error('update dispose exploded');
+            };
+        },
+        subscribeFillStart() {
+            return () => {
+                fillStartDisposerCalls += 1;
+                throw new Error('fill-start dispose exploded');
             };
         },
     });
     assert.strictEqual(throwingDisposer.start(), true);
     assert.doesNotThrow(() => throwingDisposer.stop(), `${kind}: disposer 抛错不得中断 stop`);
-    assert.strictEqual(disposerCalls, 1);
+    assert.strictEqual(updateDisposerCalls, 1, `${kind}: update disposer 必须执行一次`);
+    assert.strictEqual(fillStartDisposerCalls, 1, `${kind}: fill-start disposer 必须执行一次`);
     assert.strictEqual(throwingDisposer.getState().started, false);
     assert.strictEqual(throwingDisposer.getState().running, false);
     assert.strictEqual(throwingDisposer.getState().notificationVersion, 0);
     assert.strictEqual(throwingDisposer.getState().mutationSourceSignature, null);
     assert.strictEqual(throwingDisposer.clock.tasks.size, 0, `${kind}: disposer 抛错后仍必须清理全部 timer`);
-    assert.ok(throwingDisposer.warnings.some((entry) => entry.action?.includes('stop-unsubscribe-failed')), `${kind}: disposer 抛错必须记录结构化警告`);
+    assert.ok(throwingDisposer.warnings.some((entry) => entry.action?.includes('stop-update-unsubscribe-failed')), `${kind}: update disposer 抛错必须记录结构化警告`);
+    assert.ok(throwingDisposer.warnings.some((entry) => entry.action?.includes('stop-fill-start-unsubscribe-failed')), `${kind}: fill-start disposer 抛错必须记录结构化警告`);
     throwingDisposer.reset();
 }
 
@@ -410,8 +466,7 @@ async function testPendingMutationCoalescesNotifications(mod, kind) {
     const blocked = deferred();
     let settled = false;
     let signatureReads = 0;
-    h.setQuery(async (sql) => {
-        if (isContextSql(kind, sql)) return contextResult(kind);
+    h.setQuery(async () => {
         signatureReads += 1;
         return okSignature({
             source: 'slow-source',
@@ -423,7 +478,7 @@ async function testPendingMutationCoalescesNotifications(mod, kind) {
     h.start();
     await h.clock.tick(600);
     assert.strictEqual(h.state.mutationCalls, 1);
-    h.notify(1000);
+    h.notifyUpdate(1000);
     await h.clock.tick(60_000);
     assert.strictEqual(h.state.mutationCalls, 1, `${kind}: mutation settlement 前任何通知都不得二次写入`);
     assert.strictEqual(h.clock.tasks.size, 0, `${kind}: pending mutation 期间不得创建 retry timer`);
@@ -441,8 +496,7 @@ async function testPendingMutationCoalescesNotifications(mod, kind) {
 async function testConfirmationQueryRetriesWithoutDuplicateMutation(mod, kind) {
     const h = createHarness(mod, kind);
     let signatureCalls = 0;
-    h.setQuery(async (sql) => {
-        if (isContextSql(kind, sql)) return contextResult(kind);
+    h.setQuery(async () => {
         signatureCalls += 1;
         if (signatureCalls === 1) {
             return okSignature({ source: 'confirm-source', input: 'dirty', pending: 1 });
@@ -473,7 +527,7 @@ async function testConfirmationQueryRetriesWithoutDuplicateMutation(mod, kind) {
     assert.strictEqual(h.getState().pendingConfirmationSourceSignature, null);
     assert.strictEqual(h.clock.tasks.size, 0);
 
-    h.notify(1000);
+    h.notifyUpdate(1000);
     await h.clock.tick(600);
     assert.strictEqual(h.state.mutationCalls, 1, `${kind}: clean 确认后的通知风暴不得补写`);
     h.stop();
@@ -483,8 +537,7 @@ async function testConfirmationQueryRetriesWithoutDuplicateMutation(mod, kind) {
 async function testUnconfirmedSuccessCannotExceedMutationBudget(mod, kind) {
     const h = createHarness(mod, kind);
     let signatureCalls = 0;
-    h.setQuery(async (sql) => {
-        if (isContextSql(kind, sql)) return contextResult(kind);
+    h.setQuery(async () => {
         signatureCalls += 1;
         if (signatureCalls === 2 || signatureCalls === 5) {
             return { ok: false, code: 'query_timeout', message: 'confirmation query unavailable' };
@@ -511,7 +564,7 @@ async function testUnconfirmedSuccessCannotExceedMutationBudget(mod, kind) {
     assert.strictEqual(h.getState().mutationCircuitOpen, true);
     assert.strictEqual(h.clock.tasks.size, 0);
 
-    h.notify(1000);
+    h.notifyUpdate(1000);
     await h.clock.tick(600);
     assert.strictEqual(h.state.mutationCalls, 2, `${kind}: 熔断后普通通知不得越过写入上限`);
     h.stop();
@@ -520,9 +573,7 @@ async function testUnconfirmedSuccessCannotExceedMutationBudget(mod, kind) {
 
 async function testThrownMutationUsesFiniteRetryBudget(mod, kind) {
     const h = createHarness(mod, kind);
-    h.setQuery(async (sql) => (isContextSql(kind, sql)
-        ? contextResult(kind)
-        : okSignature({ source: 'throw-source', input: 'dirty', pending: 1 })));
+    h.setQuery(async () => okSignature({ source: 'throw-source', input: 'dirty', pending: 1 }));
     h.setMutation(async () => {
         throw new Error('mutation exploded');
     });
@@ -542,9 +593,7 @@ async function testThrownMutationUsesFiniteRetryBudget(mod, kind) {
 async function testLateFailureAllowsOneRetry(mod, kind) {
     const h = createHarness(mod, kind);
     const blocked = deferred();
-    h.setQuery(async (sql) => (isContextSql(kind, sql)
-        ? contextResult(kind)
-        : okSignature({ source: 'late-fail', input: 'dirty', pending: 1 })));
+    h.setQuery(async () => okSignature({ source: 'late-fail', input: 'dirty', pending: 1 }));
     let first = true;
     h.setMutation(async () => {
         if (first) {
@@ -555,7 +604,7 @@ async function testLateFailureAllowsOneRetry(mod, kind) {
     });
     h.start();
     await h.clock.tick(600);
-    h.notify(1000);
+    h.notifyUpdate(1000);
     assert.strictEqual(h.state.mutationCalls, 1);
     blocked.resolve({ ok: false, code: 'mutation_rejected', message: 'late rejection' });
     await flush();
@@ -570,7 +619,7 @@ async function testLateFailureAllowsOneRetry(mod, kind) {
 async function testGenerationIsolation(mod, kind) {
     const h = createHarness(mod, kind);
     const blocked = deferred();
-    h.setProbe(async () => blocked.promise);
+    h.setAvailability(async () => blocked.promise);
     h.start();
     await h.clock.tick(600);
     h.stop();
@@ -579,9 +628,11 @@ async function testGenerationIsolation(mod, kind) {
     await flush();
     assert.strictEqual(h.state.queryCalls, 0, `${kind}: stop/restart 后旧 generation 不得继续查询`);
     assert.deepStrictEqual(h.clock.delays(), [600]);
-    assert.strictEqual(h.subscriberCount(), 1, `${kind}: restart 后只能保留一个订阅`);
+    assert.strictEqual(h.updateSubscriberCount(), 1, `${kind}: restart 后只能保留一个 update 订阅`);
+    assert.strictEqual(h.fillStartSubscriberCount(), 1, `${kind}: restart 后只能保留一个 fill-start 订阅`);
     h.stop();
-    assert.strictEqual(h.subscriberCount(), 0);
+    assert.strictEqual(h.updateSubscriberCount(), 0);
+    assert.strictEqual(h.fillStartSubscriberCount(), 0);
     h.reset();
 }
 
@@ -591,14 +642,15 @@ async function main() {
     const chronicle = await import(`${pathToFileURL(path.join(root, 'modules/phone-core/derived-fields/chronicle-today-relation.js')).href}?behavior=${Date.now()}`);
 
     for (const [mod, kind] of [[small, 'small'], [chronicle, 'chronicle']]) {
-        await testProbeRetriesAreFinite(mod, kind);
+        await testRuntimeAvailabilityWaitsSilently(mod, kind);
         await testQueryRetriesAreFinite(mod, kind);
-        await testInFlightProbeNotificationKeepsRetryBackoff(mod, kind);
+        await testInFlightAvailabilityNotificationKeepsRetryWait(mod, kind);
         await testInFlightQueryNotificationKeepsRetryBackoff(mod, kind);
         await testPendingZeroNeverMutates(mod, kind);
         await testConfirmedMutationFailureRetriesExactlyOnce(mod, kind);
         await testConfirmedSuccessCannotRearmSameSourceBudget(mod, kind);
         await testSourceChangeRearmsMutationBudget(mod, kind);
+        await testFillStartPausesUntilTableUpdate(mod, kind);
         await testLifecycleFailuresRollbackCompletely(mod, kind);
         await testPendingMutationCoalescesNotifications(mod, kind);
         await testConfirmationQueryRetriesWithoutDuplicateMutation(mod, kind);
@@ -612,7 +664,7 @@ async function main() {
     const b = createHarness(chronicle, 'chronicle');
     a.start();
     b.start();
-    a.notify();
+    a.notifyUpdate();
     assert.strictEqual(a.clock.tasks.size, 1);
     assert.strictEqual(b.clock.tasks.size, 1, '两个派生服务的 timer/state 必须隔离');
     a.stop();
@@ -620,7 +672,7 @@ async function main() {
     a.reset();
     b.reset();
 
-    console.log('[通过] 派生调度行为：读失败退避不被 in-flight 通知抢占、pending=0 零写入、成功确认不重置同源预算、启动失败完整回滚、确认查询仅重试查询、同源最多两次写入、通知不重置预算、慢写合并通知、源变化重武装、generation 隔离');
+    console.log('[通过] 派生调度行为：runtime availability 静默等待、fill-start 暂停/table-update 恢复、双订阅清理、读失败有限退避、pending=0 零写入、同源写入熔断与 generation 隔离');
 }
 
 main().catch((error) => {

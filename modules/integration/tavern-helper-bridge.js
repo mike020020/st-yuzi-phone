@@ -137,10 +137,12 @@ export function getCharacterData(name = 'current', allowAvatar = false) {
     }
 }
 
-export async function getWorldbookNames() {
+export async function getWorldbookNames(options = {}) {
+    const strict = options.strict === true;
     const method = resolveHelperOrGlobalMethod('getWorldbookNames');
     if (!method) {
         Logger.warn('[玉子手机] getWorldbookNames API 不可用');
+        if (strict) throw new Error('getWorldbookNames API unavailable');
         return [];
     }
 
@@ -149,14 +151,17 @@ export async function getWorldbookNames() {
         return Array.isArray(result) ? result : [];
     } catch (error) {
         Logger.warn('[玉子手机] 获取世界书列表失败:', error);
+        if (strict) throw error;
         return [];
     }
 }
 
-export async function getCurrentCharacterWorldbooks() {
+export async function getCurrentCharacterWorldbooks(options = {}) {
+    const strict = options.strict === true;
     const method = resolveHelperOrGlobalMethod('getCharWorldbookNames');
     if (!method) {
         Logger.warn('[玉子手机] getCharWorldbookNames API 不可用');
+        if (strict) throw new Error('getCharWorldbookNames API unavailable');
         return { primary: null, additional: [] };
     }
 
@@ -170,11 +175,13 @@ export async function getCurrentCharacterWorldbooks() {
         };
     } catch (error) {
         Logger.warn('[玉子手机] 获取角色绑定世界书失败:', error);
+        if (strict) throw error;
         return { primary: null, additional: [] };
     }
 }
 
-export async function getWorldbook(worldbookName) {
+export async function getWorldbook(worldbookName, options = {}) {
+    const strict = options.strict === true;
     const safeWorldbookName = String(worldbookName || '').trim();
     if (!safeWorldbookName) {
         return [];
@@ -183,6 +190,7 @@ export async function getWorldbook(worldbookName) {
     const method = resolveHelperOrGlobalMethod('getWorldbook');
     if (!method) {
         Logger.warn('[玉子手机] getWorldbook API 不可用');
+        if (strict) throw new Error('getWorldbook API unavailable');
         return [];
     }
 
@@ -191,7 +199,28 @@ export async function getWorldbook(worldbookName) {
         return Array.isArray(result) ? result : [];
     } catch (error) {
         Logger.warn('[玉子手机] 获取世界书条目失败:', error);
+        if (strict) throw error;
         return [];
+    }
+}
+
+export async function replaceWorldbook(worldbookName, entries, options = {}) {
+    const strict = options.strict === true;
+    const safeWorldbookName = String(worldbookName || '').trim();
+    if (!safeWorldbookName) return false;
+    const method = resolveHelperOrGlobalMethod('replaceWorldbook');
+    if (!method) {
+        Logger.warn('[玉子手机] replaceWorldbook API 不可用');
+        if (strict) throw new Error('replaceWorldbook API unavailable');
+        return false;
+    }
+    try {
+        await Promise.resolve(method(safeWorldbookName, Array.isArray(entries) ? entries : []));
+        return true;
+    } catch (error) {
+        Logger.warn('[玉子手机] 替换世界书失败:', error);
+        if (strict) throw error;
+        return false;
     }
 }
 

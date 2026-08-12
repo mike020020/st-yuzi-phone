@@ -1,7 +1,7 @@
 import { ErrorCodes, assert } from '../error-handler.js';
-import { createDataConfigPageRenderers } from './page-renderers/data-config-renderers.js';
 import { createEditorPageRenderers } from './page-renderers/editor-renderers.js';
 import { createPersonalizationPageRenderers } from './page-renderers/personalization-renderers.js';
+import { createPresetPageRenderers } from './page-renderers/preset-renderers.js';
 import {
     createSettingsPageContexts,
     createSettingsRendererServices,
@@ -45,12 +45,8 @@ function validateSettingsRendererDeps(deps = {}) {
         'restoreScroll',
         'rerenderHomeKeepScroll',
         'rerenderAppearanceKeepScroll',
-        'rerenderDatabaseKeepScroll',
+        'rerenderApiPresetsKeepScroll',
         'rerenderBeautifyKeepScroll',
-        'rerenderApiPromptConfigKeepScroll',
-    ]);
-    assertFunctionDeps('home', deps.home, [
-        'setupManualUpdateBtn',
     ]);
     assertFunctionDeps('appearance', deps.appearance, [
         'getLayoutValue',
@@ -83,47 +79,22 @@ function validateSettingsRendererDeps(deps = {}) {
         'applyPhoneThemeMode',
         'setupPhoneThemeModeSettings',
     ]);
-    assertFunctionDeps('dataConfig', deps.dataConfig, [
-        'getTableData',
-        'getSheetKeys',
-        'getDbConfigApiAvailability',
-        'readDbSnapshot',
-        'getDbPresets',
-        'getActiveDbPresetName',
-        'switchPresetByName',
-        'clearActivePresetBindingIfNeeded',
-        'normalizeDbManualSelection',
-        'normalizeDbUpdateConfig',
-        'createDbPreset',
-        'saveDbPresets',
-        'setActiveDbPresetName',
-        'writeDbUpdateConfigViaApi',
-        'writeManualTableSelectionViaApi',
-        'clearManualTableSelectionViaApi',
+    assertFunctionDeps('qqV2Presets', deps.qqV2Presets, [
+        'readSharedResources',
+        'saveApiPreset',
+        'deleteApiPreset',
+        'loadModels',
+        'savePromptPreset',
+        'deletePromptPreset',
+        'restoreBuiltInPromptPreset',
+        'restoreAllBuiltInPromptPresets',
+        'importPromptPresets',
+        'exportPromptPreset',
+        'exportAllPromptPresets',
     ]);
     assertFunctionDeps('buttonStyle', deps.buttonStyle, [
         'getPhoneSettings',
         'savePhoneSetting',
-    ]);
-    assertFunctionDeps('apiPrompt', deps.apiPrompt, [
-        'getDbConfigApiAvailability',
-        'getApiPresets',
-        'getTableApiPreset',
-        'setTableApiPreset',
-        'getPlotApiPreset',
-        'setPlotApiPreset',
-        'getPhoneAiInstructionPresets',
-        'getPhoneAiInstructionPreset',
-        'getCurrentPhoneAiInstructionPresetName',
-        'setCurrentPhoneAiInstructionPresetName',
-        'deletePhoneAiInstructionPreset',
-        'importPhoneAiInstructionPresetsFromData',
-        'exportPhoneAiInstructionPresetPack',
-        'exportAllPhoneAiInstructionPresetsPack',
-    ]);
-    assertFunctionDeps('promptEditor', deps.promptEditor, [
-        'getPhoneAiInstructionPreset',
-        'savePhoneAiInstructionPreset',
     ]);
     assertFunctionDeps('contentPresetWorkshop', deps.contentPresetWorkshop, [
         'getSnapshot',
@@ -154,17 +125,17 @@ export function createSettingsPageRenderers(deps = {}) {
     };
 
     const { pages: personalizationPages = {}, ...personalizationRenderers } = createPersonalizationPageRenderers(rendererScope);
-    const { pages: dataConfigPages = {}, ...dataConfigRenderers } = createDataConfigPageRenderers(rendererScope);
+    const { pages: presetPages = {}, ...presetRenderers } = createPresetPageRenderers(rendererScope);
     const { pages: editorPages = {}, ...editorRenderers } = createEditorPageRenderers(rendererScope);
 
     return {
         pages: {
             ...personalizationPages,
-            ...dataConfigPages,
+            ...presetPages,
             ...editorPages,
         },
         ...personalizationRenderers,
-        ...dataConfigRenderers,
+        ...presetRenderers,
         ...editorRenderers,
     };
 }

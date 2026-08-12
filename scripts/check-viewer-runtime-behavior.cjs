@@ -44,9 +44,7 @@ function installDomGlobals(order = []) {
     global.HTMLElement = FakeHTMLElement;
     global.Element = FakeHTMLElement;
     global.requestAnimationFrame = (callback) => {
-        if (typeof callback === 'function') {
-            callback(Date.now());
-        }
+        if (typeof callback === 'function') callback(Date.now());
         return 1;
     };
     global.cancelAnimationFrame = () => {};
@@ -70,7 +68,6 @@ function installDomGlobals(order = []) {
     }
 
     global.MutationObserver = FakeMutationObserver;
-
     const body = new FakeHTMLElement('body');
     const windowTarget = {
         addEventListener() {},
@@ -81,7 +78,6 @@ function installDomGlobals(order = []) {
         requestAnimationFrame: global.requestAnimationFrame,
         cancelAnimationFrame: global.cancelAnimationFrame,
     };
-
     global.window = windowTarget;
     global.document = {
         body,
@@ -89,16 +85,14 @@ function installDomGlobals(order = []) {
             return null;
         },
     };
-
     return { body, windowTarget };
 }
 
 async function importViewerModules() {
     const runtimeModule = await import(toModuleUrl('modules/table-viewer/runtime.js'));
     const genericRuntimeModule = await import(toModuleUrl('modules/table-viewer/generic-runtime.js'));
-    const specialRuntimeModule = await import(toModuleUrl('modules/table-viewer/special/runtime.js'));
     const callbacksModule = await import(toModuleUrl('modules/phone-core/callbacks.js'));
-    return { runtimeModule, genericRuntimeModule, specialRuntimeModule, callbacksModule };
+    return { runtimeModule, genericRuntimeModule, callbacksModule };
 }
 
 async function testViewerRuntimeStartSession(runtimeModule) {
@@ -106,7 +100,6 @@ async function testViewerRuntimeStartSession(runtimeModule) {
     installDomGlobals(order);
     const container = new FakeHTMLElement('viewer-container');
     const observerRoot = new FakeHTMLElement('body');
-
     const runtime = runtimeModule.createViewerRuntime({
         container,
         sheetKey: 'sheet_runtime',
@@ -117,13 +110,11 @@ async function testViewerRuntimeStartSession(runtimeModule) {
                 order.push(`acquire:${sheetKey}`);
                 return { sheetKey };
             },
-            releaseCurrentViewingSheet: owner => order.push(`release:${owner.sheetKey}`),
+            releaseCurrentViewingSheet: (owner) => order.push(`release:${owner.sheetKey}`),
             resetDataVersion: () => order.push('reset'),
             bindTemplateDraftPreviewForViewer: (host, sheetKey) => {
                 order.push(`draft:${sheetKey}`);
-                host.__yuziDraftPreviewCleanup = () => {
-                    order.push('draft-cleanup');
-                };
+                host.__yuziDraftPreviewCleanup = () => order.push('draft-cleanup');
             },
             getObserverRoot: () => observerRoot,
         },
@@ -150,10 +141,10 @@ async function testViewingSheetLeaseRace(callbacksModule) {
     const ownerB = callbacksModule.acquireCurrentViewingSheet('sheet_b');
     assert.equal(callbacksModule.getCurrentViewingSheet(), 'sheet_b');
     assert.equal(callbacksModule.releaseCurrentViewingSheet(ownerA), false);
-    assert.equal(callbacksModule.getCurrentViewingSheet(), 'sheet_b', 'A 晚释放不得清空 B 的 viewing sheet');
+    assert.equal(callbacksModule.getCurrentViewingSheet(), 'sheet_b');
     assert.equal(callbacksModule.releaseCurrentViewingSheet(ownerB), true);
     assert.equal(callbacksModule.getCurrentViewingSheet(), null);
-    assert.equal(callbacksModule.releaseCurrentViewingSheet(ownerA), false, 'A 再次晚释放仍不得改变状态');
+    assert.equal(callbacksModule.releaseCurrentViewingSheet(ownerA), false);
 }
 
 async function testViewerRuntimeSuppressDepth(runtimeModule) {
@@ -187,12 +178,11 @@ async function testGenericRuntimeStartOrder(genericRuntimeModule) {
         },
         setSuppressExternalTableUpdate() {},
     };
-
     const runtime = genericRuntimeModule.createGenericTableViewerRuntime(
         container,
         {
             sheetKey: 'sheet_generic',
-            tableName: '测试表',
+            tableName: 'Generic table',
             headers: [],
             rawHeaders: [],
             rows: [],
@@ -200,9 +190,7 @@ async function testGenericRuntimeStartOrder(genericRuntimeModule) {
         },
         {
             viewerRuntime,
-            renderListPage: () => {
-                order.push('render');
-            },
+            renderListPage: () => order.push('render'),
         },
     );
 
@@ -211,57 +199,24 @@ async function testGenericRuntimeStartOrder(genericRuntimeModule) {
     assert.deepEqual(order, ['bind', 'render']);
 }
 
-async function testSpecialRuntimeStartPath(specialRuntimeModule) {
-    const container = new FakeHTMLElement('special-container');
-    const viewerEventManager = { name: 'viewer-event-manager' };
-    const messageCalls = [];
-
-    const messageRuntime = specialRuntimeModule.createSpecialTableViewerRuntime(
-        container,
-        {
-            sheetKey: 'sheet_message',
-            tableName: '消息记录表',
-            rows: [],
-            headers: [],
-            type: 'message',
-            templateMatch: null,
-        },
-        {
-            viewerRuntime: { viewerEventManager },
-            renderMessageTable: (_container, _context, deps) => {
-                messageCalls.push(deps);
-            },
-        },
-    );
-
-    assert.ok(messageRuntime);
-    assert.equal(messageRuntime.viewerEventManager, viewerEventManager);
-    assert.equal(messageRuntime.start(), true);
-    assert.equal(messageCalls.length, 1);
-    assert.equal(messageCalls[0].viewerEventManager, viewerEventManager);
-    assert.equal(typeof messageCalls[0].createSpecialTemplateStylePayload, 'function');
-}
-
 async function main() {
     installDomGlobals();
-    const { runtimeModule, genericRuntimeModule, specialRuntimeModule, callbacksModule } = await importViewerModules();
+    const { runtimeModule, genericRuntimeModule, callbacksModule } = await importViewerModules();
 
     await testViewerRuntimeStartSession(runtimeModule);
     await testViewingSheetLeaseRace(callbacksModule);
     await testViewerRuntimeSuppressDepth(runtimeModule);
     await testGenericRuntimeStartOrder(genericRuntimeModule);
-    await testSpecialRuntimeStartPath(specialRuntimeModule);
 
-    console.log('[viewer-runtime-behavior-check] 检查通过');
-    console.log('- OK | startViewerSession() 保持 viewing sheet / reset / draft / observer 启动顺序');
-    console.log('- OK | A→B→A 晚释放不会清空新 viewer 的 currentViewingSheetKey');
-    console.log('- OK | setSuppressExternalTableUpdate() 使用计数语义并防止多余 false 下溢');
-    console.log('- OK | generic-runtime.start() 保持 bind -> render 顺序');
-    console.log('- OK | special-runtime 保持 create -> start 路径与 viewerEventManager owner 传递');
+    console.log('[viewer-runtime-behavior-check] passed');
+    console.log('- viewer session startup and cleanup order');
+    console.log('- viewing sheet lease ownership');
+    console.log('- external update suppression depth');
+    console.log('- generic runtime bind then render order');
 }
 
 main().catch((error) => {
-    console.error('[viewer-runtime-behavior-check] 检查失败：');
+    console.error('[viewer-runtime-behavior-check] failed:');
     console.error(error);
     process.exitCode = 1;
 });

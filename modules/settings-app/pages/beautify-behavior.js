@@ -1,5 +1,5 @@
 export function createBeautifyPageBehavior(params = {}, deps = {}) {
-    const { container, runtime, onChanged, onBack } = params;
+    const { container, runtime, waitForCommittedRefresh, onBack } = params;
     const { contentPresetWorkshopService: service, downloadTextFile, showConfirmDialog, showToast } = deps;
     let busy = false;
     const isDisposed = () => runtime?.isDisposed?.() === true;
@@ -12,8 +12,9 @@ export function createBeautifyPageBehavior(params = {}, deps = {}) {
         try {
             await operation();
             if (isDisposed()) return;
+            await waitForCommittedRefresh?.();
+            if (isDisposed()) return;
             notify(successMessage);
-            await onChanged?.();
         } catch (error) {
             if (!isDisposed()) notify(error?.message || '操作失败', true);
         } finally {

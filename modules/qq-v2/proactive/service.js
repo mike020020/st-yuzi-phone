@@ -1,0 +1,458 @@
+import { buildProactiveQQV2Request, buildQQV2ProactiveSections } from '../prompt/materializer.js';
+import { buildQQV2StickerCatalog } from '../prompt/sticker-catalog.js';
+
+function asText(value, maxLength = 0) {
+    const text = String(value ?? '').trim();
+    return maxLength > 0 ? text.slice(0, maxLength) : text;
+}
+
+function requireRepository(repository) {
+    if (!repository
+        || typeof repository.getProactiveSettings !== 'function'
+        || typeof repository.updateProactiveSettings !== 'function'
+        || typeof repository.consumeProactiveStoryReply !== 'function') {
+        throw new TypeError('QQ v2 主动周期需要支持主动设置的 repository');
+    }
+    return repository;
+}
+
+function cloneState(state) {
+    return Object.freeze({
+        enabled: state?.enabled === true,
+        everyTurns: Number(state?.everyTurns) || 5,
+        count: Number(state?.count) || 0,
+        nextKind: state?.nextKind === 'group' ? 'group' : 'private',
+    });
+}
+
+function isSuccessfulStoryReply(message) {
+    return message?.role === 'assistant'
+        && message?.isSystem !== true
+        && message?.is_system !== true
+        && message?.isHidden !== true
+        && message?.is_hidden !== true
+        && message?.isSuccessful !== false
+        && message?.is_successful !== false;
+}
+
+function requireFunction(value, label) {
+    if (typeof value !== 'function') throw new QQV2ProactiveError(`QQ 主动周期缺少 ${label}`, 'dependency_missing');
+    return value;
+}
+
+function truncateConversationHistory(messages, limit) {
+    const history = Array.isArray(messages) ? messages : [];
+    const normalizedLimit = Number(limit);
+    if (!Number.isInteger(normalizedLimit) || normalizedLimit <= 0) return [...history];
+    return history.slice(-normalizedLimit);
+}
+
+function isVisibleMessage(message) {
+    return Boolean(message) && message.deleted !== true && message.isDeleted !== true;
+}
+
+function createProactiveMessageReferences(candidates) {
+    const messageReferences = {};
+    for (const candidate of candidates) {
+        let index = 0;
+        for (const message of Array.isArray(candidate?.messages) ? candidate.messages : []) {
+            if (!isVisibleMessage(message)) continue;
+            index += 1;
+            const messageId = asText(message?.messageId, 256);
+            if (!messageId) continue;
+            messageReferences[`${candidate.referenceId}-M${index}`] = messageId;
+        }
+    }
+    return messageReferences;
+}
+
+function buildPrivateProactiveIdentity(candidates) {
+    return candidates.map((candidate) => `${candidate.referenceId}：${candidate.title}`).join('\n') || '无';
+}
+
+function personLabel(reference) {
+    return `${reference.referenceId}：${reference.title}`;
+}
+
+function buildGroupIdentity(candidates, friendReferences = []) {
+    const groups = candidates.map((candidate) => {
+        const lines = [
+            `${candidate.referenceId}：${candidate.title}`,
+            `成员：${candidate.members.join('、') || '无'}`,
+            `群主：${candidate.ownerName || '无'}`,
+            `管理员：${candidate.adminNames.join('、') || '无'}`,
+        ];
+        if (candidate.reinviteOnly) lines.push('当前用户已退出；只能先重新邀请用户，再发送后续消息。');
+        return lines.join('\n');
+    }).join('\n\n') || '无';
+    const friends = friendReferences.map(personLabel).join('、') || '无';
+    return `${groups}\n\n可用于新建群聊的已有好友：${friends}`;
+}
+
+/**
+ * QQ 正文 N 轮主动周期的应用服务。网络、协议和投影在后续执行切片中经公开 seam 注入。
+ */
+export function createQQV2ProactiveService(options = {}) {
+    const repository = requireRepository(options.repository);
+    const requestService = options.requestService;
+    if (!requestService
+        || typeof requestService.cancelProactive !== 'function'
+        || typeof requestService.enqueueProactive !== 'function') {
+        throw new TypeError('QQ v2 主动周期需要主动请求仲裁接口');
+    }
+    const epochs = new Map();
+    const privateOnly = options.privateOnly === true;
+    const ensureScope = typeof repository.ensureScope === 'function' ? repository.ensureScope.bind(repository) : async () => {};
+
+    const advanceEpoch = (scopeId) => {
+        const next = (epochs.get(scopeId) || 0) + 1;
+        epochs.set(scopeId, next);
+        return next;
+    };
+
+    const listStickers = typeof options.listStickers === 'function' ? options.listStickers : async () => [];
+    const getStoryTime = typeof options.getStoryTime === 'function' ? options.getStoryTime : () => '';
+    const getPromptContext = typeof options.getPromptContext === 'function' ? options.getPromptContext : async () => ({});
+    const getUserName = typeof options.getUserName === 'function' ? options.getUserName : () => '';
+    const runtimeSettingsResolver = typeof options.runtimeSettingsResolver === 'function'
+        ? options.runtimeSettingsResolver
+        : async (_scopeId, scope) => scope?.settings || {};
+    const buildProactiveRequest = typeof options.buildProactiveRequest === 'function'
+        ? options.buildProactiveRequest
+        : buildProactiveQQV2Request;
+    const buildSections = typeof options.buildProactiveSections === 'function'
+        ? options.buildProactiveSections
+        : buildQQV2ProactiveSections;
+    const syncWorldbook = typeof options.syncWorldbook === 'function' ? options.syncWorldbook : async () => {};
+    const onProjectionError = typeof options.onProjectionError === 'function' ? options.onProjectionError : () => {};
+
+    const resolveCommitActions = () => {
+        if (typeof options.commitActions === 'function') return options.commitActions;
+        if (typeof options.actionService?.execute === 'function') {
+            return (input) => options.actionService.execute({
+                scopeId: input.scopeId,
+                response: input.response,
+                scenario: input.scenario,
+                references: input.references,
+                personReferences: input.personReferences,
+                messageReferences: input.messageReferences,
+                visibleMessageRefs: input.visibleMessageRefs,
+                stickers: input.stickers,
+                stickerReferences: input.stickerReferences,
+                storyTime: input.storyTime,
+            });
+        }
+        return null;
+    };
+
+    const resolveCandidates = async (scopeId, kind, historyLimit) => {
+        const conversations = await requireFunction(repository.listConversations, 'repository.listConversations')(scopeId);
+        const candidates = [];
+        const getPerson = requireFunction(repository.getPerson, 'repository.getPerson');
+        const listMessages = requireFunction(repository.listMessages, 'repository.listMessages');
+        for (const conversation of conversations) {
+            if (kind === 'private') {
+                if (conversation.kind !== 'private' || conversation.status !== 'active') continue;
+                const person = await getPerson(scopeId, conversation.personId);
+                if (!person) continue;
+                const messages = truncateConversationHistory(
+                    await listMessages(scopeId, conversation.conversationId),
+                    historyLimit,
+                );
+                candidates.push({
+                    referenceId: `P${candidates.length + 1}`,
+                    conversationId: conversation.conversationId,
+                    personId: person.personId,
+                    title: asText(person.formalName, 120),
+                    members: [],
+                    ownerName: '',
+                    adminNames: [],
+                    reinviteOnly: false,
+                    peopleById: { [person.personId]: asText(person.formalName, 120) },
+                    messages,
+                });
+            }
+        }
+        if (kind === 'private') {
+            return {
+                candidates,
+                personReferences: Object.fromEntries(candidates.map((candidate) => [candidate.referenceId, candidate.personId])),
+                friendReferences: [],
+            };
+        }
+
+        const peopleById = new Map();
+        const privateFriends = [];
+        for (const conversation of conversations) {
+            if (conversation.kind !== 'private' || conversation.status !== 'active') continue;
+            const person = await getPerson(scopeId, conversation.personId);
+            if (!person || peopleById.has(person.personId)) continue;
+            peopleById.set(person.personId, person);
+            privateFriends.push(person);
+        }
+        const referenceByPersonId = new Map();
+        const referencedPeople = [];
+        const assignPersonReference = (person) => {
+            if (!person?.personId) return null;
+            let reference = referenceByPersonId.get(person.personId);
+            if (!reference) {
+                reference = {
+                    referenceId: `N${referencedPeople.length + 1}`,
+                    personId: person.personId,
+                    title: asText(person.formalName, 120),
+                };
+                referenceByPersonId.set(person.personId, reference);
+                referencedPeople.push(reference);
+            }
+            return reference;
+        };
+        const resolveGroupPerson = async (personId) => {
+            if (peopleById.has(personId)) return peopleById.get(personId);
+            const person = await getPerson(scopeId, personId);
+            if (person) peopleById.set(person.personId, person);
+            return person;
+        };
+        for (const conversation of conversations) {
+            if (conversation.kind !== 'group') continue;
+            const group = await requireFunction(repository.getGroup, 'repository.getGroup')(scopeId, conversation.groupId);
+            if (!group || group.status !== 'active') continue;
+            const active = conversation.status === 'active' && group.selfExited !== true;
+            const mayReinvite = conversation.status === 'exited'
+                && group.selfExited === true
+                && [group.ownerId, ...(group.adminIds || [])].some(Boolean);
+            if (!active && !mayReinvite) continue;
+            const memberPeople = await Promise.all((group.memberIds || []).map(resolveGroupPerson));
+            const labelsById = new Map(memberPeople.filter(Boolean).map((person) => {
+                const reference = assignPersonReference(person);
+                return [person.personId, personLabel(reference)];
+            }));
+            const labelFor = (personId) => labelsById.get(personId)
+                || (personId === '__self__' ? '用户' : asText(personId, 120));
+            const messages = truncateConversationHistory(
+                await listMessages(scopeId, conversation.conversationId),
+                historyLimit,
+            );
+            candidates.push({
+                referenceId: `G${candidates.length + 1}`,
+                conversationId: conversation.conversationId,
+                personId: '',
+                title: asText(group.name, 120),
+                members: (group.memberIds || []).map(labelFor),
+                ownerName: labelFor(group.ownerId),
+                adminNames: (group.adminIds || []).map(labelFor),
+                reinviteOnly: mayReinvite,
+                peopleById: Object.fromEntries(memberPeople.filter(Boolean).map((person) => [person.personId, asText(person.formalName, 120)])),
+                messages,
+            });
+        }
+        const friendReferences = privateFriends.map(assignPersonReference).filter(Boolean);
+        return {
+            candidates,
+            personReferences: Object.fromEntries(referencedPeople.map((person) => [person.referenceId, person.personId])),
+            friendReferences,
+        };
+    };
+
+    const executeCycle = async ({ scopeId, kind, epoch, signal, isCurrent }) => {
+        if (privateOnly && kind !== 'private') return { status: 'cancelled' };
+        const current = () => epochs.get(scopeId) === epoch
+            && !signal?.aborted
+            && (typeof isCurrent !== 'function' || isCurrent());
+        if (!current()) return { status: 'cancelled' };
+        const scope = await requireFunction(repository.getScope, 'repository.getScope')(scopeId);
+        if (!scope || !current()) return { status: 'cancelled' };
+        const runtimeSettings = await runtimeSettingsResolver(scopeId, scope) || scope.settings || {};
+        const apiPresetId = asText(runtimeSettings.activeApiPresetId, 256);
+        const promptPresetId = asText(
+            kind === 'group' ? runtimeSettings.groupProactivePresetId : runtimeSettings.privateProactivePresetId,
+            256,
+        );
+        if (!apiPresetId || !promptPresetId) {
+            throw new QQV2ProactiveError('QQ API 或主动消息指令预设未选择', 'preset_missing');
+        }
+        const apiPresetResolver = requireFunction(options.apiPresetResolver, 'apiPresetResolver');
+        const promptPresetResolver = requireFunction(options.promptPresetResolver, 'promptPresetResolver');
+        const backend = options.backend;
+        if (!backend || typeof backend.generate !== 'function') {
+            throw new QQV2ProactiveError('QQ 主动周期缺少 backend.generate', 'dependency_missing');
+        }
+        const commitActions = resolveCommitActions();
+        if (!commitActions) throw new QQV2ProactiveError('QQ 主动周期缺少动作提交入口', 'dependency_missing');
+        const [apiPreset, promptPreset, candidateData, stickers] = await Promise.all([
+            apiPresetResolver(apiPresetId),
+            promptPresetResolver(promptPresetId),
+            resolveCandidates(scopeId, kind, runtimeSettings.conversationHistoryLimit),
+            listStickers(),
+        ]);
+        if (!apiPreset || !promptPreset) {
+            throw new QQV2ProactiveError('所选 QQ API 或主动消息指令预设已不存在', 'preset_missing');
+        }
+        if (!current()) return { status: 'cancelled' };
+        const { candidates, personReferences, friendReferences } = candidateData;
+        const storyTime = asText(getStoryTime(), 128);
+        const sections = buildSections({ kind, conversations: candidates });
+        const stickerCatalog = buildQQV2StickerCatalog(stickers);
+        const promptContext = await getPromptContext({
+            scopeId,
+            kind,
+            scope,
+            runtimeSettings,
+            candidates,
+            friendReferences,
+            storyTime,
+        }) || {};
+        const variables = {
+            ...promptContext,
+            privatePerson: '无',
+            privateProactivePeople: kind === 'private' ? buildPrivateProactiveIdentity(candidates) : '无',
+            groupMembers: kind === 'group' ? buildGroupIdentity(candidates, friendReferences) : '无',
+            privateHistory: '无',
+            privateProactiveHistory: kind === 'private' ? sections : '无',
+            groupHistory: kind === 'group' ? sections : '无',
+            storyTime: asText(promptContext.storyTime || storyTime, 128),
+            availableStickers: stickerCatalog.text,
+        };
+        const promptMessages = await buildProactiveRequest({
+            scopeId,
+            kind,
+            scope,
+            candidates,
+            preset: promptPreset,
+            variables,
+        });
+        if (!current()) return { status: 'cancelled' };
+        const response = await backend.generate({ preset: apiPreset, messages: promptMessages, signal });
+        if (!current()) return { status: 'cancelled' };
+        const references = Object.fromEntries(candidates.map((candidate) => [candidate.referenceId, candidate.conversationId]));
+        const messageReferences = createProactiveMessageReferences(candidates);
+        const visibleMessageRefs = new Set(Object.keys(messageReferences));
+        // The commit seam must make the last currentness check immediately before its transaction.
+        if (!current()) return { status: 'cancelled' };
+        const actionResult = await commitActions({
+            scopeId,
+            kind,
+            response: response?.content ?? response,
+            scenario: `${kind}-proactive`,
+            references,
+            personReferences,
+            messageReferences,
+            visibleMessageRefs,
+            stickers: new Set(Object.keys(stickerCatalog.references)),
+            stickerReferences: stickerCatalog.references,
+            storyTime,
+            isCurrent: current,
+        });
+        if (!current()) return { status: 'cancelled' };
+        const conversationIds = [...new Set([
+            ...candidates.map((candidate) => candidate.conversationId),
+            ...(Array.isArray(actionResult?.createdConversationIds) ? actionResult.createdConversationIds : []),
+        ])];
+        try {
+            await syncWorldbook({
+                scopeId,
+                conversationIds,
+                storyTime,
+                userName: asText(getUserName(), 256),
+                actionResult,
+            });
+        } catch (error) {
+            try {
+                onProjectionError(error, { scopeId, conversationIds, storyTime, actionResult });
+            } catch {
+                // Projection observers are diagnostic only and cannot turn a committed QQ batch into a failure.
+            }
+        }
+        return { status: 'succeeded' };
+    };
+
+    return Object.freeze({
+        async getState(scopeId) {
+            const normalizedScopeId = asText(scopeId, 512);
+            if (!normalizedScopeId) throw new QQV2ProactiveError('QQ 作用域 ID 不能为空', 'scope_required');
+            await ensureScope(normalizedScopeId);
+            const [state, runtimeSettings] = await Promise.all([
+                repository.getProactiveSettings(normalizedScopeId),
+                runtimeSettingsResolver(normalizedScopeId),
+            ]);
+            const proactive = runtimeSettings?.proactive || {};
+            const resolved = {
+                ...state,
+                ...(Object.hasOwn(proactive, 'enabled') ? { enabled: proactive.enabled === true } : {}),
+                ...(Object.hasOwn(proactive, 'everyTurns') ? { everyTurns: proactive.everyTurns } : {}),
+            };
+            return cloneState(privateOnly ? { ...resolved, nextKind: 'private' } : resolved);
+        },
+        async configure(input = {}) {
+            const scopeId = asText(input.scopeId, 512);
+            if (!scopeId) throw new QQV2ProactiveError('QQ 作用域 ID 不能为空', 'scope_required');
+            await ensureScope(scopeId);
+            const before = await repository.getProactiveSettings(scopeId);
+            const patch = {};
+            if (Object.hasOwn(input, 'enabled')) patch.enabled = input.enabled === true;
+            if (Object.hasOwn(input, 'everyTurns')) patch.everyTurns = input.everyTurns;
+            const after = await repository.updateProactiveSettings(scopeId, patch);
+            if (before.enabled !== after.enabled || before.everyTurns !== after.everyTurns) {
+                advanceEpoch(scopeId);
+                requestService.cancelProactive({ scopeId });
+            }
+            return cloneState(privateOnly ? { ...after, nextKind: 'private' } : after);
+        },
+        async recordSuccessfulStoryReply(input = {}) {
+            const scopeId = asText(input.scopeId, 512);
+            if (!scopeId) throw new QQV2ProactiveError('QQ 作用域 ID 不能为空', 'scope_required');
+            await ensureScope(scopeId);
+            if (!isSuccessfulStoryReply(input.message)) {
+                return Object.freeze({
+                    counted: false,
+                    triggered: false,
+                    skipped: 'not-successful-story-reply',
+                });
+            }
+            const epoch = epochs.get(scopeId) || 0;
+            const runtimeSettings = await runtimeSettingsResolver(scopeId);
+            const cycle = await repository.consumeProactiveStoryReply(scopeId, runtimeSettings?.proactive);
+            if (epochs.get(scopeId) !== epoch) {
+                return Object.freeze({
+                    counted: false,
+                    triggered: false,
+                    skipped: 'configuration-changed',
+                });
+            }
+            if (!cycle.triggered) {
+                return Object.freeze({
+                    counted: cycle.enabled === true,
+                    triggered: false,
+                    cycleKind: null,
+                    queued: false,
+                    skipped: '',
+                });
+            }
+            const cycleKind = privateOnly ? 'private' : cycle.kind;
+            const queued = await requestService.enqueueProactive({
+                scopeId,
+                execute: (request) => executeCycle({ ...request, kind: cycleKind, epoch }),
+            });
+            return Object.freeze({
+                counted: true,
+                triggered: true,
+                cycleKind,
+                queued: queued?.queued === true,
+                skipped: asText(queued?.skipped, 128),
+            });
+        },
+        cancelScope(input = {}) {
+            const scopeId = asText(typeof input === 'string' ? input : input.scopeId, 512);
+            if (!scopeId) return 0;
+            advanceEpoch(scopeId);
+            return requestService.cancelProactive({ scopeId });
+        },
+    });
+}
+
+export class QQV2ProactiveError extends Error {
+    constructor(message, code = 'proactive_failed') {
+        super(message);
+        this.name = 'QQV2ProactiveError';
+        this.code = code;
+    }
+}

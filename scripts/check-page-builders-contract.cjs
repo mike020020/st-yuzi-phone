@@ -1,30 +1,24 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const ROOT = process.cwd();
-
 const FILES = {
     facade: 'modules/settings-app/layout/page-builders.js',
     overview: 'modules/settings-app/layout/page-builders/overview-builders.js',
+    primitives: 'modules/settings-app/layout/primitives.js',
     appearance: 'modules/settings-app/layout/page-builders/appearance-builders.js',
-    data: 'modules/settings-app/layout/page-builders/data-builders.js',
     editor: 'modules/settings-app/layout/page-builders/editor-builders.js',
     frame: 'modules/settings-app/layout/frame.js',
     pageShell: 'modules/settings-app/ui/page-shell.js',
-    homePage: 'modules/settings-app/pages/home.js',
-    appearancePage: 'modules/settings-app/pages/appearance.js',
-    databasePage: 'modules/settings-app/pages/database.js',
-    buttonStylePage: 'modules/settings-app/pages/button-style.js',
-    promptEditorPage: 'modules/settings-app/pages/prompt-editor.js',
-    apiPromptConfigPage: 'modules/settings-app/pages/api-prompt-config.js',
+    home: 'modules/settings-app/pages/home.js',
+    api: 'modules/settings-app/pages/api-presets.js',
+    prompt: 'modules/settings-app/pages/ai-instruction-presets.js',
+    presetRenderers: 'modules/settings-app/page-renderers/preset-renderers.js',
+    styles: 'styles/phone-base/07-settings-modern.css',
 };
 
 function read(relativePath) {
     return fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
-}
-
-function has(content, snippet) {
-    return content.includes(snippet);
 }
 
 function check(results, fileKey, description, ok) {
@@ -32,60 +26,45 @@ function check(results, fileKey, description, ok) {
 }
 
 function main() {
-    const contents = Object.fromEntries(
-        Object.entries(FILES).map(([key, relativePath]) => [key, read(relativePath)])
-    );
-
+    const contents = Object.fromEntries(Object.entries(FILES).map(([key, file]) => [key, read(file)]));
     const results = [];
-
-    check(results, 'facade', '继续暴露 buildSettingsHomePageHtml()', has(contents.facade, 'export function buildSettingsHomePageHtml('));
-    check(results, 'facade', '继续暴露 buildAppearancePageHtml()', has(contents.facade, 'export function buildAppearancePageHtml('));
-    check(results, 'facade', '继续暴露 buildDatabasePageHtml()', has(contents.facade, 'export function buildDatabasePageHtml('));
-    check(results, 'facade', '继续暴露 buildButtonStylePageHtml()', has(contents.facade, 'export function buildButtonStylePageHtml('));
-    check(results, 'facade', '继续暴露 buildPromptEditorPageHtml()', has(contents.facade, 'export function buildPromptEditorPageHtml('));
-    check(results, 'facade', '继续暴露 buildApiPromptConfigPageHtml()', has(contents.facade, 'export function buildApiPromptConfigPageHtml('));
-    check(results, 'facade', '继续暴露 buildBeautifyTemplatePageHtml()', has(contents.facade, 'export function buildBeautifyTemplatePageHtml('));
-
-    check(results, 'overview', '存在 buildSettingsHomePageHtml()', has(contents.overview, 'export function buildSettingsHomePageHtml('));
-    check(results, 'appearance', '存在 buildAppearancePageHtml()', has(contents.appearance, 'export function buildAppearancePageHtml('));
-    check(results, 'appearance', '存在 buildButtonStylePageHtml()', has(contents.appearance, 'export function buildButtonStylePageHtml('));
-    check(results, 'data', '存在 buildDatabaseTableChecklistHtml()', has(contents.data, 'export function buildDatabaseTableChecklistHtml('));
-    check(results, 'data', '存在 buildDatabasePageHtml()', has(contents.data, 'export function buildDatabasePageHtml('));
-    check(results, 'editor', '存在 buildPromptEditorPageHtml()', has(contents.editor, 'export function buildPromptEditorPageHtml('));
-    check(results, 'editor', '存在 buildApiPromptConfigPageHtml()', has(contents.editor, 'export function buildApiPromptConfigPageHtml('));
-    check(results, 'editor', '存在 buildBeautifyTemplatePageHtml()', has(contents.editor, 'export function buildBeautifyTemplatePageHtml('));
-
-    check(results, 'frame', '继续从 page-builders façade 导入 settings builders', has(contents.frame, "from './page-builders.js';"));
-    check(results, 'pageShell', '共享 page-shell 暴露 createPageShellSnapshot()', has(contents.pageShell, 'export function createPageShellSnapshot('));
-    check(results, 'pageShell', '共享 page-shell 暴露 ensurePageShell()', has(contents.pageShell, 'export function ensurePageShell('));
-    check(results, 'pageShell', '共享 page-shell 暴露 patchPageShell()', has(contents.pageShell, 'export function patchPageShell('));
-    check(results, 'pageShell', '共享 page-shell patch 使用 replaceWith()', has(contents.pageShell, 'currentRegion.replaceWith(nextRegion);'));
-
-    check(results, 'homePage', '继续使用 buildSettingsHomePageHtml()', has(contents.homePage, 'buildSettingsHomePageHtml('));
-    check(results, 'appearancePage', '继续使用 buildAppearancePageHtml()', has(contents.appearancePage, 'buildAppearancePageHtml('));
-    check(results, 'databasePage', '数据库页使用共享 createPageShellSnapshot()', has(contents.databasePage, 'createPageShellSnapshot({'));
-    check(results, 'databasePage', '数据库页使用共享 ensurePageShell()', has(contents.databasePage, 'ensurePageShell(container, shellSnapshot,'));
-    check(results, 'databasePage', '数据库页使用共享 patchPageShell()', has(contents.databasePage, 'patchPageShell(shellState.pageRoot, shellSnapshot,'));
-    check(results, 'buttonStylePage', '继续使用 buildButtonStylePageHtml()', has(contents.buttonStylePage, 'buildButtonStylePageHtml('));
-    check(results, 'promptEditorPage', '继续使用 buildPromptEditorPageHtml()', has(contents.promptEditorPage, 'buildPromptEditorPageHtml('));
-    check(results, 'apiPromptConfigPage', 'API Prompt 页使用共享 createPageShellSnapshot()', has(contents.apiPromptConfigPage, 'createPageShellSnapshot({'));
-    check(results, 'apiPromptConfigPage', 'API Prompt 页使用共享 ensurePageShell()', has(contents.apiPromptConfigPage, 'ensurePageShell(container, shellSnapshot,'));
-    check(results, 'apiPromptConfigPage', 'API Prompt 页使用共享 patchPageShell()', has(contents.apiPromptConfigPage, 'patchPageShell(shellState.pageRoot, shellSnapshot,'));
-
+    for (const name of ['buildSettingsHomePageHtml', 'buildAppearancePageHtml', 'buildButtonStylePageHtml', 'buildBeautifyTemplatePageHtml']) {
+        check(results, 'facade', `设置 page-builder facade 暴露 ${name}()`, contents.facade.includes(`export function ${name}(`));
+    }
+    check(results, 'facade', '设置 page-builder facade 不再暴露数据库设置页 builder', !contents.facade.includes('buildDatabasePageHtml'));
+    check(results, 'overview', '首页 builder 存在 API 预设入口', contents.overview.includes("'api_presets'"));
+    check(results, 'overview', '首页 builder 保留 AI 指令预设入口', contents.overview.includes("'ai_instruction_presets'"));
+    check(results, 'overview', '首页 builder 不再包含数据库快捷选择', !contents.overview.includes('phone-db-preset-quick-select'));
+    check(results, 'overview', '首页 builder 不再包含手动更新按钮', !contents.overview.includes('phone-top-trigger-update') && !contents.overview.includes('手动更新'));
+    check(results, 'overview', '首页入口按 2 + 3 分组', contents.overview.includes('entries.slice(0, 2)') && contents.overview.includes('entries.slice(2)'));
+    check(results, 'overview', '首页入口使用 profile-action 变体', contents.overview.includes("variant: 'profile-action'"));
+    check(results, 'primitives', 'profile-action 只渲染标题与箭头', contents.primitives.includes("variant === 'profile-action'") && contents.primitives.includes('phone-settings-profile-action-title') && contents.primitives.includes('phone-settings-profile-action-chevron'));
+    check(results, 'styles', 'profile-action 分组使用 Figma 一级页尺寸', contents.styles.includes('border-radius: 14px;') && contents.styles.includes('padding: 13px 16px;') && contents.styles.includes('font-size: 16px;') && contents.styles.includes('line-height: 24px;'));
+    check(results, 'appearance', '外观 builder 存在', contents.appearance.includes('export function buildAppearancePageHtml('));
+    check(results, 'editor', '美化工坊 builder 存在', contents.editor.includes('export function buildBeautifyTemplatePageHtml('));
+    check(results, 'frame', '设置 frame 从 page-builder facade 导入', contents.frame.includes("from './page-builders.js';"));
+    check(results, 'pageShell', '共享 page-shell 暴露 snapshot', contents.pageShell.includes('export function createPageShellSnapshot('));
+    check(results, 'home', '首页使用 settings home builder', contents.home.includes('buildSettingsHomePageHtml('));
+    check(results, 'api', 'API 页面使用 Facade 预设服务', contents.api.includes('qqV2PresetService'));
+    check(results, 'api', 'API 页面下拉与新建按钮分离', contents.api.includes('phone-api-preset-select') && contents.api.includes('phone-api-preset-new-btn'));
+    check(results, 'prompt', 'AI 页面使用 Facade 预设服务', contents.prompt.includes('qqV2PresetService'));
+    check(results, 'prompt', 'AI 页面下拉与新建按钮分离', contents.prompt.includes('phone-ai-instruction-preset-select') && contents.prompt.includes('phone-ai-instruction-new-btn'));
+    check(results, 'presetRenderers', '预设 renderer 注册 API 和 AI 页面', contents.presetRenderers.includes('api_presets') && contents.presetRenderers.includes('ai_instruction_presets'));
+    for (const legacyPath of [
+        'modules/settings-app/layout/page-builders/data-builders.js',
+        'modules/settings-app/pages/database.js',
+        'modules/settings-app/page-renderers/data-config-renderers.js',
+    ]) {
+        results.push({ file: legacyPath, description: '旧数据库设置页链已删除', ok: !fs.existsSync(path.join(ROOT, legacyPath)) });
+    }
     const failed = results.filter(item => !item.ok);
-    if (failed.length > 0) {
+    if (failed.length) {
         console.error('[page-builders-contract-check] 检查失败：');
-        for (const item of failed) {
-            console.error(`- ${item.file}: ${item.description}`);
-        }
+        failed.forEach(item => console.error(`- ${item.file}: ${item.description}`));
         process.exitCode = 1;
         return;
     }
-
     console.log('[page-builders-contract-check] 检查通过');
-    for (const item of results) {
-        console.log(`- OK | ${item.file} | ${item.description}`);
-    }
 }
 
 main();

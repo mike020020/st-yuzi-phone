@@ -16,50 +16,15 @@
  *   - 调用约定不变：唯一外部 API 仍是 export function renderSettings(container)
  */
 
-import {
-    getTableData,
-    getSheetKeys,
-    getDbConfigApiAvailability,
-    readDbUpdateConfigViaApi,
-    writeDbUpdateConfigViaApi,
-    readManualTableSelectionViaApi,
-    writeManualTableSelectionViaApi,
-    clearManualTableSelectionViaApi,
-    // API 预设选择桥接
-    getApiPresets,
-    getTableApiPreset,
-    setTableApiPreset,
-    getPlotApiPreset,
-    setPlotApiPreset,
-} from '../phone-core/data-api.js';
-import {
-    deletePhoneAiInstructionPreset,
-    exportAllPhoneAiInstructionPresetsPack,
-    exportPhoneAiInstructionPresetPack,
-    getCurrentPhoneAiInstructionPresetName,
-    getPhoneAiInstructionPreset,
-    getPhoneAiInstructionPresets,
-    importPhoneAiInstructionPresetsFromData,
-    savePhoneAiInstructionPreset,
-    setCurrentPhoneAiInstructionPresetName,
-} from '../phone-core/chat-support.js';
+import { getTableData } from '../phone-core/data-api.js';
 import { navigateBack } from '../phone-core/routing.js';
 import { bindPhoneScrollGuards } from '../phone-core/scroll-guards.js';
 import { getPhoneSettings, savePhoneSetting } from '../settings.js';
-import { createContentPresetWorkshopService } from '../content-presets/workshop-service.js';
+import { createContentPresetWorkshopService, createUnavailableContentPresetWorkshopService } from '../content-presets/workshop-service.js';
+import { isContentPresetFullPageRuntimeEnabled } from '../content-presets/activation-gate.js';
 import { createScrollPreserver } from './ui/settings-scroll-binding.js';
 import { showToast } from './ui/toast.js';
-import {
-    createDbPreset,
-    getActiveDbPresetNameFromSettings,
-    getDbPresetsFromPhoneSettings,
-    normalizeDbManualSelection,
-    normalizeDbUpdateConfig,
-    saveDbPresetsToPhoneSettings,
-    setActiveDbPresetNameToSettings,
-} from './services/db-presets.js';
-import { createDbConfigRuntime } from './services/db-config-runtime.js';
-import { setupManualUpdateBtn } from './services/manual-update.js';
+import { qqV2PresetSettingsService } from './services/qq-v2-preset-facade.js';
 import {
     setupBgUpload,
     renderIconUploadList,
@@ -91,9 +56,21 @@ import {
     getLayoutValue,
 } from './services/appearance-settings.js';
 import { createSettingsPageRenderers } from './page-renderers.js';
-import { consumePendingSettingsIntent, projectIntentToStatePatch } from './intent.js';
-import { createSettingsAppState, applyStatePatch } from './state-machine.js';
+import { createSettingsAppState } from './state-machine.js';
 import { createPageRuntimeManager } from './page-runtime.js';
+
+function selectContentPresetWorkshop(enabled, createAvailable, createUnavailable) {
+    return enabled ? createAvailable() : createUnavailable();
+}
+
+function normalizeSettingsMode(mode, contentPresetFullPageRuntimeEnabled) {
+    return mode === 'beautify' && !contentPresetFullPageRuntimeEnabled ? 'home' : mode;
+}
+
+export const __test__settingsGate = Object.freeze({
+    normalizeSettingsMode,
+    selectContentPresetWorkshop,
+});
 
 /**
  * 渲染设置 App。
@@ -102,10 +79,12 @@ import { createPageRuntimeManager } from './page-runtime.js';
 export function renderSettings(container) {
     /** @type {import('../../types').SettingsAppState} */
     const state = createSettingsAppState();
-    const contentPresetWorkshop = createContentPresetWorkshopService({ getTableData });
+    const contentPresetWorkshop = selectContentPresetWorkshop(
+        isContentPresetFullPageRuntimeEnabled(),
+        () => createContentPresetWorkshopService({ getTableData }),
+        () => createUnavailableContentPresetWorkshopService(),
+    );
 
-    const intent = consumePendingSettingsIntent();
-    applyStatePatch(state, projectIntentToStatePatch(intent));
     applyPhoneThemeMode();
 
     const {
@@ -135,51 +114,25 @@ export function renderSettings(container) {
         pageRuntime,
     );
 
-    const getDbPresets = () => getDbPresetsFromPhoneSettings();
-    /** @param {import('../../types').NamedSettingsEntry[]} presets */
-    const saveDbPresets = (presets) => saveDbPresetsToPhoneSettings(presets);
-    const getActiveDbPresetName = () => getActiveDbPresetNameFromSettings();
-    /** @param {string} name */
-    const setActiveDbPresetName = (name) => setActiveDbPresetNameToSettings(name);
-
-    const {
-        readDbSnapshot,
-        switchPresetByName,
-        clearActivePresetBindingIfNeeded,
-    } = createDbConfigRuntime({
-        getDbConfigApiAvailability,
-        readDbUpdateConfigViaApi,
-        writeDbUpdateConfigViaApi,
-        readManualTableSelectionViaApi,
-        writeManualTableSelectionViaApi,
-        clearManualTableSelectionViaApi,
-        getDbPresets,
-        getActiveDbPresetName,
-        setActiveDbPresetName,
-        showToast,
-    });
-
     const renderLegacyPageByMode = (mode) => {
         if (mode === 'appearance') {
             pageRenderers.renderAppearancePage();
-        } else if (mode === 'database') {
-            pageRenderers.renderDatabasePage();
+        } else if (mode === 'api_presets') {
+            pageRenderers.renderApiPresetsPage();
         } else if (mode === 'beautify') {
-            pageRenderers.renderBeautifyTemplatePage();
+            if (isContentPresetFullPageRuntimeEnabled()) pageRenderers.renderBeautifyTemplatePage();
+            else pageRenderers.renderHomePage();
         } else if (mode === 'button_style') {
             pageRenderers.renderButtonStylePage();
         } else if (mode === 'ai_instruction_presets') {
             pageRenderers.renderAiInstructionPresetsPage();
-        } else if (mode === 'api_prompt_config') {
-            pageRenderers.renderApiPromptConfigPage();
-        } else if (mode === 'prompt_editor') {
-            pageRenderers.renderPromptEditorPage();
         } else {
             pageRenderers.renderHomePage();
         }
     };
 
     const render = () => {
+        state.mode = normalizeSettingsMode(state.mode, isContentPresetFullPageRuntimeEnabled());
         const nextMode = String(state.mode || 'home');
         const pageDefinition = pageRenderers?.pages && typeof pageRenderers.pages === 'object'
             ? pageRenderers.pages[nextMode]
@@ -217,9 +170,9 @@ export function renderSettings(container) {
 
     const rerenderHomeKeepScroll = createRerenderWithScroll('homeScrollTop', render);
     const rerenderAppearanceKeepScroll = createRerenderWithScroll('appearanceScrollTop', render);
-    const rerenderDatabaseKeepScroll = createRerenderWithScroll('databaseScrollTop', render);
+    const rerenderApiPresetsKeepScroll = createRerenderWithScroll('apiPresetsScrollTop', render);
     const rerenderBeautifyKeepScrollGlobal = createRerenderWithScroll('beautifyScrollTop', render);
-    const rerenderApiPromptConfigKeepScroll = createRerenderWithScroll('apiPromptConfigScrollTop', render);
+    const rerenderAiInstructionPresetsKeepScroll = createRerenderWithScroll('aiInstructionPresetsScrollTop', render);
 
     /** @type {import('../../types').SettingsPageRendererGroupedDeps} */
     const pageRendererDeps = {
@@ -239,15 +192,12 @@ export function renderSettings(container) {
             restoreScroll,
             rerenderHomeKeepScroll,
             rerenderAppearanceKeepScroll,
-            rerenderDatabaseKeepScroll,
+            rerenderApiPresetsKeepScroll,
             rerenderBeautifyKeepScroll: rerenderBeautifyKeepScrollGlobal,
-            rerenderApiPromptConfigKeepScroll,
+            rerenderAiInstructionPresetsKeepScroll,
         },
         feedback: {
             showToast,
-        },
-        home: {
-            setupManualUpdateBtn,
         },
         appearance: {
             getLayoutValue,
@@ -280,47 +230,10 @@ export function renderSettings(container) {
             applyPhoneThemeMode,
             setupPhoneThemeModeSettings,
         },
-        dataConfig: {
-            getTableData,
-            getSheetKeys,
-            getDbConfigApiAvailability,
-            readDbSnapshot,
-            getDbPresets,
-            getActiveDbPresetName,
-            switchPresetByName,
-            clearActivePresetBindingIfNeeded,
-            normalizeDbManualSelection,
-            normalizeDbUpdateConfig,
-            createDbPreset,
-            saveDbPresets,
-            setActiveDbPresetName,
-            writeDbUpdateConfigViaApi,
-            writeManualTableSelectionViaApi,
-            clearManualTableSelectionViaApi,
-        },
+        qqV2Presets: qqV2PresetSettingsService,
         buttonStyle: {
             getPhoneSettings,
             savePhoneSetting,
-        },
-        apiPrompt: {
-            getDbConfigApiAvailability,
-            getApiPresets,
-            getTableApiPreset,
-            setTableApiPreset,
-            getPlotApiPreset,
-            setPlotApiPreset,
-            getPhoneAiInstructionPresets,
-            getPhoneAiInstructionPreset,
-            getCurrentPhoneAiInstructionPresetName,
-            setCurrentPhoneAiInstructionPresetName,
-            deletePhoneAiInstructionPreset,
-            importPhoneAiInstructionPresetsFromData,
-            exportPhoneAiInstructionPresetPack,
-            exportAllPhoneAiInstructionPresetsPack,
-        },
-        promptEditor: {
-            getPhoneAiInstructionPreset,
-            savePhoneAiInstructionPreset,
         },
         contentPresetWorkshop: {
             ...contentPresetWorkshop,

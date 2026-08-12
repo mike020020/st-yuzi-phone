@@ -33,7 +33,28 @@ function createHarness({ seed = {}, autoComplete = true, requestError = null, de
             const map = this.staged[name];
             const tx = this;
             return {
-                put(record) { map.set(record.id, structuredClone(record)); },
+                put(record) {
+                    const key = name === 'presets' ? record.id : record.sheetKey;
+                    map.set(key, structuredClone(record));
+                },
+                get(key) {
+                    const request = { result: undefined, error: null, onsuccess: null, onerror: null };
+                    queueMicrotask(() => {
+                        request.result = structuredClone(map.get(key));
+                        request.onsuccess?.();
+                        if (autoComplete) setImmediate(() => tx.complete());
+                    });
+                    return request;
+                },
+                getAll() {
+                    const request = { result: undefined, error: null, onsuccess: null, onerror: null };
+                    queueMicrotask(() => {
+                        request.result = [...map.values()].map(value => structuredClone(value));
+                        request.onsuccess?.();
+                        if (autoComplete) setImmediate(() => tx.complete());
+                    });
+                    return request;
+                },
                 delete(key) {
                     if (name === 'activeByTable' && key === deleteErrorKey) throw new Error('fixture binding delete failed');
                     map.delete(key);
@@ -94,9 +115,48 @@ function createHarness({ seed = {}, autoComplete = true, requestError = null, de
     return { factory, committed, transactions, get lastTransaction() { return transactions.at(-1); } };
 }
 
+function validRecord(id, itemIds, name = id) {
+    const manifestItems = itemIds.map(itemId => ({
+        id: itemId,
+        name: itemId,
+        target: { tableName: '测试表', fields: ['字段'] },
+        entry: { mount: 'pages/main.mjs' },
+        assets: [],
+    }));
+    const items = manifestItems.map(item => ({
+        ...item,
+        target: { ...item.target, fields: [...item.target.fields] },
+        entry: { ...item.entry },
+        assets: [...item.assets],
+        issues: [],
+        activatable: true,
+    }));
+    return {
+        id,
+        name,
+        version: '1.0.0',
+        author: 'test',
+        format: 'yuzi-beautify-preset',
+        formatVersion: 2,
+        apiVersion: 1,
+        manifest: { id, name, version: '1.0.0', author: 'test', items: manifestItems },
+        files: {
+            'pages/main.mjs': {
+                path: 'pages/main.mjs',
+                mimeType: 'text/javascript', encoding: 'text', content: 'export function mount(context) {}',
+            },
+        },
+        items,
+        issues: [],
+        importedAt: '2025-01-01T00:00:00.000Z',
+    };
+}
 
 const seed = {
-    presets: [{ id: 'preset-1', name: 'Old' }, { id: 'preset-2', name: 'Other' }],
+    presets: [
+        validRecord('preset-1', ['old-a', 'old-b'], 'Old'),
+        validRecord('preset-2', ['other-key', 'other'], 'Other'),
+    ],
     activeByTable: [
         { sheetKey: 'sheet-a', presetId: 'preset-1', itemId: 'old-a' },
         { sheetKey: 'sheet-b', presetId: 'preset-1', itemId: 'old-b' },
@@ -120,8 +180,68 @@ async function main() {
     const originalIndexedDb = globalThis.indexedDB;
     try {
         {
+            const valid = validRecord('preset-valid', ['item-valid']);
+            const untrusted = { id: 'preset-untrusted', items: [{ id: 'item-untrusted', activatable: true, entry: { mount: 'pages/main.mjs' } }] };
+            const malformedPath = validRecord('preset-malformed-path', ['item-malformed-path']);
+            malformedPath.items[0].entry.mount = '../pages/main.mjs';
+            malformedPath.files['../pages/main.mjs'] = malformedPath.files['pages/main.mjs'];
+            const malformedHtml = validRecord('preset-malformed-html', ['item-malformed-html']);
+            malformedHtml.items[0].entry.html = 'pages/page.html';
+            malformedHtml.files['pages/page.html'] = {
+                path: 'pages/page.html',
+                mimeType: 'application/octet-stream', encoding: 'base64', content: 'x',
+            };
+            const malformedCss = validRecord('preset-malformed-css', ['item-malformed-css']);
+            malformedCss.items[0].entry.css = 'pages/page.css';
+            malformedCss.files['pages/page.css'] = {
+                path: 'pages/page.css',
+                mimeType: 'image/png', encoding: 'base64', content: 'x',
+            };
+            const legacyItem = validRecord('preset-legacy-item', ['item-legacy-item']);
+            legacyItem.items[0].scriptMode = 'module';
+            const { harness, repository } = await setup({ seed: {
+                presets: [
+                    valid,
+                    untrusted,
+                    malformedPath,
+                    malformedHtml,
+                    malformedCss,
+                    legacyItem,
+                    { ...validRecord('preset-inactive', ['item-inactive']), items: validRecord('preset-inactive', ['item-inactive']).items.map(item => ({ ...item, activatable: false })) },
+                    { id: 'preset-legacy', items: [{ id: 'item-legacy', activatable: true, entry: { js: 'pages/old.js' } }] },
+                ],
+                activeByTable: [
+                    { sheetKey: 'valid', presetId: 'preset-valid', itemId: 'item-valid' },
+                    { sheetKey: 'untrusted', presetId: 'preset-untrusted', itemId: 'item-untrusted' },
+                    { sheetKey: 'malformed-path', presetId: 'preset-malformed-path', itemId: 'item-malformed-path' },
+                    { sheetKey: 'malformed-html', presetId: 'preset-malformed-html', itemId: 'item-malformed-html' },
+                    { sheetKey: 'malformed-css', presetId: 'preset-malformed-css', itemId: 'item-malformed-css' },
+                    { sheetKey: 'legacy-item', presetId: 'preset-legacy-item', itemId: 'item-legacy-item' },
+                    { sheetKey: 'orphan-preset', presetId: 'missing', itemId: 'item-x' },
+                    { sheetKey: 'orphan-item', presetId: 'preset-valid', itemId: 'missing' },
+                    { sheetKey: 'inactive', presetId: 'preset-inactive', itemId: 'item-inactive' },
+                    { sheetKey: 'legacy', presetId: 'preset-legacy', itemId: 'item-legacy' },
+                    { sheetKey: '', presetId: 'preset-valid', itemId: 'item-valid' },
+                ],
+            } });
+            assert.deepEqual((await repository.listPresetMetadata()).map(record => record.id), ['preset-valid', 'preset-inactive']);
+            assert.deepEqual((await repository.listPresetRecords()).map(record => record.id), ['preset-valid', 'preset-inactive']);
+            assert.equal((await repository.getPresetRecord('preset-untrusted')), null);
+            assert.equal((await repository.getPresetRecord('preset-malformed-path')), null);
+            assert.equal((await repository.getPresetRecord('preset-malformed-html')), null);
+            assert.equal((await repository.getPresetRecord('preset-malformed-css')), null);
+            assert.equal((await repository.getPresetExportRecord('preset-legacy-item')), null);
+            assert.equal((await repository.getPresetExportRecord('preset-untrusted')), null);
+            const bindings = await repository.loadActiveBindings();
+            assert.deepEqual([...bindings], [['valid', { sheetKey: 'valid', presetId: 'preset-valid', itemId: 'item-valid' }]]);
+            assert.deepEqual(harness.lastTransaction.storeNames, ['presets', 'activeByTable']);
+            assert.equal(harness.lastTransaction.mode, 'readonly');
+            assert.equal(harness.transactions.length, 9, '每个 repository 读取 API 必须各自使用单个事务，绑定过滤不得额外触发 N+1 查询事务');
+        }
+
+        {
             const { harness, repository } = await setup();
-            const record = { id: 'preset-1', name: 'New' };
+            const record = validRecord('preset-1', ['old-a', 'old-b'], 'New');
             const result = await repository.replacePresetRecord(record);
             assert.equal(harness.transactions.length, 1);
             assertTransaction(harness.lastTransaction);
@@ -131,6 +251,26 @@ async function main() {
             assert.equal(harness.committed.activeByTable.has('sheet-b'), false);
             assert.equal(harness.committed.activeByTable.has('preset-1'), true, '不得把 presetId 错当 sheetKey 删除');
             assert.equal(harness.committed.activeByTable.has('sheet-c'), true);
+        }
+
+        {
+            const { harness, repository } = await setup();
+            const oldPath = 'user-assets/avatar.png';
+            harness.committed.presets.get('preset-1').files[oldPath] = { path: oldPath, mimeType: 'image/png', encoding: 'base64', content: 'b2xk' };
+            const path = 'user-assets/avatar.webp';
+            const file = { path, mimeType: 'image/webp', encoding: 'base64', content: 'aW1hZ2U=' };
+            const saved = await repository.updatePresetFiles('preset-1', { removePaths: [oldPath, path], file });
+            assert.deepEqual(harness.lastTransaction.storeNames, ['presets']);
+            assert.equal(harness.lastTransaction.mode, 'readwrite');
+            assert.deepEqual(saved.files[path], file);
+            assert.equal(oldPath in saved.files, false, '同槽旧扩展文件必须与新文件原子替换');
+            assert.deepEqual(harness.committed.presets.get('preset-1').files[path], file);
+            assert.equal(harness.committed.activeByTable.has('sheet-a'), true, '保存图片不得清除活动绑定');
+            assert.equal(harness.committed.activeByTable.has('sheet-b'), true, '保存图片不得清除同预设的其他绑定');
+
+            const removed = await repository.updatePresetFiles('preset-1', { removePaths: [oldPath, path] });
+            assert.equal(path in removed.files, false);
+            assert.equal(harness.committed.activeByTable.has('sheet-a'), true, '删除图片不得清除活动绑定');
         }
 
         {
@@ -146,7 +286,7 @@ async function main() {
 
         {
             const { harness, repository } = await setup({ requestError: new Error('fixture binding lookup failed') });
-            await assert.rejects(() => repository.replacePresetRecord({ id: 'preset-1', name: 'Broken' }), /fixture binding lookup failed/);
+            await assert.rejects(() => repository.replacePresetRecord(validRecord('preset-1', ['old-a', 'old-b'], 'Broken')), /fixture binding lookup failed/);
             assert.equal(harness.lastTransaction.abortCalls, 1);
             assert.equal(harness.lastTransaction.completed, false);
             assert.equal(harness.committed.presets.get('preset-1').name, 'Old');
@@ -164,7 +304,7 @@ async function main() {
         }
 
         for (const [label, invoke] of [
-            ['replace', repository => repository.replacePresetRecord({ id: 'preset-1', name: 'Manual' })],
+            ['replace', repository => repository.replacePresetRecord(validRecord('preset-1', ['old-a', 'old-b'], 'Manual'))],
             ['delete', repository => repository.deletePresetRecord('preset-1')],
         ]) {
             const { harness, repository } = await setup({ autoComplete: false });
@@ -176,6 +316,55 @@ async function main() {
             harness.lastTransaction.complete();
             await promise;
             assert.equal(settled, true);
+        }
+
+        {
+            const malformedPath = validRecord('preset-malformed-path', ['item-malformed-path']);
+            malformedPath.items[0].entry.mount = '../pages/main.mjs';
+            malformedPath.files['../pages/main.mjs'] = malformedPath.files['pages/main.mjs'];
+            const { harness, repository } = await setup({ seed: { presets: [malformedPath] } });
+            await assert.rejects(
+                () => repository.setActiveBinding('sheet-malformed-path', 'preset-malformed-path', 'item-malformed-path'),
+                /不符合 v2 Runtime API 合同/,
+            );
+            assert.equal(harness.lastTransaction.abortCalls, 1, '拒绝畸形路径绑定时必须中止事务');
+            assert.equal(harness.committed.activeByTable.has('sheet-malformed-path'), false);
+            await assert.rejects(
+                () => repository.replacePresetRecord(malformedPath),
+                /不符合 v2 Runtime API 合同/,
+            );
+            assert.equal(harness.transactions.length, 1, 'replace 必须在开启事务前拒绝畸形路径记录');
+        }
+
+        {
+            const malformedHtml = validRecord('preset-malformed-html', ['item-malformed-html']);
+            malformedHtml.items[0].entry.html = 'pages/page.html';
+            malformedHtml.files['pages/page.html'] = {
+                path: 'pages/page.html',
+                mimeType: 'application/octet-stream', encoding: 'base64', content: 'x',
+            };
+            const { harness, repository } = await setup({ seed: { presets: [malformedHtml] } });
+            await assert.rejects(
+                () => repository.setActiveBinding('sheet-malformed-html', 'preset-malformed-html', 'item-malformed-html'),
+                /不符合 v2 Runtime API 合同/,
+            );
+            assert.equal(harness.lastTransaction.abortCalls, 1, '拒绝畸形 HTML 入口绑定时必须中止事务');
+            await assert.rejects(
+                () => repository.replacePresetRecord(malformedHtml),
+                /不符合 v2 Runtime API 合同/,
+            );
+            assert.equal(harness.transactions.length, 1, 'replace 必须在开启事务前拒绝畸形 HTML 入口记录');
+        }
+
+        {
+            const untrusted = { id: 'preset-untrusted', items: [{ id: 'item-untrusted', activatable: true, entry: { mount: 'pages/main.mjs' } }] };
+            const { harness, repository } = await setup({ seed: { presets: [untrusted] } });
+            await assert.rejects(
+                () => repository.setActiveBinding('sheet-untrusted', 'preset-untrusted', 'item-untrusted'),
+                /不符合 v2 Runtime API 合同/,
+            );
+            assert.equal(harness.lastTransaction.abortCalls, 1, '拒绝不可信绑定时必须中止事务');
+            assert.equal(harness.committed.activeByTable.has('sheet-untrusted'), false);
         }
     } finally {
         if (originalIndexedDb === undefined) delete globalThis.indexedDB;

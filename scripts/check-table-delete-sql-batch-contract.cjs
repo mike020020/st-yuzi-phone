@@ -100,7 +100,7 @@ function main() {
     check(results, 'architectureGuide', 'Theater 文档说明不做跨表 SQL/事务删除', has(contents.architectureGuide, '当前不做跨表单条 SQL，不承诺跨表事务原子性。'));
     check(results, 'theaterDelete', '小剧场仍按表等待 deleteTableRowsBatch 真实完成', has(contents.theaterDelete, 'const result = await deleteTableRowsBatch(plan.tableName, plan.rowIndexes);'));
     check(results, 'theaterDelete', '小剧场不再传递旧 refreshProjection 选项', !has(contents.theaterDelete, 'refreshProjection'));
-    check(results, 'rowDelete', '通用表格仍通过 deletePhoneSheetRows 进入仓库层', has(contents.rowDelete, 'const result = await deletePhoneSheetRows(sheetKey, requestedRowIndexes, {'));
+    check(results, 'rowDelete', '通用表格仍通过 deleteSheetRows 进入仓库层', has(contents.rowDelete, 'const result = await deleteSheetRows(sheetKey, requestedRowIndexes, {'));
 
     const failed = results.filter(item => !item.ok);
     if (failed.length > 0) {

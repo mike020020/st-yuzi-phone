@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://yuzi.local/schemas/workflow-state.schema.json",
+  "title": "Yuzi Beautify Workflow State",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "projectId", "phase", "tables", "queue", "currentTable", "confirmation"],
+  "properties": {
+    "format": { "const": "yuzi-beautify-workflow" },
+    "version": { "const": 1 },
+    "projectId": { "type": "string" },
+    "phase": { "enum": ["empty", "tables-imported", "working", "ready", "confirmed"] },
+    "tables": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["originalFile", "sourceDir", "generatedFile", "originalSha256", "generatedSha256"],
+      "properties": {
+        "originalFile": { "type": ["string", "null"] },
+        "sourceDir": { "type": ["string", "null"] },
+        "generatedFile": { "type": ["string", "null"] },
+        "originalSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "generatedSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "queue": { "type": "array", "items": { "$ref": "#/definitions/queueEntry" } },
+    "currentTable": { "type": ["string", "null"] },
+    "confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmed", "confirmedAt", "summaryHash"],
+      "properties": {
+        "confirmed": { "type": "boolean" },
+        "confirmedAt": { "type": ["string", "null"] },
+        "summaryHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  },
+  "definitions": {
+    "nonEmptyString": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "recordedAt", "notes"],
+      "properties": {
+        "status": { "enum": ["not-run", "passed", "skipped", "failed"] },
+        "recordedAt": { "type": ["string", "null"] },
+        "notes": { "type": "string" }
+      }
+    },
+    "queueEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sheetKey", "tableName", "headers", "schemaHash", "status", "itemId", "fields", "skipReason", "completedAt", "preview"],
+      "properties": {
+        "sheetKey": { "$ref": "#/definitions/nonEmptyString" },
+        "tableName": { "$ref": "#/definitions/nonEmptyString" },
+        "headers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/nonEmptyString" }
+        },
+        "schemaHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "status": { "enum": ["pending", "in-progress", "completed", "skipped", "invalidated"] },
+        "itemId": { "type": ["string", "null"] },
+        "fields": { "type": "array", "items": { "$ref": "#/definitions/nonEmptyString" } },
+        "skipReason": { "type": ["string", "null"] },
+        "completedAt": { "type": ["string", "null"] },
+        "preview": { "$ref": "#/definitions/preview" }
+      }
+    }
+  }
+}

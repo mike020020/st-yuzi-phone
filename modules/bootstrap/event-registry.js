@@ -1,15 +1,19 @@
 import {
     onChatChanged,
+    onChatDeleted,
+    onGroupChatDeleted,
     onCharacterLoaded,
     onAppReady,
     onUserMessageRendered,
     onCharacterMessageRendered,
     onMessageUpdated,
     onMessageDeleted,
-    onGenerationStarted,
     onGenerationEnded,
     onGenerationAfterCommands,
+    onWorldInfoActivated,
 } from '../integration/event-bridge.js';
+import { resolveCurrentHostIdentity } from '../integration/chat-identity.js';
+import { createHostChatDeletedFact } from '../qq-v2/host/lifecycle.js';
 import { Logger, handleError } from '../error-handler.js';
 import {
     DOM_IDS,
@@ -18,17 +22,57 @@ import {
     applyPhoneTogglePosition,
 } from './toggle-button.js';
 
+function dispatchQQV2Event(callback, eventName, ...args) {
+    if (typeof callback !== 'function') return;
+
+    try {
+        void Promise.resolve(callback(...args)).catch((error) => {
+            Logger.warn(`QQ v2 ${eventName}处理失败`, error);
+        });
+    } catch (error) {
+        Logger.warn(`QQ v2 ${eventName}处理失败`, error);
+    }
+}
+
 export async function registerPhoneEventListeners(options = {}) {
-    const { onVisiblePhoneRefresh, onBackgroundChatChanged } = options;
+    const {
+        onVisiblePhoneRefresh,
+        onBackgroundChatChanged,
+        onQQV2ChatChanged,
+        onQQV2ChatDeleted,
+        onQQV2GroupChatDeleted,
+        onQQV2CharacterMessageRendered,
+        onQQV2WorldInfoActivated,
+        resolveQQV2HostIdentity = resolveCurrentHostIdentity,
+    } = options;
 
     try {
         await onChatChanged((chatId) => {
             Logger.info('聊天切换:', chatId);
             onBackgroundChatChanged?.(chatId);
+            dispatchQQV2Event(onQQV2ChatChanged, '聊天切换', chatId);
             const container = document.getElementById(DOM_IDS.container);
             if (container && container.classList.contains('visible')) {
                 onVisiblePhoneRefresh?.();
             }
+        });
+
+        await onChatDeleted((chatFile) => {
+            const identity = resolveQQV2HostIdentity?.();
+            const fact = createHostChatDeletedFact('character', chatFile, {
+                hostId: identity?.hostType === 'character' ? identity.hostId : '',
+            });
+            Logger.info('私聊聊天删除:', fact);
+            dispatchQQV2Event(onQQV2ChatDeleted, '私聊聊天删除', fact);
+        });
+
+        await onGroupChatDeleted((chatId) => {
+            const identity = resolveQQV2HostIdentity?.();
+            const fact = createHostChatDeletedFact('group', chatId, {
+                hostId: identity?.hostType === 'group' ? identity.hostId : '',
+            });
+            Logger.info('群聊聊天删除:', fact);
+            dispatchQQV2Event(onQQV2GroupChatDeleted, '群聊聊天删除', fact);
         });
 
         await onCharacterLoaded((characterId) => {
@@ -43,8 +87,14 @@ export async function registerPhoneEventListeners(options = {}) {
             Logger.debug('用户消息渲染完成:', messageId);
         });
 
-        await onCharacterMessageRendered((messageId) => {
-            Logger.debug('角色消息渲染完成:', messageId);
+        await onCharacterMessageRendered((messageId, generationType) => {
+            Logger.debug('角色消息渲染完成:', messageId, generationType);
+            dispatchQQV2Event(onQQV2CharacterMessageRendered, '正文角色消息', messageId, generationType);
+        });
+
+        await onWorldInfoActivated((...args) => {
+            Logger.debug('正文世界书条目已激活');
+            dispatchQQV2Event(onQQV2WorldInfoActivated, '正文世界书激活', ...args);
         });
 
         await onMessageUpdated((messageId) => {
@@ -53,10 +103,6 @@ export async function registerPhoneEventListeners(options = {}) {
 
         await onMessageDeleted((messageId) => {
             Logger.debug('消息删除:', messageId);
-        });
-
-        await onGenerationStarted(() => {
-            Logger.debug('AI 生成开始');
         });
 
         await onGenerationEnded(() => {

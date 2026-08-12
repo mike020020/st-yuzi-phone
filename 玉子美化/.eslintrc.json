@@ -1,0 +1,25 @@
+{
+  "root": true,
+  "env": {
+    "es2022": true,
+    "node": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "no-undef": "error",
+    "no-unreachable": "error",
+    "no-dupe-keys": "error",
+    "no-dupe-args": "error",
+    "no-cond-assign": "error",
+    "no-constant-condition": "warn",
+    "no-debugger": "error"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "output/"
+  ]
+}

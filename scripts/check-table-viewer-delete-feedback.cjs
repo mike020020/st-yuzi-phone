@@ -94,7 +94,7 @@ assert(deleteBody.includes('return createDeleteOutcome({ message });'), '未选�
 assert(deleteBody.includes('showInlineToast(container, message, true);'), '前置校验失败必须使用错误样式');
 assert(deleteBody.includes('return createDeletePreflightFailureOutcome(message, requestedRowIndexes);'), '前置校验失败必须透传请求行、未尝试行与未删除行');
 assertOrdered(deleteBody, [
-    'const result = await deletePhoneSheetRows(sheetKey, requestedRowIndexes, {',
+    'const result = await deleteSheetRows(sheetKey, requestedRowIndexes, {',
     'const deletedRowIndexes = normalizeRowIndexes(result.deletedRowIndexes || []);',
     'const failedRowIndexes = normalizeRowIndexes(result.failedRowIndexes || []);',
     'const fallbackNotDeletedRowIndexes = requestedRowIndexes.filter((rowIndex) => !deletedRowIndexes.includes(rowIndex));',

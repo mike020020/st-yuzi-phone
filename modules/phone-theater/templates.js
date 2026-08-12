@@ -1,5 +1,10 @@
 import { escapeHtml, escapeHtmlAttr } from '../utils/dom-escape.js';
-import { PHONE_ICONS } from '../phone-home/icons.js';
+import {
+    buildPhoneBackButton,
+    buildPhoneNavBar,
+    buildPhoneNavTitleSwitcher,
+    buildPhoneSwitchButton,
+} from '../phone-core/navigation-ui.js';
 import { theaterRenderKit } from './core/render-kit.js';
 
 function renderEditMenu(editableTables = []) {
@@ -18,19 +23,33 @@ function renderEditMenu(editableTables = []) {
 }
 
 function renderTitleNavigation(title, navigation) {
-    const escapedTitle = escapeHtml(title || '小剧场');
     if (!navigation?.currentSheetKey) {
-        return `<div class="phone-theater-title-navigation is-title-only"><span class="phone-nav-title">${escapedTitle}</span></div>`;
+        return buildPhoneNavTitleSwitcher({
+            title: title || '小剧场',
+            className: 'phone-theater-title-navigation is-title-only',
+        });
     }
     const previous = navigation.previous || {};
     const next = navigation.next || {};
-    return `
-        <div class="phone-theater-title-navigation phone-theater-table-navigation" aria-label="切换表格">
-            <button type="button" class="phone-theater-table-navigation-button" data-action="theater-table-navigation-previous" aria-label="上一张表" aria-disabled="${previous.disabled ? 'true' : 'false'}" ${previous.disabled ? 'disabled' : ''}>‹</button>
-            <span class="phone-nav-title">${escapedTitle}</span>
-            <button type="button" class="phone-theater-table-navigation-button" data-action="theater-table-navigation-next" aria-label="下一张表" aria-disabled="${next.disabled ? 'true' : 'false'}" ${next.disabled ? 'disabled' : ''}>›</button>
-        </div>
-    `;
+    return buildPhoneNavTitleSwitcher({
+        title: title || '小剧场',
+        previousHtml: buildPhoneSwitchButton('previous', {
+            className: 'phone-theater-table-navigation-button',
+            action: 'theater-table-navigation-previous',
+            label: '上一张表',
+            disabled: previous.disabled === true,
+            attributes: { 'aria-disabled': previous.disabled ? 'true' : 'false' },
+        }),
+        nextHtml: buildPhoneSwitchButton('next', {
+            className: 'phone-theater-table-navigation-button',
+            action: 'theater-table-navigation-next',
+            label: '下一张表',
+            disabled: next.disabled === true,
+            attributes: { 'aria-disabled': next.disabled ? 'true' : 'false' },
+        }),
+        className: 'phone-theater-title-navigation phone-theater-table-navigation',
+        attributes: { 'aria-label': '切换表格' },
+    });
 }
 
 function renderNavActions(uiState = {}) {
@@ -45,7 +64,7 @@ function renderNavActions(uiState = {}) {
     if (!canEdit && !canDelete) return '<div class="phone-theater-nav-actions" aria-hidden="true"></div>';
 
     return `
-        <div class="phone-theater-nav-actions">
+        <div class="phone-nav-inline-actions phone-theater-nav-actions">
             ${canEdit ? `
                 <div class="phone-theater-edit-wrapper ${editMenuOpen ? 'is-open' : ''}">
                     <button type="button" class="phone-theater-edit-toggle" data-action="toggle-theater-edit-menu" aria-expanded="${editMenuOpen ? 'true' : 'false'}">${editButtonLabel}</button>
@@ -58,13 +77,12 @@ function renderNavActions(uiState = {}) {
 }
 
 function renderNav(title, uiState = {}) {
-    return `
-        <div class="phone-nav-bar phone-theater-nav">
-            <button type="button" class="phone-nav-back">${PHONE_ICONS.back}<span>返回</span></button>
-            ${renderTitleNavigation(title, uiState.tableNavigation)}
-            ${renderNavActions(uiState)}
-        </div>
-    `;
+    return buildPhoneNavBar({
+        className: `phone-theater-nav ${uiState.canEdit || uiState.canDelete ? 'has-inline-actions' : ''}`,
+        leadingHtml: buildPhoneBackButton(),
+        centerHtml: renderTitleNavigation(title, uiState.tableNavigation),
+        trailingHtml: renderNavActions(uiState),
+    });
 }
 
 function renderDeleteManageBar(uiState = {}) {

@@ -9,13 +9,14 @@ export function bumpContentPresetGenerations(sheetKeys = []) {
 }
 export function isContentPresetGenerationCurrent(sheetKey, generation) { return getContentPresetGeneration(sheetKey) === generation; }
 
-export function enqueueContentPresetMutation(operation, commit) {
+export function enqueueContentPresetMutation(operation, commit, afterCommit) {
     const run = async () => {
         const result = await operation();
         const current = getContentPresetIndexSnapshot();
         const patch = await commit(result, current);
         if (patch?.affectedSheetKeys) bumpContentPresetGenerations(patch.affectedSheetKeys);
         if (patch?.indexPatch) commitContentPresetIndex(patch.indexPatch);
+        await afterCommit?.(result, current, patch);
         return result;
     };
     const next = mutationQueue.then(run, run);

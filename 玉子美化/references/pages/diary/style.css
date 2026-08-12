@@ -1,0 +1,103 @@
+.yb-diary-page {
+  --diary-paper: #fbf3df;
+  --diary-ink: #5d412a;
+  --diary-muted: #9a7754;
+  --diary-accent: #b98042;
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 12px;
+  color: var(--diary-ink);
+  background: radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.72), transparent 26%), radial-gradient(circle at 82% 18%, rgba(222, 171, 103, 0.18), transparent 30%), linear-gradient(180deg, #fff8e9, #f3dfbd);
+  font-family: ui-rounded, "Microsoft YaHei", sans-serif;
+}
+
+.yb-diary-page *,
+.yb-diary-page *::before,
+.yb-diary-page *::after { box-sizing: border-box; }
+
+.yb-diary-page button { font: inherit; }
+
+.yb-diary-page .yb-diary-page__runtime-bar {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid rgba(162, 109, 56, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 250, 238, 0.86);
+}
+
+.yb-diary-page .yb-diary-page__runtime-bar strong { overflow: hidden; color: #624126; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+
+.yb-diary-page .yb-diary-page__runtime-bar button {
+  padding: 6px 8px;
+  border: 1px solid rgba(166, 108, 62, 0.18);
+  border-radius: 999px;
+  color: #745238;
+  background: rgba(255, 253, 248, 0.9);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.yb-diary-page .yb-diary-page__runtime-bar button:disabled { cursor: default; opacity: 0.4; }
+.yb-diary-page .yb-diary-page__action-status { min-height: 18px; margin: 6px 4px; color: var(--diary-muted); font-size: 12px; text-align: center; }
+.yb-diary-page .yb-diary-page__content { position: relative; display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 18px; }
+
+.yb-diary-page .yb-diary-page__card {
+  position: relative;
+  padding: 19px 17px 17px;
+  border: 1px solid rgba(151, 98, 48, 0.2);
+  border-radius: 24px;
+  background: linear-gradient(90deg, rgba(164, 115, 69, 0.06) 1px, transparent 1px), linear-gradient(180deg, rgba(164, 115, 69, 0.05) 1px, transparent 1px), linear-gradient(180deg, rgba(255, 253, 246, 0.98), rgba(248, 235, 207, 0.96));
+  background-size: 20px 20px, 20px 20px, auto;
+  box-shadow: 0 14px 28px rgba(96, 61, 32, 0.18);
+  transform-origin: 50% 0;
+}
+
+.yb-diary-page .yb-diary-page__card:nth-child(2n) { transform: rotate(0.45deg); }
+.yb-diary-page .yb-diary-page__card:nth-child(2n + 1) { transform: rotate(-0.35deg); }
+
+.yb-diary-page .yb-diary-page__card::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  width: 72px;
+  height: 18px;
+  border-radius: 4px;
+  background: rgba(226, 189, 132, 0.46);
+  transform: translateX(-50%) rotate(-2deg);
+}
+
+.yb-diary-page .yb-diary-page__pin { position: absolute; top: 14px; right: 48px; width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle, #f4c97b 0 35%, #9e6536 38% 100%); }
+.yb-diary-page .yb-diary-page__card-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.yb-diary-page .yb-diary-page__date,
+.yb-diary-page .yb-diary-page__private { padding: 5px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; }
+.yb-diary-page .yb-diary-page__date { max-width: 66%; overflow: hidden; color: #6e4828; background: rgba(255, 246, 220, 0.86); text-overflow: ellipsis; white-space: nowrap; }
+.yb-diary-page .yb-diary-page__private { color: #9e5549; background: rgba(201, 120, 105, 0.12); }
+.yb-diary-page .yb-diary-page__author-row { position: relative; display: flex; align-items: center; gap: 11px; margin-bottom: 13px; }
+.yb-diary-page .yb-diary-page__avatar { display: grid; flex: 0 0 auto; width: 38px; height: 38px; place-items: center; border: 1px solid rgba(154, 101, 47, 0.2); border-radius: 15px; color: #6f4426; background: linear-gradient(135deg, #f7d89e, #fff4d9); font-size: 17px; font-weight: 800; }
+.yb-diary-page .yb-diary-page__author { margin: 0; color: #54351f; font-size: 16px; }
+.yb-diary-page .yb-diary-page__signature { margin-top: 3px; color: var(--diary-muted); font-size: 11px; letter-spacing: 0.06em; }
+.yb-diary-page .yb-diary-page__body { position: relative; padding: 12px; border: 1px solid rgba(145, 94, 45, 0.11); border-radius: 18px; background: rgba(255, 252, 243, 0.58); }
+.yb-diary-page .yb-diary-page__line { margin: 0; color: #5d4028; font-size: 13px; line-height: 1.85; overflow-wrap: anywhere; }
+.yb-diary-page .yb-diary-page__line + .yb-diary-page__line { margin-top: 8px; }
+.yb-diary-page .yb-diary-page__secret { display: inline; padding: 1px 5px 2px; border-radius: 999px; color: #7b443f; background: rgba(218, 150, 137, 0.14); box-decoration-break: clone; }
+.yb-diary-page .yb-diary-page__postscript { display: flex; flex-direction: column; gap: 7px; margin-top: 13px; padding: 11px 12px; border: 1px dashed rgba(176, 113, 57, 0.28); border-radius: 16px; background: rgba(255, 241, 210, 0.62); }
+.yb-diary-page .yb-diary-page__postscript-line { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; color: #6e4a2f; font-size: 12px; line-height: 1.65; }
+.yb-diary-page .yb-diary-page__postscript-label { padding: 2px 7px; border-radius: 999px; color: #fff8ef; background: #a66c3e; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; }
+.yb-diary-page .yb-diary-page__empty { padding: 28px 20px; border: 1px dashed rgba(158, 108, 58, 0.28); border-radius: 24px; color: var(--diary-muted); background: rgba(255, 250, 236, 0.78); box-shadow: 0 14px 28px rgba(112, 76, 39, 0.1); text-align: center; }
+.yb-diary-page .yb-diary-page__empty strong { display: block; margin-bottom: 8px; color: #5c3d25; font-size: 18px; }
+
+@media (max-width: 380px) {
+  .yb-diary-page .yb-diary-page__runtime-bar { grid-template-columns: repeat(4, auto); }
+  .yb-diary-page .yb-diary-page__runtime-bar strong { grid-column: 1 / -1; grid-row: 1; }
+  .yb-diary-page .yb-diary-page__card { padding: 18px 14px 15px; }
+  .yb-diary-page .yb-diary-page__postscript-line { grid-template-columns: 1fr; gap: 5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yb-diary-page .yb-diary-page__card:nth-child(2n),
+  .yb-diary-page .yb-diary-page__card:nth-child(2n + 1) { transform: none; }
+}

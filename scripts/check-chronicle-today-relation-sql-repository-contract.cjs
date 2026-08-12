@@ -26,6 +26,7 @@ function main() {
 
     assertIncludes(dataApi, "from './data-api/sql-repository.js';", 'data-api facade 必须导出 SQL repository');
     assertIncludes(dataApi, 'querySqlViaApi', 'data-api facade 必须导出 querySqlViaApi');
+    assertIncludes(dataApi, 'queryTableRowsViaApi', 'data-api facade 必须导出 queryTableRowsViaApi');
     assertIncludes(dataApi, 'executeSqlMutationViaApi', 'data-api facade 必须导出 executeSqlMutationViaApi');
 
     assertIncludes(repository, "from '../db-bridge.js';", 'SQL repository 必须通过 db-bridge 访问数据库 API');
@@ -34,12 +35,23 @@ function main() {
     assertIncludes(repository, "enqueueTableMutation('executeSqlMutationViaApi'", 'SQL mutation 必须进入 enqueueTableMutation');
     assertIncludes(repository, 'api.querySql', 'querySqlViaApi 必须优先支持 querySql');
     assertIncludes(repository, 'api.executeSqlQuery', 'querySqlViaApi 必须支持 executeSqlQuery fallback');
+    assertIncludes(repository, 'api.queryTableRows', 'queryTableRowsViaApi 必须调用 queryTableRows');
+    assertIncludes(repository, "buildFailure('runtime_not_ready', 'SQLite 只读 runtime 尚未就绪')", 'querySql 方法未发布时必须返回 runtime_not_ready');
+    assertIncludes(repository, "buildFailure('runtime_not_ready', 'SQLite 表格只读 runtime 尚未就绪')", 'queryTableRows 方法未发布时必须返回 runtime_not_ready');
+    assertIncludes(repository, 'api.getLastSqlApiError()', '只读查询 null 结果必须读取底层 SQL 诊断');
+    assertIncludes(repository, "String(diagnostic.method || '') !== methodName", '只读诊断必须匹配本次调用 method');
+    assertIncludes(repository, 'Number(diagnostic.at) < startedAt', '只读诊断必须不早于本次调用开始时间');
+    assertIncludes(repository, '{ sqlApiError: diagnostic }', '有效底层 SQL 诊断必须保留在 sqlApiError');
+    assertIncludes(repository, 'method.call(api, normalizeOptions(options))', 'queryTableRowsViaApi 必须绑定 API this 并透传规范化 options');
     assertIncludes(repository, 'api.executeSqlMutation', 'executeSqlMutationViaApi 必须调用 executeSqlMutation');
     assertIncludes(repository, 'callMutationApiToSettlement(', 'executeSqlMutationViaApi 必须等待 mutation 真实 settlement');
     assertIncludes(repository, 'normalizeSqlMutationSettlement(result)', 'executeSqlMutationViaApi 必须通过共享 normalizer 解释底层 settlement');
     assertNotIncludes(repository, 'function normalizeMutationResult(', 'SQL repository 不得重新内联私有 mutation normalizer');
 
-    assertIncludes(repository, "buildFailure('sqlite_unavailable'", 'query null 必须判定 sqlite_unavailable');
+    assertNotIncludes(repository, 'sqlite_unavailable', '只读 runtime 未发布不得伪装成 sqlite_unavailable');
+    assertNotIncludes(repository, 'probeSqliteCapabilityViaApi', 'SQL repository 不得恢复独立 SQLite probe');
+    assertNotIncludes(repository, 'SELECT 1 AS ok', 'SQL repository 不得用探针 SQL 判断 runtime 就绪');
+    assertNotIncludes(repository, 'readProbeScalar', 'SQL repository 不得保留旧 probe 标量解析');
     assertIncludes(repository, "buildFailure('mutation_rejected'", 'mutation API reject 必须判定 mutation_rejected');
     assertIncludes(repository, "rowCount: 0", '失败结构必须稳定提供 rowCount: 0');
     assertIncludes(repository, "SQL 查询返回错误", 'query errors 非空必须失败，不能污染 signature 状态机');
@@ -82,7 +94,7 @@ function main() {
     assertNotIncludes(repository, 'suppressNotify', 'SQL repository 默认不得传 suppressNotify');
     assertNotIncludes(repository, 'silent: true', 'SQL repository 默认不得 silent: true');
 
-    console.log('[通过] 纪要 today_relation SQL repository 合同：data-api facade、mutation queue、返回值归一化、默认刷新/追踪选项边界通过');
+    console.log('[通过] 纪要 today_relation SQL repository 合同：只读 runtime、诊断新鲜度、声明式表查询、mutation queue 与参数边界通过');
 }
 
 try {

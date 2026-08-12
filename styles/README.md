@@ -7,9 +7,10 @@
 - `00-phone-shell.css`：独立容器、toggle、拖拽/缩放外壳层
 - `01-phone-base.css`：`styles/phone-base/` 现代基础层聚合入口
 - `02-phone-nav-detail.css`：顶层通用导航 / 详情补层
-- `03-phone-special-base.css`：三张专属表模板基础层
-- `04-phone-special-interactions.css`：三张专属表交互补层
 - `05-phone-generic-template.css`：通用表模板层
+- `06-phone-theater.css`：Theater 小剧场场景层
+- `12-variable-manager.css`：变量管理层
+- `13-content-presets.css`：美化预设运行 shell 与工坊补层
 
 ## phone-base 子目录
 - 详见 `styles/phone-base/README.md`，集中说明 `phone-base` 子目录的现代分层。
@@ -26,7 +27,7 @@
 - `09-table-manage-detail.css`
 - `12-table-update-review.css`
 - `10-scroll-generic-patches.css`
-- `11-api-dialog-worldbook.css`
+- `11-api-dialog-worldbook.css`：世界书工作台对话框与条目控件
 
 > 历史 legacy 文件（`03-table-legacy.css` / `04-settings-legacy.css`）已在 2026-04 完成清理，对应现代替代层分别为 `09-table-manage-detail.css` 与 `07-settings-modern.css`。
 

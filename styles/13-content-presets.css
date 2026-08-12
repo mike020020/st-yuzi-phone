@@ -1,8 +1,19 @@
+.phone-content-preset-root {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+}
+
 .phone-content-preset-shell { min-height: 100%; background: var(--yuzi-phone-bg, #f7f5f1); }
-.phone-content-preset-title-nav { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px; align-items: center; gap: 6px; min-width: 0; flex: 1; }
-.phone-content-preset-title-nav button { width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 20px; cursor: pointer; }
-.phone-content-preset-title-nav button:disabled { opacity: .35; cursor: not-allowed; }
-.phone-content-preset-title-nav .phone-nav-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.phone-content-preset-title-nav { width: 100%; }
 .phone-content-preset-body { min-height: 0; overflow: auto; }
 .phone-content-preset-body > :first-child { margin-top: 0; }
 .phone-settings-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--yuzi-settings-border, rgba(58,55,49,.1)); border-radius: 12px; background: var(--yuzi-settings-surface, rgba(255,255,255,.55)); }

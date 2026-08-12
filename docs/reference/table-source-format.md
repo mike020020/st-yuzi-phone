@@ -59,7 +59,6 @@ tables/
   sources/
     小剧场2.1/
       00-mate.md
-      01-消息记录表.md
       02-广场表.md
       ...
     纪要/

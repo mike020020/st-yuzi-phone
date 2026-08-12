@@ -13,7 +13,7 @@ export {
 
 export {
     querySqlViaApi,
-    probeSqliteCapabilityViaApi,
+    queryTableRowsViaApi,
     executeSqlMutationViaApi,
 } from './data-api/sql-repository.js';
 
@@ -31,29 +31,10 @@ export {
 } from './data-api/lock-repository.js';
 
 export {
-    triggerManualUpdate,
     openVisualizerWithStatus,
     openDatabaseUiWithStatus,
     openDatabaseSettingsWithStatus,
 } from './data-api/panel-actions.js';
-
-export {
-    getDbConfigApiAvailability,
-    readDbUpdateConfigViaApi,
-    writeDbUpdateConfigViaApi,
-    readManualTableSelectionViaApi,
-    writeManualTableSelectionViaApi,
-    clearManualTableSelectionViaApi,
-} from './data-api/config-repository.js';
-
-export {
-    getApiPresets,
-    getTableApiPreset,
-    setTableApiPreset,
-    getPlotApiPreset,
-    setPlotApiPreset,
-    loadApiPreset,
-} from './data-api/preset-repository.js';
 
 export {
     exportDatabaseSnapshotViaApi,

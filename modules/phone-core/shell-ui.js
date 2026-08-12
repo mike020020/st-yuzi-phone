@@ -3,7 +3,7 @@ import { PHONE_ICONS } from '../phone-home/icons.js';
 export function buildPhoneShellHtml() {
     return `
         <div class="phone-shell">
-            <div class="phone-notch"></div>
+            <div class="phone-notch" aria-hidden="true"></div>
             <div class="phone-status-bar">
                 <span class="phone-status-time"></span>
                 <span class="phone-status-icons">
@@ -13,7 +13,10 @@ export function buildPhoneShellHtml() {
                 </span>
             </div>
             <div class="phone-screen"></div>
-            <div class="phone-home-indicator"></div>
+            <div class="phone-temporary-layer-host" data-phone-temporary-layer-host></div>
+            <button class="phone-home-indicator" data-phone-home-indicator type="button" aria-label="返回手机主页" hidden>
+                <span aria-hidden="true"></span>
+            </button>
         </div>
         <div class="yuzi-phone-resize yuzi-phone-resize-e" data-dir="e"></div>
         <div class="yuzi-phone-resize yuzi-phone-resize-se" data-dir="se"></div>

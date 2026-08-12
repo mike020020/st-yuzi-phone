@@ -1,0 +1,18 @@
+# 依赖
+node_modules/
+
+# 测试与脚手架临时目录
+.tmp-tests/
+.yuzi-beautify-new-*/
+.yuzi-beautify-import-*/
+.analysis-cache.md
+.*.table-backup-*/
+.*.table-build-*/
+
+# 本地预览状态
+.preview-state/
+
+# 打包候选与原子写入临时文件
+output/*.tmp
+output/*.backup
+output/*-candidate.json

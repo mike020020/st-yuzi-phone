@@ -30,13 +30,16 @@ jobs:
         run: npm run lint
 
       - name: Run contract checks
+        run: npm run check
+
+      - name: Run contract checks
         run: npm run check:ci
 
-      - name: Check Yuzi Beautify workshop
-        run: npm run beautify:check
+      - name: Verify table sources
+        run: npm run tables:check
 
-      - name: Pack and read back Yuzi Beautify example
-        run: npm run beautify:readback
+      - name: Rebuild generated tables
+        run: npm run tables:build
 
       - name: Build production bundle
         run: npm run build

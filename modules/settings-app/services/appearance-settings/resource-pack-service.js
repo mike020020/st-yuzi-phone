@@ -564,12 +564,14 @@ export function applyAppearanceResourcePack(packInput, options = {}) {
     const backup = {
         backgroundImage: currentSettings.backgroundImage || null,
         appIcons: { ...(currentSettings.appIcons || {}) },
+        appIconOrigins: { ...(currentSettings.appIconOrigins || {}) },
         appearanceResourcePool: currentSettings.appearanceResourcePool || createEmptyAppearanceResourcePool(),
         appearanceActivePackId: safeString(currentSettings.appearanceActivePackId, 160),
     };
     const patch = {
         backgroundImage: wallpaper ? wallpaper.dataUrl : backup.backgroundImage,
         appIcons: assignment.nextIcons,
+        appIconOrigins: {},
         appearanceResourcePool: createEmptyAppearanceResourcePool(),
     };
     const activePackId = safeString(options.activePackId, 160);

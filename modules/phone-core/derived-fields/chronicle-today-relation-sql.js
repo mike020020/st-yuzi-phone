@@ -11,98 +11,6 @@ export const CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS = Object.freeze(['
 
 const CHRONICLE_TODAY_RELATION_ANCHOR_TABLE_NAMES = new Set(CHRONICLE_TODAY_RELATION_ANCHOR_TABLES);
 
-function formatSqlStringLiteral(value) {
-    return `'${String(value).replaceAll("'", "''")}'`;
-}
-
-function formatChronicleTodayRelationAnchorCandidateValuesSql() {
-    return CHRONICLE_TODAY_RELATION_ANCHOR_TABLES
-        .map((tableName, index) => `(${formatSqlStringLiteral(tableName)}, ${index})`)
-        .join(', ');
-}
-
-function buildRequiredColumnChecksSql() {
-    return CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS
-        .map((columnName) => (
-            `AND EXISTS (SELECT 1 FROM pragma_table_info(candidate_anchor_tables.name) WHERE name = ${formatSqlStringLiteral(columnName)})`
-        ))
-        .join('\n    ');
-}
-
-export function buildChronicleTodayRelationAnchorTableSql() {
-    return `WITH
-candidate_anchor_tables(name, priority) AS (
-    VALUES ${formatChronicleTodayRelationAnchorCandidateValuesSql()}
-),
-available_anchor_tables AS (
-    SELECT candidate_anchor_tables.name, candidate_anchor_tables.priority
-    FROM candidate_anchor_tables
-    WHERE EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = candidate_anchor_tables.name)
-    ${buildRequiredColumnChecksSql()}
-)
-SELECT name AS anchor_table
-FROM available_anchor_tables
-ORDER BY priority
-LIMIT 1`;
-}
-
-export function buildChronicleTodayRelationSchemaGateSql() {
-    const chronicleColumnValues = CHRONICLE_TODAY_RELATION_REQUIRED_COLUMNS
-        .map((name) => `('chronicle', ${formatSqlStringLiteral(name)})`)
-        .join(', ');
-    const anchorColumnValues = CHRONICLE_TODAY_RELATION_ANCHOR_TABLES
-        .flatMap((tableName) => CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS
-            .map((name) => `(${formatSqlStringLiteral(tableName)}, ${formatSqlStringLiteral(name)})`))
-        .join(', ');
-    return `WITH
-required_columns(table_name, column_name) AS (
-    VALUES ${chronicleColumnValues}, ${anchorColumnValues}
-),
-column_capabilities AS (
-    SELECT required_columns.table_name, required_columns.column_name,
-        CASE WHEN EXISTS (
-            SELECT 1 FROM sqlite_master
-            WHERE type = 'table' AND name = required_columns.table_name
-        ) AND EXISTS (
-            SELECT 1 FROM pragma_table_info(required_columns.table_name)
-            WHERE name = required_columns.column_name
-        ) THEN 1 ELSE 0 END AS available
-    FROM required_columns
-),
-anchor_capabilities AS (
-    SELECT table_name, MIN(available) AS available
-    FROM column_capabilities
-    WHERE table_name IN ('global_state', 'current_status')
-    GROUP BY table_name
-),
-selected_anchor AS (
-    SELECT table_name
-    FROM anchor_capabilities
-    WHERE available = 1
-    ORDER BY CASE table_name WHEN 'global_state' THEN 0 ELSE 1 END
-    LIMIT 1
-),
-missing AS (
-    SELECT table_name || '.' || column_name AS requirement
-    FROM column_capabilities
-    WHERE available = 0 AND (
-        table_name = 'chronicle'
-        OR NOT EXISTS (SELECT 1 FROM selected_anchor)
-    )
-    ORDER BY table_name, column_name
-),
-fingerprint_parts AS (
-    SELECT table_name || '.' || column_name || '=' || available AS part
-    FROM column_capabilities
-    ORDER BY table_name, column_name
-)
-SELECT
-    CASE WHEN NOT EXISTS (SELECT 1 FROM missing) AND EXISTS (SELECT 1 FROM selected_anchor) THEN 1 ELSE 0 END AS schema_ok,
-    COALESCE((SELECT table_name FROM selected_anchor), '') AS anchor_table,
-    COALESCE((SELECT group_concat(requirement, ',') FROM missing), '') AS missing_requirements,
-    COALESCE((SELECT group_concat(part, '|') FROM fingerprint_parts), '') || '|anchor=' || COALESCE((SELECT table_name FROM selected_anchor), '') AS schema_fingerprint`;
-}
-
 const CHINESE_SMALL_INTEGER_LABELS = [
     '零', '一', '二', '三', '四', '五', '六', '七', '八', '九',
     '十', '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九',
@@ -322,27 +230,17 @@ parsed_chronicle AS (
 ),
 computed_relation AS (
     SELECT
-        row_id,
+        row_id AS target_row_id,
         ${buildRelativeRelationCaseSql('CAST(julianday(today_date) - julianday(target_date) AS INTEGER)')} AS new_relation
     FROM parsed_chronicle
     WHERE today_date IS NOT NULL AND target_date IS NOT NULL
 )
 UPDATE chronicle
-SET today_relation = (
-    SELECT new_relation
-    FROM computed_relation
-    WHERE computed_relation.row_id = chronicle.row_id
-)
-WHERE row_id IN (
-    SELECT row_id
-    FROM computed_relation
-    WHERE new_relation IS NOT NULL
-)
-AND COALESCE(today_relation, '') <> COALESCE((
-    SELECT new_relation
-    FROM computed_relation
-    WHERE computed_relation.row_id = chronicle.row_id
-), '')`;
+SET today_relation = computed_relation.new_relation
+FROM computed_relation
+WHERE row_id = computed_relation.target_row_id
+AND computed_relation.new_relation IS NOT NULL
+AND COALESCE(today_relation, '') <> COALESCE(computed_relation.new_relation, '')`;
 }
 
 export function buildChronicleInvalidTimeSpanDebugSql() {

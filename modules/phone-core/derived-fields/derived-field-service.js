@@ -1,5 +1,5 @@
 const DEFAULT_DEBOUNCE_MS = 600;
-const DEFAULT_PROBE_RETRY_DELAYS = Object.freeze([1000, 2000, 5000]);
+const DEFAULT_AVAILABILITY_RETRY_MS = 1000;
 const DEFAULT_QUERY_RETRY_DELAYS = Object.freeze([1000, 2000, 5000]);
 const DEFAULT_MUTATION_RETRY_DELAY_MS = 2000;
 const DEFAULT_MAX_MUTATION_ATTEMPTS = 2;
@@ -45,7 +45,9 @@ export function createDerivedFieldService(config = {}) {
     const debounceMs = Number.isFinite(Number(config.debounceMs))
         ? Math.max(0, Math.round(Number(config.debounceMs)))
         : DEFAULT_DEBOUNCE_MS;
-    const probeRetryDelays = cloneDelays(config.probeRetryDelays, DEFAULT_PROBE_RETRY_DELAYS);
+    const availabilityRetryMs = Number.isFinite(Number(config.availabilityRetryMs))
+        ? Math.max(0, Math.round(Number(config.availabilityRetryMs)))
+        : DEFAULT_AVAILABILITY_RETRY_MS;
     const queryRetryDelays = cloneDelays(config.queryRetryDelays, DEFAULT_QUERY_RETRY_DELAYS);
     const mutationRetryDelayMs = Number.isFinite(Number(config.mutationRetryDelayMs))
         ? Math.max(0, Math.round(Number(config.mutationRetryDelayMs)))
@@ -58,22 +60,22 @@ export function createDerivedFieldService(config = {}) {
         : DEFAULT_MAX_SIGNATURE_RETRY;
 
     const runtime = {
-        unsubscribe: null,
+        unsubscribeUpdate: null,
+        unsubscribeFillStart: null,
         started: false,
         generation: 0,
         debounceTimer: null,
-        probeTimer: null,
+        availabilityTimer: null,
         queryRetryTimer: null,
         mutationRetryTimer: null,
-        probeRetryIndex: 0,
         queryRetryIndex: 0,
         notificationVersion: 0,
         consumedVersion: 0,
         running: false,
+        fillActive: false,
         lastInputSignature: null,
         lastInvalidWarningSignature: null,
         lastContextWarningSignature: null,
-        lastProbeErrorKey: null,
         lastFailureErrorKey: null,
         mutationSourceSignature: null,
         mutationAttempts: 0,
@@ -111,7 +113,7 @@ export function createDerivedFieldService(config = {}) {
     }
 
     function hasRetryTimer() {
-        return runtime.probeTimer !== null
+        return runtime.availabilityTimer !== null
             || runtime.queryRetryTimer !== null
             || runtime.mutationRetryTimer !== null;
     }
@@ -209,8 +211,28 @@ export function createDerivedFieldService(config = {}) {
     }
 
     async function loadContext(generation) {
+        if (typeof config.resolveContext === 'function') {
+            const normalized = await config.resolveContext(deps, {
+                shouldPause: () => runtime.fillActive || !isCurrent(generation),
+            });
+            if (!isCurrent(generation)) return { status: 'stale-generation' };
+            if (normalized?.status === 'runtime-not-ready') return normalized;
+            if (normalized?.status === 'query-failed') {
+                const failure = normalized.result || normalized;
+                warnOnce(failure, 'context-query', {
+                    action: `${actionPrefix}.context-query-failed`,
+                    message: config.messages?.contextQueryFailed || '派生字段运行条件查询失败',
+                    context: { code: failure?.code, message: failure?.message },
+                });
+                return normalized;
+            }
+            warnContext(normalized);
+            return normalized?.status ? normalized : { status: 'completed' };
+        }
+
         const result = await deps.query(config.buildContextSql());
         if (!isCurrent(generation)) return { status: 'stale-generation' };
+        if (result?.code === 'runtime_not_ready') return { status: 'runtime-not-ready' };
         if (!result?.ok) {
             warnOnce(result, 'context-query', {
                 action: `${actionPrefix}.context-query-failed`,
@@ -230,6 +252,7 @@ export function createDerivedFieldService(config = {}) {
     async function querySignature(stage, context, generation) {
         const result = await deps.query(config.buildSignatureSql(context));
         if (!isCurrent(generation)) return { status: 'stale-generation' };
+        if (result?.code === 'runtime_not_ready') return { status: 'runtime-not-ready' };
         if (!result?.ok) {
             warnOnce(result, `signature-${stage}`, {
                 action: `${actionPrefix}.signature-query-failed`,
@@ -252,10 +275,12 @@ export function createDerivedFieldService(config = {}) {
     }
 
     async function runPass(attempt, generation) {
+        if (runtime.fillActive) return 'fill-active';
         const contextResult = await loadContext(generation);
         if (contextResult.status !== 'ready') return contextResult.status;
         const context = contextResult.context;
 
+        if (runtime.fillActive) return 'fill-active';
         const preResult = await querySignature('pre-update', context, generation);
         if (preResult.status !== 'completed') return preResult.status;
         const pre = preResult.value;
@@ -293,6 +318,7 @@ export function createDerivedFieldService(config = {}) {
             return 'mutation-blocked';
         }
 
+        if (runtime.fillActive) return 'fill-active';
         if (!beginMutationAttempt(pre.sourceSignature)) {
             warnMutationCircuit(pre.sourceSignature);
             return 'mutation-blocked';
@@ -340,6 +366,7 @@ export function createDerivedFieldService(config = {}) {
         }
 
         runtime.pendingConfirmationSourceSignature = pre.sourceSignature;
+        if (runtime.fillActive) return 'fill-active';
         const postResult = await querySignature('post-update', context, generation);
         if (postResult.status !== 'completed') return postResult.status;
         const post = postResult.value;
@@ -395,7 +422,7 @@ export function createDerivedFieldService(config = {}) {
     }
 
     function scheduleDebounce(generation) {
-        if (!isCurrent(generation) || runtime.running || hasRetryTimer()) return false;
+        if (!isCurrent(generation) || runtime.fillActive || runtime.running || hasRetryTimer()) return false;
         clearTimer('debounceTimer');
         runtime.debounceTimer = deps.setTimeout(() => {
             runtime.debounceTimer = null;
@@ -404,14 +431,12 @@ export function createDerivedFieldService(config = {}) {
         return true;
     }
 
-    function scheduleProbeRetry(generation) {
-        if (!isCurrent(generation) || runtime.probeRetryIndex >= probeRetryDelays.length) return false;
-        const delay = probeRetryDelays[runtime.probeRetryIndex++];
-        clearTimer('probeTimer');
-        runtime.probeTimer = deps.setTimeout(() => {
-            runtime.probeTimer = null;
+    function scheduleAvailabilityRetry(generation) {
+        if (!isCurrent(generation) || runtime.fillActive || runtime.availabilityTimer !== null) return false;
+        runtime.availabilityTimer = deps.setTimeout(() => {
+            runtime.availabilityTimer = null;
             void runRunner(generation);
-        }, delay);
+        }, availabilityRetryMs);
         return true;
     }
 
@@ -443,40 +468,28 @@ export function createDerivedFieldService(config = {}) {
     }
 
     async function runRunner(generation) {
-        if (!isCurrent(generation) || runtime.running) return;
+        if (!isCurrent(generation) || runtime.running || runtime.fillActive) return;
         runtime.running = true;
         let rounds = 0;
 
         try {
             while (rounds < 2 && isCurrent(generation)) {
                 const capturedVersion = runtime.notificationVersion;
-                const probe = await deps.probe();
-                if (!isCurrent(generation)) return;
-
-                if (!probe?.ok) {
-                    const key = failureKey(probe, 'probe');
-                    if (key !== runtime.lastProbeErrorKey) {
-                        runtime.lastProbeErrorKey = key;
-                        deps.logger.warn({
-                            action: `${actionPrefix}.probe-failed`,
-                            message: config.messages?.probeFailed || 'SQLite 能力探测失败，派生字段本轮跳过',
-                            context: { code: probe?.code, message: probe?.message },
-                        });
-                    }
-                    const scheduled = scheduleProbeRetry(generation);
-                    runtime.consumedVersion = capturedVersion;
-                    if (!scheduled && runtime.probeRetryIndex >= probeRetryDelays.length) {
-                        runtime.lastProbeErrorKey = key;
-                    }
-                    return;
-                }
-
-                runtime.probeRetryIndex = 0;
-                runtime.lastProbeErrorKey = null;
                 const result = await runRound(generation);
                 if (!isCurrent(generation) || result === 'stale-generation') return;
 
                 const status = typeof result === 'string' ? result : result?.status;
+                if (status === 'runtime-not-ready') {
+                    scheduleAvailabilityRetry(generation);
+                    runtime.consumedVersion = capturedVersion;
+                    return;
+                }
+
+                if (status === 'fill-active') {
+                    runtime.consumedVersion = capturedVersion;
+                    return;
+                }
+
                 if (status === 'query-failed') {
                     const scheduled = scheduleQueryRetry(generation);
                     runtime.consumedVersion = capturedVersion;
@@ -527,26 +540,44 @@ export function createDerivedFieldService(config = {}) {
     function requestRun() {
         if (!runtime.started) return;
         runtime.notificationVersion += 1;
-        if (!runtime.running && !hasRetryTimer()) {
+        if (!runtime.fillActive && !runtime.running && !hasRetryTimer()) {
             scheduleDebounce(runtime.generation);
         }
     }
 
-    function clearRuntimeState() {
+    function handleFillStart() {
+        if (!runtime.started) return;
+        runtime.fillActive = true;
         clearTimer('debounceTimer');
-        clearTimer('probeTimer');
+        clearTimer('availabilityTimer');
         clearTimer('queryRetryTimer');
         clearTimer('mutationRetryTimer');
-        runtime.unsubscribe = null;
+        runtime.queryRetryIndex = 0;
+        runtime.lastFailureErrorKey = null;
+    }
+
+    function handleTableUpdate() {
+        if (!runtime.started) return;
+        runtime.fillActive = false;
+        clearReadFailureState();
+        requestRun();
+    }
+
+    function clearRuntimeState() {
+        clearTimer('debounceTimer');
+        clearTimer('availabilityTimer');
+        clearTimer('queryRetryTimer');
+        clearTimer('mutationRetryTimer');
+        runtime.unsubscribeUpdate = null;
+        runtime.unsubscribeFillStart = null;
         runtime.running = false;
-        runtime.probeRetryIndex = 0;
+        runtime.fillActive = false;
         runtime.queryRetryIndex = 0;
         runtime.notificationVersion = 0;
         runtime.consumedVersion = 0;
         runtime.lastInputSignature = null;
         runtime.lastInvalidWarningSignature = null;
         runtime.lastContextWarningSignature = null;
-        runtime.lastProbeErrorKey = null;
         runtime.lastFailureErrorKey = null;
         runtime.mutationSourceSignature = null;
         runtime.mutationAttempts = 0;
@@ -555,26 +586,26 @@ export function createDerivedFieldService(config = {}) {
         runtime.lastCircuitWarningSignature = null;
     }
 
-    function rollbackFailedStart(generation, unsubscribe, stage, error) {
+    function disposeSubscription(unsubscribe, stage, generation) {
+        if (typeof unsubscribe !== 'function') return;
+        try {
+            unsubscribe();
+        } catch (error) {
+            warnLifecycle(
+                `${actionPrefix}.${stage}-unsubscribe-failed`,
+                '派生字段生命周期解除订阅失败',
+                { stage, generation },
+                error,
+            );
+        }
+    }
+
+    function rollbackFailedStart(generation, subscriptions, stage, error) {
         runtime.started = false;
         runtime.generation += 1;
-        const disposer = typeof unsubscribe === 'function'
-            ? unsubscribe
-            : runtime.unsubscribe;
-        runtime.unsubscribe = null;
-
-        try {
-            if (typeof disposer === 'function') disposer();
-        } catch (disposeError) {
-            warnLifecycle(
-                `${actionPrefix}.start-rollback-unsubscribe-failed`,
-                '派生字段启动回滚时解除订阅失败',
-                { stage, generation },
-                disposeError,
-            );
-        } finally {
-            clearRuntimeState();
-        }
+        disposeSubscription(subscriptions?.update, 'start-rollback-update', generation);
+        disposeSubscription(subscriptions?.fillStart, 'start-rollback-fill-start', generation);
+        clearRuntimeState();
 
         warnLifecycle(
             `${actionPrefix}.start-failed`,
@@ -590,32 +621,48 @@ export function createDerivedFieldService(config = {}) {
         runtime.started = true;
         runtime.generation += 1;
         const generation = runtime.generation;
-        let unsubscribe = null;
+        const subscriptions = { update: null, fillStart: null };
 
         try {
-            unsubscribe = deps.subscribe(requestRun);
+            subscriptions.fillStart = deps.subscribeFillStart(handleFillStart);
         } catch (error) {
-            return rollbackFailedStart(generation, unsubscribe, 'subscribe', error);
+            return rollbackFailedStart(generation, subscriptions, 'subscribe-fill-start', error);
         }
 
-        if (typeof unsubscribe !== 'function') {
+        if (typeof subscriptions.fillStart !== 'function') {
             return rollbackFailedStart(
                 generation,
-                unsubscribe,
-                'invalid-disposer',
-                new TypeError('派生字段订阅未返回有效 disposer'),
+                subscriptions,
+                'invalid-fill-start-disposer',
+                new TypeError('派生字段填表开始订阅未返回有效 disposer'),
+            );
+        }
+
+        try {
+            subscriptions.update = deps.subscribeUpdate(handleTableUpdate);
+        } catch (error) {
+            return rollbackFailedStart(generation, subscriptions, 'subscribe-update', error);
+        }
+
+        if (typeof subscriptions.update !== 'function') {
+            return rollbackFailedStart(
+                generation,
+                subscriptions,
+                'invalid-update-disposer',
+                new TypeError('派生字段表格更新订阅未返回有效 disposer'),
             );
         }
 
         if (!isCurrent(generation)) {
-            return rollbackFailedStart(generation, unsubscribe, 'stale-generation');
+            return rollbackFailedStart(generation, subscriptions, 'stale-generation');
         }
 
-        runtime.unsubscribe = unsubscribe;
+        runtime.unsubscribeUpdate = subscriptions.update;
+        runtime.unsubscribeFillStart = subscriptions.fillStart;
         try {
             requestRun();
         } catch (error) {
-            return rollbackFailedStart(generation, unsubscribe, 'initial-schedule', error);
+            return rollbackFailedStart(generation, subscriptions, 'initial-schedule', error);
         }
         return true;
     }
@@ -623,21 +670,14 @@ export function createDerivedFieldService(config = {}) {
     function stop() {
         runtime.generation += 1;
         runtime.started = false;
-        const unsubscribe = runtime.unsubscribe;
-        runtime.unsubscribe = null;
+        const unsubscribeUpdate = runtime.unsubscribeUpdate;
+        const unsubscribeFillStart = runtime.unsubscribeFillStart;
+        runtime.unsubscribeUpdate = null;
+        runtime.unsubscribeFillStart = null;
 
-        try {
-            if (typeof unsubscribe === 'function') unsubscribe();
-        } catch (error) {
-            warnLifecycle(
-                `${actionPrefix}.stop-unsubscribe-failed`,
-                '派生字段服务停止时解除订阅失败，继续清理其余运行状态',
-                { generation: runtime.generation },
-                error,
-            );
-        } finally {
-            clearRuntimeState();
-        }
+        disposeSubscription(unsubscribeUpdate, 'stop-update', runtime.generation);
+        disposeSubscription(unsubscribeFillStart, 'stop-fill-start', runtime.generation);
+        clearRuntimeState();
     }
 
     function setDeps(overrides = {}) {
@@ -655,6 +695,7 @@ export function createDerivedFieldService(config = {}) {
             started: runtime.started,
             generation: runtime.generation,
             running: runtime.running,
+            fillActive: runtime.fillActive,
             notificationVersion: runtime.notificationVersion,
             consumedVersion: runtime.consumedVersion,
             mutationSourceSignature: runtime.mutationSourceSignature,
@@ -662,7 +703,7 @@ export function createDerivedFieldService(config = {}) {
             mutationCircuitOpen: runtime.mutationCircuitOpen,
             pendingConfirmationSourceSignature: runtime.pendingConfirmationSourceSignature,
             hasDebounceTimer: runtime.debounceTimer !== null,
-            hasProbeTimer: runtime.probeTimer !== null,
+            hasAvailabilityTimer: runtime.availabilityTimer !== null,
             hasQueryRetryTimer: runtime.queryRetryTimer !== null,
             hasMutationRetryTimer: runtime.mutationRetryTimer !== null,
         };

@@ -7,7 +7,6 @@ const MODULES_DIR = path.join(ROOT, 'modules');
 const ALLOWED_STORAGE_FILES = new Set([
     'modules/storage-manager/core.js',
     'modules/storage-manager/manager.js',
-    'modules/phone-core/chat-support/ai-instruction-store.js',
 ]);
 
 const ALLOWED_INDEXED_DB_FILES = new Set([
@@ -21,8 +20,6 @@ const REQUIRED_SETTING_FILES = {
     settingsPersistence: 'modules/settings/persistence.js',
     templateStore: 'modules/phone-beautify-templates/store.js',
     templateRepository: 'modules/phone-beautify-templates/repository.js',
-    worldbookSelection: 'modules/settings-app/services/worldbook-selection.js',
-    aiInstructionStore: 'modules/phone-core/chat-support/ai-instruction-store.js',
 };
 
 const REQUIRED_CACHE_FILES = {
@@ -103,6 +100,12 @@ function check(results, file, description, ok, details = '') {
 
 function main() {
     const results = [];
+    check(
+        results,
+        'modules/phone-core/chat-support/ai-instruction-store.js',
+        '旧 AI 指令 localStorage 迁移存储已删除，QQ 配置不复用该路径',
+        !fs.existsSync(path.join(ROOT, 'modules/phone-core/chat-support/ai-instruction-store.js')),
+    );
 
     const storageReferences = collectStorageReferences();
     for (const item of storageReferences) {
@@ -156,8 +159,6 @@ function main() {
     );
     const templateStore = read(REQUIRED_SETTING_FILES.templateStore);
     const templateRepository = read(REQUIRED_SETTING_FILES.templateRepository);
-    const worldbookSelection = read(REQUIRED_SETTING_FILES.worldbookSelection);
-    const aiInstructionStore = read(REQUIRED_SETTING_FILES.aiInstructionStore);
     check(results, REQUIRED_SETTING_FILES.settingsFacade, 'settings facade 统一导出 savePhoneSetting()', has(settingsFacade, 'export const savePhoneSetting = persistenceTools.savePhoneSetting;'));
     check(results, REQUIRED_SETTING_FILES.settingsFacade, 'settings facade 统一导出 savePhoneSettingsPatch()', has(settingsFacade, 'export const savePhoneSettingsPatch = persistenceTools.savePhoneSettingsPatch;'));
     check(results, REQUIRED_SETTING_FILES.settingsPersistence, 'settings persistence 保存单项前走 validateSetting()', has(savePhoneSettingBody, 'validateSetting(key, value);'));
@@ -167,11 +168,7 @@ function main() {
     check(results, REQUIRED_SETTING_FILES.settingsPersistence, 'settings persistence 保存 patch 保留 invalid 通知', has(savePhoneSettingsPatchBody, "showNotification?.('部分设置已按默认规则修正', 'warning');"));
     check(results, REQUIRED_SETTING_FILES.templateStore, 'beautify template store 通过 settings 保存模板仓库', has(templateStore, 'savePhoneSetting(PHONE_BEAUTIFY_STORE_KEY, normalized);'));
     check(results, REQUIRED_SETTING_FILES.templateRepository, 'beautify template repository 保存后失效缓存', has(templateRepository, 'invalidatePhoneBeautifyTemplateCache();'));
-    check(results, REQUIRED_SETTING_FILES.worldbookSelection, 'worldbook selection 使用 settings 事实源保存', has(worldbookSelection, "savePhoneSetting('worldbookSelection', nextSelection);"));
-    check(results, REQUIRED_SETTING_FILES.aiInstructionStore, 'AI instruction store 使用 settings patch 持久化', has(aiInstructionStore, 'savePhoneSettingsPatch({ phoneAiInstruction: nextSettings });'));
-    check(results, REQUIRED_SETTING_FILES.aiInstructionStore, 'AI instruction legacy localStorage 只读迁移使用 getItem()', has(aiInstructionStore, 'localStorage.getItem(LEGACY_PROMPT_TEMPLATES_KEY);'));
-    check(results, REQUIRED_SETTING_FILES.aiInstructionStore, 'AI instruction legacy migration 不写 legacy localStorage', !/localStorage\.(?:setItem|removeItem|clear)\s*\(/.test(aiInstructionStore));
-
+    check(results, 'modules/settings-app/services/worldbook-selection.js', '旧世界书选择服务已删除，QQ 不再通过手机设置保存世界书筛选', !fs.existsSync(path.join(ROOT, 'modules/settings-app/services/worldbook-selection.js')));
     const cacheManager = read(REQUIRED_CACHE_FILES.cacheManager);
     const backgroundService = read(REQUIRED_CACHE_FILES.backgroundService);
     const iconUploadService = read(REQUIRED_CACHE_FILES.iconUploadService);
@@ -197,8 +194,8 @@ function main() {
     check(results, REQUIRED_APPEARANCE_PACK_REPOSITORY, '外观包仓库定义数量、单包和总容量限制', has(appearancePackRepository, 'MAX_PACK_COUNT = 20') && has(appearancePackRepository, 'MAX_SINGLE_PACK_BYTES = 20 * 1024 * 1024') && has(appearancePackRepository, 'MAX_TOTAL_PACK_BYTES = 100 * 1024 * 1024'));
     check(results, REQUIRED_CACHE_FILES.backgroundService, '背景图片原始设置走 settings', has(backgroundService, "savePhoneSetting('backgroundImage', dataUrl);"));
     check(results, REQUIRED_CACHE_FILES.backgroundService, '背景图片大对象预览走 cache-manager', has(backgroundService, 'cacheSet(CACHE_STORES.images, cachedKey, dataUrl'));
-    check(results, REQUIRED_CACHE_FILES.iconUploadService, '应用图标原始设置走 settings', has(iconUploadService, "savePhoneSetting('appIcons', nextIcons);"));
-    check(results, REQUIRED_CACHE_FILES.iconUploadService, '应用图标大对象预览走 cache-manager', has(iconUploadService, 'cacheSet(CACHE_STORES.images, cacheKey, dataUrl'));
+    check(results, REQUIRED_CACHE_FILES.iconUploadService, '应用图标原始设置走 settings', has(iconUploadService, 'savePhoneSettingsPatch(nextState);'));
+    check(results, REQUIRED_CACHE_FILES.iconUploadService, '应用图标大对象预览走 cache-manager', has(iconUploadService, 'cacheSet(CACHE_STORES.images, `icon:${key}`, dataUrl'));
 
     const failed = results.filter(item => !item.ok);
     if (failed.length > 0) {

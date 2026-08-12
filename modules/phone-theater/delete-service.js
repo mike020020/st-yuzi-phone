@@ -1,5 +1,5 @@
 import { deleteTableRowsBatch, getTableData } from '../phone-core/data-api.js';
-import { dispatchPhoneTableUpdated } from '../phone-core/chat-support.js';
+import { dispatchTableUpdated } from '../phone-core/table-support.js';
 import { getTheaterSceneDefinition } from './config.js';
 import { buildTheaterTableIndex, getCellByHeader, normalizeText, resolveRowIdentity, splitSemicolonText } from './core/table-index.js';
 import { buildDeleteTargets, hasDeleteTarget, parseTheaterDeleteKey } from './core/delete-key.js';
@@ -390,7 +390,7 @@ export async function deleteTheaterEntities(rawData, sceneId, selectedKeys = [])
         ...affectedSheetKeys,
         ...deletionPlans.map(plan => plan.sheetKey),
     ].filter(Boolean)));
-    notifiedSheetKeys.forEach(sheetKey => dispatchPhoneTableUpdated(sheetKey));
+    notifiedSheetKeys.forEach(sheetKey => dispatchTableUpdated(sheetKey));
 
     if (!execution.ok) {
         return {

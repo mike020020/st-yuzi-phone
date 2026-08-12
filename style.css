@@ -5,12 +5,11 @@
  * 1. shell    : 独立容器 / toggle / resize 基础层
  * 2. base     : phone-base 现代基础层（legacy 归档说明由 01-phone-base.css 承接）
  * 3. nav      : 顶层通用导航 / 详情补层
- * 4. special  : 三张专属表模板层
- * 5. generic  : 通用表模板层
- * 6. theater  : 小剧场三场景（广场 / 论坛 / 直播）美化层
- * 7. variable : 变量管理层
- * 8. presets  : 玉子美化运行 shell 与模板工坊补层
- * @version 1.4.2
+ * 4. generic  : 通用表模板层
+ * 5. theater  : 小剧场三场景（广场 / 论坛 / 直播）美化层
+ * 6. variable : 变量管理层
+ * 7. presets  : 玉子美化运行 shell 与模板工坊补层
+ * @version 2.0.0
  */
 
 /* 1) shell layer */
@@ -22,18 +21,14 @@
 /* 3) shared nav / detail layer */
 @import url('./styles/02-phone-nav-detail.css');
 
-/* 4) special template layers */
-@import url('./styles/03-phone-special-base.css');
-@import url('./styles/04-phone-special-interactions.css');
-
-/* 5) generic template layer */
+/* 4) generic template layer */
 @import url('./styles/05-phone-generic-template.css');
 
-/* 6) theater scene layer */
+/* 5) theater scene layer */
 @import url('./styles/06-phone-theater.css');
 
-/* 7) variable manager layer */
+/* 6) variable manager layer */
 @import url('./styles/12-variable-manager.css');
 
-/* 8) content preset shell / workshop */
+/* 7) content preset shell / workshop */
 @import url('./styles/13-content-presets.css');

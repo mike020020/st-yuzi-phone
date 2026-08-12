@@ -10,7 +10,11 @@ const FILES = {
     readme: 'styles/README.md',
     phoneBaseReadme: 'styles/phone-base/README.md',
     shell: 'styles/phone-base/01-shell-system.css',
+    tokens: 'styles/phone-base/00-phone-tokens.css',
+    navCore: 'styles/phone-base/06-layout-nav-core.css',
+    genericTemplate: 'styles/05-phone-generic-template.css',
     tableUpdateReview: 'styles/phone-base/12-table-update-review.css',
+    contentPresets: 'styles/13-content-presets.css',
     settingsModern: 'styles/phone-base/07-settings-modern.css',
     fontLibrary: 'modules/settings-app/services/appearance-settings/font-library-service.js',
 };
@@ -22,6 +26,7 @@ const REMOVED_FILES = [
     'styles/legacy',
     'styles/phone-base/03-table-legacy.css',
     'styles/phone-base/04-settings-legacy.css',
+    'styles/14-qq.css',
 ];
 
 function read(relativePath) {
@@ -72,10 +77,11 @@ function main() {
     check(results, 'entry', '顶层入口继续导入 shell layer', has(contents.entry, "@import url('./styles/00-phone-shell.css');"));
     check(results, 'entry', '顶层入口继续导入 base layer', has(contents.entry, "@import url('./styles/01-phone-base.css');"));
     check(results, 'entry', '顶层入口继续导入 nav/detail layer', has(contents.entry, "@import url('./styles/02-phone-nav-detail.css');"));
-    check(results, 'entry', '顶层入口继续导入 special base layer', has(contents.entry, "@import url('./styles/03-phone-special-base.css');"));
-    check(results, 'entry', '顶层入口继续导入 special interactions layer', has(contents.entry, "@import url('./styles/04-phone-special-interactions.css');"));
     check(results, 'entry', '顶层入口继续导入 generic template layer', has(contents.entry, "@import url('./styles/05-phone-generic-template.css');"));
-    check(results, 'entry', '顶层入口声明 shell / base / special / generic 分层说明', has(contents.entry, 'Layer map'));
+    check(results, 'entry', '顶层入口不再导入旧 QQ App 样式层', !has(contents.entry, "@import url('./styles/14-qq.css');"));
+    check(results, 'entry', '顶层入口不再导入旧 special 样式层', !has(contents.entry, "@import url('./styles/03-phone-special-base.css');")
+        && !has(contents.entry, "@import url('./styles/04-phone-special-interactions.css');"));
+    check(results, 'entry', '顶层入口声明 shell / base / generic 分层说明', has(contents.entry, 'Layer map') && !has(contents.entry, '内置 QQ 实时聊天 App'));
 
     check(results, 'base', 'base 入口继续声明 Active modern layers', has(contents.base, 'Active modern layers'));
     check(results, 'base', 'base 入口继续导入 tokens', has(contents.base, "@import url('./phone-base/00-phone-tokens.css');"));
@@ -137,12 +143,74 @@ function main() {
     check(results, 'tableUpdateReview', '审核页不再保留字段更多提示样式', !has(contents.tableUpdateReview, '.tur-field-more'));
 
     const homeOverlayBlock = getCssRuleBlock(contents.home, '.phone-home-overlay');
+    const contentPresetRootBlock = getCssRuleBlock(contents.contentPresets, '.phone-content-preset-root');
+    const phoneShellBlock = getCssRuleBlock(contents.shell, '.phone-shell');
+    const dynamicIslandBlock = getCssRuleBlock(contents.shell, '.phone-notch');
+    const baseNavBlock = getCssRuleBlock(contents.navCore, '.phone-nav-bar');
+    const settingsNavBlock = getCssRuleBlock(contents.settingsModern, '.phone-settings-page .phone-nav-bar');
+    const genericNavBlock = getCssRuleBlock(contents.genericTemplate, '.phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav');
+
+    check(results, 'shell', 'legacy shell exposes a physical bezel around the screen', has(phoneShellBlock, 'display: flex;')
+        && has(phoneShellBlock, 'flex-direction: column;')
+        && has(phoneShellBlock, 'border: var(--yuzi-phone-frame-border-width, 6px) solid var(--yuzi-phone-bg-app, #000);')
+        && has(phoneShellBlock, '0 0 0 var(--yuzi-phone-shell-bezel-inner-width, 4px) var(--yuzi-phone-bg-shell-bezel-inner, #3a3a3a)')
+        && has(phoneShellBlock, '0 0 0 var(--yuzi-phone-shell-bezel-outer-width, 8px) var(--yuzi-phone-bg-shell-bezel-outer, #1a1a1a)'));
+    check(results, 'tokens', 'bezel rings and app nav geometry are public visual tokens', has(contents.tokens, '--yuzi-phone-bg-shell-bezel-inner: #3a3a3a;')
+        && has(contents.tokens, '--yuzi-phone-bg-shell-bezel-outer: #1a1a1a;')
+        && has(contents.tokens, '--yuzi-phone-shell-bezel-inner-width: 4px;')
+        && has(contents.tokens, '--yuzi-phone-shell-bezel-outer-width: 8px;')
+        && has(contents.tokens, '--yuzi-phone-app-nav-top-padding: var(--yuzi-phone-status-safe-height);')
+        && has(contents.tokens, '--yuzi-phone-nav-content-height: 54px;')
+        && has(contents.tokens, '--yuzi-phone-nav-padding-inline-start: 10px;')
+        && has(contents.tokens, '--yuzi-phone-nav-padding-inline-end: 12px;')
+        && has(contents.tokens, '--yuzi-phone-nav-control-size: 32px;')
+        && has(contents.tokens, '--yuzi-phone-nav-icon-size: 24px;')
+        && has(contents.tokens, '--yuzi-phone-nav-side-slot-width: clamp(44px, 15cqi, 60px);')
+        && has(contents.tokens, '--yuzi-phone-nav-title-font-size: 17px;')
+        && has(contents.tokens, '--yuzi-phone-nav-title-line-height: 24px;')
+        && has(contents.tokens, '--yuzi-phone-nav-title-font-weight: 500;')
+        && has(contents.tokens, '--yuzi-phone-nav-secondary-actions-gap: 6px;')
+        && has(contents.tokens, '--yuzi-phone-nav-secondary-actions-padding-inline: 10px;')
+        && has(contents.tokens, '--yuzi-phone-nav-secondary-actions-padding-block-end: 10px;')
+        && has(contents.tokens, '--yuzi-phone-nav-inline-actions-side-slot-width: clamp(76px, 27cqi, 108px);')
+        && has(contents.tokens, '--yuzi-phone-nav-inline-actions-gap: clamp(4px, 1.5cqi, 6px);')
+        && has(contents.tokens, '--yuzi-phone-nav-inline-action-padding-inline: clamp(4px, 2cqi, 8px);'));
+    check(results, 'shell', 'phone screen exposes the shared inline-size container', has(contents.shell, 'container-name: yuzi-phone-screen;')
+        && has(contents.shell, 'container-type: inline-size;'));
+    check(results, 'shell', 'dynamic island keeps the new UI dimensions', has(dynamicIslandBlock, 'width: var(--yuzi-phone-dynamic-island-width, 78px);')
+        && has(dynamicIslandBlock, 'height: var(--yuzi-phone-dynamic-island-height, 24px);'));
+    check(results, 'navCore', 'base app nav owns the shared three-slot geometry below the status-safe area', has(baseNavBlock, 'var(--yuzi-phone-nav-side-slot-width)')
+        && has(baseNavBlock, 'minmax(0, 1fr)')
+        && has(baseNavBlock, 'min-height: calc(var(--yuzi-phone-app-nav-top-padding) + var(--yuzi-phone-nav-content-height));')
+        && has(baseNavBlock, 'padding: var(--yuzi-phone-app-nav-top-padding) 0 0;'));
+    check(results, 'navCore', 'base app nav owns icon-only controls and title ellipsis', has(contents.navCore, 'width: var(--yuzi-phone-nav-control-size);')
+        && has(contents.navCore, 'height: var(--yuzi-phone-nav-control-size);')
+        && has(contents.navCore, 'width: var(--yuzi-phone-nav-icon-size);')
+        && has(contents.navCore, 'background: transparent;')
+        && has(contents.navCore, 'pointer-events: none;')
+        && has(contents.navCore, 'width: max-content;')
+        && has(contents.navCore, 'text-overflow: ellipsis;')
+        && has(contents.navCore, 'white-space: nowrap;'));
+    check(results, 'settingsModern', 'settings and fusion only override shared nav theme roles', has(settingsNavBlock, '--yuzi-phone-nav-background:')
+        && has(settingsNavBlock, '--yuzi-phone-nav-border-color:')
+        && has(settingsNavBlock, '--yuzi-phone-nav-action-color:')
+        && has(settingsNavBlock, '--yuzi-phone-nav-title-color:')
+        && !/(?:^|;)\s*(?:padding|height|min-height|grid-template-columns|font-size)\s*:/m.test(settingsNavBlock));
+    check(results, 'genericTemplate', 'generic nav only supplies its template theme roles', has(genericNavBlock, 'background: var(--_gt-nav-bg);')
+        && has(genericNavBlock, 'border-bottom: 1px solid var(--_gt-nav-border);')
+        && !/(?:^|;)\s*(?:padding|height|min-height|grid-template-columns|font-size)\s*:/m.test(genericNavBlock));
+    check(results, 'contentPresets', '完整页面预设根节点可伸缩并负责纵向滚动', has(contentPresetRootBlock, 'flex: 1 1 auto;')
+        && has(contentPresetRootBlock, 'min-height: 0;')
+        && has(contentPresetRootBlock, 'height: 100%;')
+        && has(contentPresetRootBlock, 'overflow-y: auto;')
+        && has(contentPresetRootBlock, 'touch-action: pan-y;'));
     check(results, 'home', '主页不再保留整屏 overlay 规则', homeOverlayBlock.length === 0);
     check(results, 'home', '主页不再使用 15% 黑色遮罩压暗壁纸', !has(contents.home, 'background: rgba(0, 0, 0, 0.15);'));
-    check(results, 'home', '主页无壁纸时由 .phone-home 提供浅暖玉默认背景', has(contents.home, 'linear-gradient(180deg, #f4efe6'));
+    check(results, 'home', '主页无壁纸时由登记的 Figma 壁纸 token 提供默认背景', has(contents.home, 'background-image: var(--yuzi-phone-home-wallpaper-image);')
+        && !has(contents.home, 'linear-gradient(180deg, #f4efe6'));
     check(results, 'home', '主页 App 名称使用受控颜色变量与局部文字阴影保障可读性', has(contents.home, '.phone-app-label')
-        && has(contents.home, 'color: var(--phone-home-app-label-color, rgba(255, 255, 255, 0.96));')
-        && has(contents.home, 'text-shadow: var(--phone-home-app-label-shadow, 0 1px 3px rgba(0, 0, 0, 0.32));'));
+        && has(contents.home, 'color: var(--yuzi-phone-home-app-label-color);')
+        && has(contents.home, 'text-shadow: var(--yuzi-phone-home-app-label-shadow);'));
     check(results, 'home', '主页 overlay 不得使用 backdrop-filter 模糊高清壁纸', !/backdrop-filter\s*:/i.test(homeOverlayBlock) && !/-webkit-backdrop-filter\s*:/i.test(homeOverlayBlock));
     check(results, 'shell', '手机容器声明字体库 CSS 变量入口', has(contents.shell, '#yuzi-phone-standalone')
         && has(contents.shell, '--yuzi-phone-font-family')

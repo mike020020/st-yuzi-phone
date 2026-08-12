@@ -14,6 +14,6 @@ assert.ok(repository.includes('export function repairActiveBeautifyTemplateSetti
 assert.ok(repository.includes('return createBeautifyUserTemplateWriteDisabledResult();'));
 assert.ok(reset.includes('invalidatePhoneBeautifyTemplateCache();'));
 assert.ok(reset.includes('const verification = verifyRestoredDefaults();'));
-assert.ok(reset.includes('specialRuntimeBuiltin'));
+assert.ok(!reset.includes('specialRuntimeBuiltin'));
 assert.ok(reset.includes('genericRuntimeBuiltin'));
 console.log('[beautify-template-cache-invalidation-check] 检查通过');

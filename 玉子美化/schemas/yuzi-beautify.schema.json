@@ -1,36 +1,41 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://yuzi.local/schemas/yuzi-beautify.schema.json",
   "title": "Yuzi Beautify Bundle",
   "type": "object",
   "additionalProperties": false,
-  "required": ["format", "formatVersion", "manifest", "files"],
+  "required": ["format", "formatVersion", "apiVersion", "manifest", "files"],
   "properties": {
     "format": { "const": "yuzi-beautify-preset" },
-    "formatVersion": { "const": 1 },
+    "formatVersion": { "const": 2 },
+    "apiVersion": { "const": 1 },
     "manifest": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "items"],
       "properties": {
-        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "id": { "$ref": "#/definitions/nonEmptyString" },
         "name": { "type": "string" },
         "version": { "type": "string" },
         "author": { "type": "string" },
-        "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/item" } }
+        "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/item" } }
       }
     },
-    "files": { "type": "object", "additionalProperties": { "$ref": "#/$defs/file" } }
+    "files": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/definitions/packagePath" },
+      "additionalProperties": { "$ref": "#/definitions/file" }
+    }
   },
-  "$defs": {
+  "definitions": {
     "nonEmptyString": { "type": "string", "minLength": 1, "pattern": "\\S" },
-    "packagePath": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?![A-Za-z]:)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*[?#]).+$" },
+    "packagePath": { "type": "string", "minLength": 1, "pattern": "^(?!\\s)(?!.*\\s$)(?!/)(?![A-Za-z]:)(?![A-Za-z][A-Za-z0-9+.-]*:)(?!.*[\\\\?#\\x00-\\x1F\\x7F])(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//).+$" },
     "file": {
       "type": "object",
       "additionalProperties": false,
       "required": ["mimeType", "encoding", "content"],
       "properties": {
-        "mimeType": { "$ref": "#/$defs/nonEmptyString" },
+        "mimeType": { "$ref": "#/definitions/nonEmptyString" },
         "encoding": { "enum": ["text", "base64"] },
         "content": { "type": "string" }
       }
@@ -40,31 +45,30 @@
       "additionalProperties": false,
       "required": ["tableName", "fields"],
       "properties": {
-        "tableName": { "$ref": "#/$defs/nonEmptyString" },
-        "fields": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmptyString" } }
+        "tableName": { "$ref": "#/definitions/nonEmptyString" },
+        "fields": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/definitions/nonEmptyString" } }
       }
     },
     "entry": {
       "type": "object",
       "additionalProperties": false,
+      "required": ["mount"],
       "properties": {
-        "html": { "$ref": "#/$defs/packagePath" },
-        "css": { "$ref": "#/$defs/packagePath" },
-        "js": { "$ref": "#/$defs/packagePath" },
-        "scriptMode": { "enum": ["classic", "module"] }
-      },
-      "anyOf": [{ "required": ["html"] }, { "required": ["css"] }, { "required": ["js"] }]
+        "html": { "$ref": "#/definitions/packagePath" },
+        "css": { "$ref": "#/definitions/packagePath" },
+        "mount": { "$ref": "#/definitions/packagePath" }
+      }
     },
     "item": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "target", "entry"],
       "properties": {
-        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "id": { "$ref": "#/definitions/nonEmptyString" },
         "name": { "type": "string" },
-        "target": { "$ref": "#/$defs/target" },
-        "entry": { "$ref": "#/$defs/entry" },
-        "assets": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/packagePath" } }
+        "target": { "$ref": "#/definitions/target" },
+        "entry": { "$ref": "#/definitions/entry" },
+        "assets": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/definitions/packagePath" } }
       }
     }
   }

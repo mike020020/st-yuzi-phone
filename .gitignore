@@ -17,3 +17,6 @@ Thumbs.db
 # 临时分析缓存
 .analysis-cache
 .analysis-cache.md
+
+# 本地 Skill 任务清单
+.scratch/

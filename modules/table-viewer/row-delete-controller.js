@@ -87,7 +87,7 @@ export function createRowDeleteController(options) {
         getLiveTableName,
         syncRowsFromSheet,
         isTableRowLocked,
-        deletePhoneSheetRows,
+        deleteSheetRows,
         showInlineToast,
         viewerRuntime,
     } = options;
@@ -130,7 +130,7 @@ export function createRowDeleteController(options) {
             return createDeletePreflightFailureOutcome(message, requestedRowIndexes);
         }
 
-        const result = await deletePhoneSheetRows(sheetKey, requestedRowIndexes, {
+        const result = await deleteSheetRows(sheetKey, requestedRowIndexes, {
             tableName: liveTableName,
         });
         const deletedRowIndexes = normalizeRowIndexes(result.deletedRowIndexes || []);

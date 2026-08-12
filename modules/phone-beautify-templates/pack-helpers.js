@@ -100,7 +100,7 @@ export function parsePackInput(input) {
 const TEMPLATE_FIELD_COMMENT_MAP = Object.freeze({
     id: '模板唯一标识，建议保持稳定，避免覆盖冲突。',
     name: '模板显示名称，用于设置页与导出识别。',
-    templateType: '模板类型：special_app_template 或 generic_table_template。',
+    templateType: '模板类型：generic_table_template。',
     source: '模板来源：builtin（内置）/ user（用户导入）。',
     readOnly: '是否只读；内置模板通常为 true。',
     exportable: '是否允许导出。',
@@ -110,7 +110,7 @@ const TEMPLATE_FIELD_COMMENT_MAP = Object.freeze({
     'matcher.requiredHeaders': '必须命中的表头列表。',
     'matcher.optionalHeaders': '可选加分表头列表。',
     'matcher.minScore': '匹配阈值（0~100）。',
-    'render.rendererKey': '渲染器键：special_message/generic_table。',
+    'render.rendererKey': '渲染器键：generic_table。',
     'render.customCss': '自定义样式，建议仅在高级模式启用并逐步验证。',
     'render.advanced.customCssEnabled': '高级模式 customCss 开关；false 时 customCss 不生效。',
     'render.advanced.customCss': '高级模式 customCss 原始内容。',

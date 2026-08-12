@@ -1,1 +1,11 @@
-<section class="character-card"><h2>角色表</h2><div id="rows"></div></section>
+<section class="character-page">
+  <header class="character-toolbar">
+    <button type="button" data-action="back">返回</button>
+    <button id="previous" type="button" data-action="previousTable">上一张</button>
+    <h2 id="title">角色表</h2>
+    <button id="next" type="button" data-action="nextTable">下一张</button>
+    <button type="button" data-action="editCurrentTable">编辑</button>
+  </header>
+  <p id="status" class="character-status" aria-live="polite"></p>
+  <pre id="rows" class="character-rows"></pre>
+</section>

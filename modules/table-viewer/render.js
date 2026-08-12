@@ -3,20 +3,14 @@
  * 玉子的手机 - 表格查看器入口
  *
  * 通用表：列表 + 详情。
- * 专属表：消息记录表对齐游戏界面中的手机聊天交互风格。
  */
 
 import { Logger } from '../error-handler.js';
 import { navigateBack } from '../phone-core/routing.js';
-import { PHONE_ICONS } from '../phone-home/icons.js';
-import { detectSpecialTemplateForTable, detectGenericTemplateForTable } from '../phone-beautify-templates/matcher.js';
+import { detectGenericTemplateForTable } from '../phone-beautify-templates/matcher.js';
 import { renderTableViewerLoadError, resolveTableViewerContext } from './context.js';
 import { createViewerRuntime } from './runtime.js';
 import { renderGenericTableViewer } from './generic-viewer.js';
-import {
-    detectSpecialTableType,
-    createSpecialTableViewerRuntime,
-} from './special/runtime.js';
 
 const logger = Logger.withScope({ scope: 'table-viewer/render', feature: 'table-viewer' });
 
@@ -62,7 +56,6 @@ export function renderTableViewer(container, sheetKey, options = {}) {
         renderTableViewerLoadError(container, {
             sheetKey,
             title: sheetKey,
-            backIconHtml: PHONE_ICONS.back,
             navigateBack,
             runtime: viewerRuntime,
         });
@@ -77,30 +70,6 @@ export function renderTableViewer(container, sheetKey, options = {}) {
         rows,
         tableName,
     } = viewerContext;
-
-    const specialMatch = forceGenericList ? null : detectSpecialTemplateForTable({
-        sheetKey,
-        tableName,
-        headers,
-    });
-
-    const specialType = forceGenericList ? '' : specialMatch?.specialType || detectSpecialTableType(tableName);
-
-    if (specialType) {
-        const specialRuntime = createSpecialTableViewerRuntime(container, {
-            sheetKey,
-            navigationSheetKey,
-            tableName,
-            rows,
-            headers,
-            type: specialType,
-            templateMatch: specialMatch || null,
-        }, {
-            viewerRuntime,
-        });
-        specialRuntime?.start();
-        return;
-    }
 
     const genericMatch = detectGenericTemplateForTable({
         sheetKey,
@@ -119,6 +88,7 @@ export function renderTableViewer(container, sheetKey, options = {}) {
     }, {
         viewerRuntime,
         forceListMode: forceGenericList,
+        reviewNavigationAttemptId: options.reviewNavigationAttemptId,
     });
 
 }

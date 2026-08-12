@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>玉子美化 · 制作期模拟</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="preview-shell">
+    <header class="preview-header">
+      <div>
+        <p class="eyebrow">YUZI BEAUTIFY WORKSHOP</p>
+        <h1>实时制作期模拟面板</h1>
+        <p id="disclaimer" class="disclaimer"></p>
+        <p id="build-status" class="build-status" role="status" aria-live="polite"></p>
+      </div>
+      <div class="header-actions">
+        <button id="reload" type="button">重新构建 Bundle</button>
+        <button id="cleanup" class="ghost" type="button">清理运行状态</button>
+      </div>
+    </header>
+
+    <section class="control-grid" aria-label="预览控制">
+      <label>美化 item<select id="item"></select></label>
+      <label>模拟表<select id="table"></select></label>
+      <label>手机宽度<select id="width"><option value="320">320 px</option><option value="375" selected>375 px</option><option value="430">430 px</option></select></label>
+      <label>Action 场景<select id="scenario"><option value="navigated">成功</option><option value="unavailable">不可用</option><option value="stale">失效</option><option value="failed">失败</option></select></label>
+    </section>
+
+    <section class="workspace">
+      <div class="device-column">
+        <div class="device-toolbar" role="group" aria-label="Runtime actions">
+          <button type="button" data-action="back">返回</button>
+          <button type="button" data-action="previousTable">上一表</button>
+          <button type="button" data-action="nextTable">下一表</button>
+          <button type="button" data-action="editCurrentTable">编辑</button>
+        </div>
+        <div id="device" class="device" style="--device-width:375px">
+          <div class="device-speaker"></div>
+          <iframe id="frame" title="美化预设沙箱" src="./frame.html" sandbox="allow-scripts"></iframe>
+        </div>
+      </div>
+
+      <aside class="debug-column">
+        <section class="panel mock-panel" aria-labelledby="mock-title">
+          <div class="panel-title mock-title-row">
+            <div>
+              <h2 id="mock-title">内存 Mock 数据库</h2>
+              <p id="mock-meta" class="panel-meta"></p>
+            </div>
+            <div class="panel-actions">
+              <button id="apply" type="button">应用到内存</button>
+              <button id="reset" class="ghost" type="button">重置当前表</button>
+            </div>
+          </div>
+          <p id="mock-notice" class="mock-notice" role="status" aria-live="polite"></p>
+          <div class="mock-table-wrap" tabindex="0" aria-label="Mock 数据编辑表格">
+            <table class="mock-table">
+              <thead id="mock-head"></thead>
+              <tbody id="mock-body"></tbody>
+            </table>
+          </div>
+          <div class="mock-editor-actions" role="group" aria-label="Mock 表结构操作">
+            <button id="add-column" class="ghost" type="button">新增列</button>
+            <button id="add-row" class="ghost" type="button">新增行</button>
+          </div>
+        </section>
+        <section class="panel log-panel">
+          <div class="panel-title"><h2>生命周期日志</h2><button id="clear-log" class="ghost" type="button">清空</button></div>
+          <pre id="log" aria-live="polite"></pre>
+        </section>
+      </aside>
+    </section>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

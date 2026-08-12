@@ -15,6 +15,8 @@ import {
     stopTableUpdateReviewService,
 } from '../table-update-review/service.js';
 import { getPhoneCoreState, phoneRuntime, resetPhoneCoreState, resetPhoneRuntimeScope } from './state.js';
+import { getCurrentRoute, navigateTo, onRouteChange } from './routing.js';
+import { bindPhoneShellAppControls } from './shell-app-controls.js';
 import {
     ensureRouteRuntimeSubscription,
     clearRouteRuntimeSubscription,
@@ -84,6 +86,26 @@ function clearShellInteractionTimer(state = getPhoneCoreState()) {
     if (state.shellInteractionTimerId === null) return;
     phoneRuntime.clearTimeout(state.shellInteractionTimerId);
     state.shellInteractionTimerId = null;
+}
+
+function disposeShellAppControls(state = getPhoneCoreState()) {
+    state.shellAppControlsRouteCleanup?.();
+    state.shellAppControlsRouteCleanup = null;
+    state.shellAppControls?.dispose?.();
+    state.shellAppControls = null;
+}
+
+function initializeShellAppControls(state = getPhoneCoreState()) {
+    disposeShellAppControls(state);
+    if (!state.phoneContainer) return;
+
+    state.shellAppControls = bindPhoneShellAppControls(state.phoneContainer, {
+        getCurrentRoute,
+        navigateTo,
+    });
+    state.shellAppControlsRouteCleanup = onRouteChange(() => {
+        state.shellAppControls?.refresh?.();
+    });
 }
 
 function scheduleShellWindowInteractions(state = getPhoneCoreState()) {
@@ -167,6 +189,7 @@ function cleanupPhoneRuntimeBindings(state = getPhoneCoreState()) {
     unregisterTableUpdateListener();
     unregisterTableFillStartListener();
     destroyPhoneWindowInteractions();
+    disposeShellAppControls(state);
 
     logger.debug({
         action: 'bindings.destroy',
@@ -196,6 +219,7 @@ export function initPhoneUI() {
     state.phoneContainer = $container[0];
 
     $container.html(buildPhoneShellHtml());
+    initializeShellAppControls(state);
     applyAppearanceFontLibrary(state.phoneContainer);
     applyPhoneThemeMode();
     applyReadableTextScale(state.phoneContainer);

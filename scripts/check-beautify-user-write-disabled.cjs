@@ -27,18 +27,17 @@ async function main() {
     const matcher = await import(url('modules/phone-beautify-templates/matcher.js'));
     const cache = await import(url('modules/phone-beautify-templates/cache.js'));
 
-    const builtinSpecial = repository.getBuiltinPhoneBeautifyTemplates()
-        .find(item => item.id === 'builtin.special.message.v1');
-    const userTemplate = clone(builtinSpecial);
-    Object.assign(userTemplate, { id: 'user.legacy.special', source: 'user', readOnly: false });
+    const userTemplate = clone(repository.getBuiltinPhoneBeautifyTemplates()
+        .find(item => item.id === 'builtin.generic.table.v1'));
+    Object.assign(userTemplate, { id: 'user.legacy.generic', source: 'user', readOnly: false });
     ctx.extensionSettings[settings.extensionName] = {
         ...clone(settings.defaultSettings),
         yuziPhoneBeautifyTemplates: {
             schemaVersion: '1.0.0', updatedAt: 11,
             templates: [userTemplate], bindings: { legacy_sheet: userTemplate.id },
         },
-        beautifyTemplateSourceModeSpecial: 'user',
-        beautifyActiveTemplateIdsSpecial: { special_message: userTemplate.id },
+        beautifyTemplateSourceModeGeneric: 'user',
+        beautifyActiveTemplateIdGeneric: userTemplate.id,
     };
     cache.invalidatePhoneBeautifyTemplateCache();
     const cachedBefore = cache.getCachedPhoneBeautifyTemplateById(userTemplate.id);
@@ -47,7 +46,7 @@ async function main() {
     const cacheVersionBefore = cache.getPhoneBeautifyTemplateCacheVersion();
 
     const calls = [
-        () => repository.setBeautifyTemplateSourceMode('special_app_template', 'user'),
+        () => repository.setBeautifyTemplateSourceMode('generic_table_template', 'user'),
         () => repository.setActiveBeautifyTemplateIdByType('generic_table_template', 'user.any'),
         () => repository.savePhoneBeautifyUserTemplate({ id: 'user.any' }),
         () => repository.deletePhoneBeautifyUserTemplate('user.any'),
@@ -66,7 +65,7 @@ async function main() {
     assert.equal(timers.size, 0, '禁写 API 不得调度宿主保存');
     assert.equal(saveCalls, 0, '禁写 API 不得触发宿主保存');
     assert.equal(cache.getPhoneBeautifyTemplateCacheVersion(), cacheVersionBefore, '禁写 API 不得失效模板缓存');
-    assert.deepEqual(cache.getCachedPhoneBeautifyTemplateById(userTemplate.id), cachedBefore, '预热的历史模板缓存必须保持可读');
+    assert.deepEqual(cache.getCachedPhoneBeautifyTemplateById(userTemplate.id), cachedBefore, '预热的 generic 模板缓存必须保持可读');
     console.log('[beautify-user-write-disabled-check] 检查通过');
 }
 

@@ -149,12 +149,10 @@ export interface SillyTavernContextLike {
 /**
  * 手机设置
  */
-export type BeautifyTemplateType = 'special_app_template' | 'generic_table_template';
+export type BeautifyTemplateType = 'generic_table_template';
 export type BeautifySourceMode = 'builtin' | 'user';
-export type PhoneBeautifySpecialRendererKey = 'special_message';
 export type PhoneBeautifyGenericRendererKey = 'generic_table';
-export type PhoneBeautifyRendererKey = PhoneBeautifySpecialRendererKey | PhoneBeautifyGenericRendererKey;
-export type PhoneBeautifySpecialType = 'message';
+export type PhoneBeautifyRendererKey = PhoneBeautifyGenericRendererKey;
 export type PhoneBeautifyTemplateSource = 'builtin' | 'user';
 export type PhoneBeautifyTemplateBindings = Record<string, string>;
 export type PhoneBeautifyTemplateExportMode = 'runtime' | 'annotated';
@@ -335,7 +333,6 @@ export interface PhoneBeautifyTemplateMatchResult {
     score: number;
     threshold?: number;
     reason: string;
-    specialType?: PhoneBeautifySpecialType;
     sourceMode?: BeautifySourceMode | 'active_template';
     sourceModePreferred?: BeautifySourceMode;
     sourceModeFallbackApplied?: boolean;
@@ -489,6 +486,7 @@ export interface PhoneSettings {
     phoneContainerHeight: number;
     backgroundImage: string | null;
     appIcons: Record<string, string>;
+    appIconOrigins: Record<string, string>;
     appearanceResourcePool: AppearanceResourcePoolSettings;
     appearanceActivePackId: string;
     appearanceFontLibrary: AppearanceFontLibrarySettings;
@@ -496,35 +494,12 @@ export interface PhoneSettings {
     phoneReadableTextScalePercent: number;
     hideTableCountBadge: boolean;
     hiddenTableApps: Record<string, boolean>;
-    beautifyTemplateSourceModeSpecial: BeautifySourceMode;
     beautifyTemplateSourceModeGeneric: BeautifySourceMode;
-    beautifyActiveTemplateIdsSpecial: Partial<Record<PhoneBeautifySpecialRendererKey, string>>;
     beautifyActiveTemplateIdGeneric: string;
     dockIconSize: number;
     phoneToggleStyleSize: number;
     phoneToggleStyleShape: 'circle' | 'rounded';
     phoneToggleCoverImage: string | null;
-    phoneChat: {
-        useStoryContext: boolean;
-        storyContextTurns: number;
-        apiPresetName: string;
-        maxHistoryMessages: number;
-        maxReplyTokens: number;
-        requestTimeoutMs: number;
-        worldbookMaxEntries: number;
-        worldbookMaxChars: number;
-    };
-    phoneAiInstruction: {
-        currentPresetName: string;
-        lastOpenedPresetName: string;
-        migratedLegacyTemplates: boolean;
-        presets: any[];
-    };
-    worldbookSelection: {
-        sourceMode: 'off' | 'manual' | 'character_bound';
-        selectedWorldbook: string;
-        entries: Record<string, Record<string, boolean>>;
-    };
 }
 
 /**
@@ -721,54 +696,19 @@ export interface SettingsModule {
 export type SettingsPageMode =
     | 'home'
     | 'appearance'
-    | 'database'
+    | 'api_presets'
     | 'beautify'
     | 'button_style'
-    | 'ai_instruction_presets'
-    | 'api_prompt_config'
-    | 'prompt_editor';
+    | 'ai_instruction_presets';
 
 export interface SettingsAppState {
     mode: SettingsPageMode;
     homeScrollTop?: number;
-    databaseScrollTop: number;
+    apiPresetsScrollTop: number;
     appearanceScrollTop: number;
     beautifyScrollTop: number;
     buttonStyleScrollTop: number;
-    apiPromptConfigScrollTop: number;
-    promptEditorName: string;
-    promptEditorContent: string;
-    promptEditorIsNew: boolean;
-    promptEditorOriginalName: string;
-    promptEditorMediaMarkers: {
-        imagePrefix: string;
-        videoPrefix: string;
-    } | null;
-    aiInstructionSelectedPresetName?: string;
-    aiInstructionDraftName?: string;
-    aiInstructionDraftOriginalName?: string;
-    aiInstructionDraftImagePrefix?: string;
-    aiInstructionDraftVideoPrefix?: string;
-    aiInstructionDraftPromptGroup?: any[];
-    worldbookLoading: boolean;
-    worldbookError: string | null;
-    worldbookList: string[];
-    currentWorldbook: string;
-    worldbookSourceMode: 'off' | 'manual' | 'character_bound';
-    boundWorldbookNames: string[];
-    worldbookEntries: any[];
-    worldbookSearchQuery: string;
-}
-
-export interface SettingsRuntimeStatus {
-    ok: boolean;
-    message?: string;
-    [key: string]: any;
-}
-
-export interface NamedSettingsEntry {
-    name: string;
-    [key: string]: any;
+    aiInstructionPresetsScrollTop: number;
 }
 
 export type SettingsToastHandler = (host: unknown, message: string, isError?: boolean) => void;
@@ -809,27 +749,14 @@ export interface SettingsPageRendererScrollDeps {
     restoreScroll: (key: string) => void;
     rerenderHomeKeepScroll: () => void;
     rerenderAppearanceKeepScroll: () => void;
-    rerenderDatabaseKeepScroll: () => void;
+    rerenderApiPresetsKeepScroll: () => void;
     rerenderBeautifyKeepScroll: () => void;
-    rerenderApiPromptConfigKeepScroll: () => void;
+    rerenderAiInstructionPresetsKeepScroll: () => void;
 }
 
 export interface SettingsPageRendererFeedbackDeps {
     showToast: SettingsToastHandler;
 }
-
-export interface SettingsDatabasePresetService {
-    getDbConfigApiAvailability: () => SettingsRuntimeStatus;
-    getDbPresets: () => NamedSettingsEntry[];
-    getActiveDbPresetName: () => string;
-    switchPresetByName: (presetName: string, toastHost?: unknown) => boolean;
-}
-
-export interface SettingsManualUpdateService {
-    setupManualUpdateBtn: (container: HTMLElement, btnSelector?: string, statusSelector?: string | null) => void;
-}
-
-export interface SettingsHomePageRendererDeps extends SettingsManualUpdateService {}
 
 export interface SettingsAppearancePageService {
     getLayoutValue: (key: string, fallback: number) => string;
@@ -873,22 +800,19 @@ export interface SettingsAppearancePageContext extends SettingsPageRendererCommo
 
 export interface SettingsAppearancePageRendererDeps extends SettingsAppearancePageService {}
 
-export interface SettingsDatabaseConfigService extends SettingsDatabasePresetService {
-    getTableData: () => Record<string, any> | null;
-    getSheetKeys: (rawData?: Record<string, any> | null) => string[];
-    readDbSnapshot: () => { ready: boolean; snapshot: Record<string, any>; apiAvailability?: SettingsRuntimeStatus; [key: string]: any };
-    clearActivePresetBindingIfNeeded: () => boolean;
-    normalizeDbManualSelection: (raw: any) => { hasManualSelection: boolean; selectedTables: string[] };
-    normalizeDbUpdateConfig: (raw: any) => Record<string, any>;
-    createDbPreset: (name: string, snapshot: any) => NamedSettingsEntry;
-    saveDbPresets: (presets: NamedSettingsEntry[]) => void;
-    setActiveDbPresetName: (name: string) => void;
-    writeDbUpdateConfigViaApi: (payload: Record<string, any>) => SettingsRuntimeStatus;
-    writeManualTableSelectionViaApi: (sheetKeys: string[]) => SettingsRuntimeStatus;
-    clearManualTableSelectionViaApi: () => SettingsRuntimeStatus;
+export interface SettingsQQV2PresetService {
+    readSharedResources: () => Promise<Record<string, any>>;
+    saveApiPreset: (input: Record<string, any>) => Promise<Record<string, any>>;
+    deleteApiPreset: (input: Record<string, any>) => Promise<Record<string, any>>;
+    loadModels: (input: Record<string, any>) => Promise<Record<string, any>>;
+    savePromptPreset: (input: Record<string, any>) => Promise<Record<string, any>>;
+    deletePromptPreset: (input: Record<string, any>) => Promise<Record<string, any>>;
+    restoreBuiltInPromptPreset: (input: Record<string, any>) => Promise<Record<string, any>>;
+    restoreAllBuiltInPromptPresets: () => Promise<Record<string, any>>;
+    importPromptPresets: (input: Record<string, any>) => Promise<Record<string, any>>;
+    exportPromptPreset: (input: Record<string, any>) => Promise<Record<string, any>>;
+    exportAllPromptPresets: () => Promise<Record<string, any>>;
 }
-
-export interface SettingsDataConfigPageRendererDeps extends SettingsDatabaseConfigService {}
 
 export interface SettingsButtonStylePageService {
     getPhoneSettings: SettingsModule['getPhoneSettings'];
@@ -900,33 +824,6 @@ export interface SettingsButtonStylePageRendererDeps {
     getPhoneSettings: SettingsModule['getPhoneSettings'];
     savePhoneSetting: SettingsModule['savePhoneSetting'];
 }
-
-export interface SettingsApiPromptService {
-    getDbConfigApiAvailability: () => SettingsRuntimeStatus;
-    getApiPresets: () => NamedSettingsEntry[];
-    getTableApiPreset: () => string;
-    setTableApiPreset: (presetName: string) => boolean;
-    getPlotApiPreset: () => string;
-    setPlotApiPreset: (presetName: string) => boolean;
-}
-
-export interface SettingsAiInstructionPresetService {
-    getPhoneAiInstructionPresets: () => NamedSettingsEntry[];
-    getPhoneAiInstructionPreset: (name: string) => any;
-    getCurrentPhoneAiInstructionPresetName: () => string;
-    setCurrentPhoneAiInstructionPresetName: (name: string) => any;
-    deletePhoneAiInstructionPreset: (name: string) => any;
-    importPhoneAiInstructionPresetsFromData: (data: any, options?: Record<string, any>) => any;
-    exportPhoneAiInstructionPresetPack: (name?: string) => any;
-    exportAllPhoneAiInstructionPresetsPack: () => any;
-}
-
-export interface SettingsPromptEditorService {
-    getPhoneAiInstructionPreset: (name: string) => any;
-    savePhoneAiInstructionPreset: (...args: any[]) => any;
-}
-
-export type ContentPresetScriptMode = 'classic' | 'module';
 
 export interface ContentPresetIssue {
     code: string;
@@ -944,7 +841,7 @@ export interface ContentPresetItem {
     id: string;
     name: string;
     target: { tableName: string; fields: readonly string[] };
-    entry: { html?: string; css?: string; js?: string; scriptMode: ContentPresetScriptMode };
+    entry: { html?: string; css?: string; mount: string };
     assets: readonly string[];
     issues: readonly ContentPresetIssue[];
     activatable: boolean;
@@ -958,6 +855,9 @@ export interface ContentPresetRecord {
     items: readonly ContentPresetItem[];
     issues: readonly ContentPresetIssue[];
     files: Readonly<Record<string, { path: string; mimeType: string; encoding: 'text' | 'base64'; content: string }>>;
+    format: 'yuzi-beautify-preset';
+    formatVersion: 2;
+    apiVersion: 1;
     importedAt: string;
 }
 
@@ -982,21 +882,14 @@ export interface SettingsContentPresetWorkshopService {
     clearAllActive: () => Promise<any>;
 }
 
-export interface SettingsApiPromptPageRendererDeps extends SettingsApiPromptService, SettingsAiInstructionPresetService {}
-
-export interface SettingsPromptEditorPageRendererDeps extends SettingsPromptEditorService {}
-
 export interface SettingsPageRendererGroupedDeps {
     common?: SettingsPageRendererCommonDeps;
     navigation?: SettingsPageRendererNavigationDeps;
     scroll?: SettingsPageRendererScrollDeps;
     feedback?: SettingsPageRendererFeedbackDeps;
-    home?: SettingsHomePageRendererDeps;
     appearance?: SettingsAppearancePageRendererDeps;
-    dataConfig?: SettingsDataConfigPageRendererDeps;
+    qqV2Presets?: SettingsQQV2PresetService;
     buttonStyle?: SettingsButtonStylePageRendererDeps;
-    apiPrompt?: SettingsApiPromptPageRendererDeps;
-    promptEditor?: SettingsPromptEditorPageRendererDeps;
     contentPresetWorkshop?: SettingsContentPresetWorkshopService;
 }
 
@@ -1016,12 +909,10 @@ export interface SettingsPageRenderers {
     pages: SettingsPageRegistry;
     renderHomePage(): void;
     renderAppearancePage(): void;
-    renderDatabasePage(): void;
+    renderApiPresetsPage(): void;
     renderButtonStylePage(): void;
-    renderAiInstructionPresetsPage(): void;
-    renderApiPromptConfigPage(): void;
-    renderPromptEditorPage(): void;
     renderBeautifyTemplatePage(): void;
+    renderAiInstructionPresetsPage(): void;
 }
 
 /**
@@ -1079,7 +970,6 @@ export interface PhoneBeautifyTemplatesModule {
     getBeautifyTemplateSourceMode(templateType: BeautifyTemplateType): BeautifySourceMode;
     setBeautifyTemplateSourceMode(templateType: BeautifyTemplateType, sourceMode: BeautifySourceMode): PhoneBeautifyTemplateSourceModeResult;
     getActiveBeautifyTemplateIdByType(templateType: BeautifyTemplateType, options?: { withFallback?: boolean; persist?: boolean }): string;
-    getActiveBeautifyTemplateIdsForSpecial(options?: { withFallback?: boolean; persist?: boolean }): Partial<Record<PhoneBeautifySpecialRendererKey, string>>;
     setActiveBeautifyTemplateIdByType(templateType: BeautifyTemplateType, templateId: string): PhoneBeautifyTemplateActivationResult;
     getBeautifyTemplateSourceModeRuntime(templateType: BeautifyTemplateType, options?: PhoneBeautifyTemplateSourceModeRuntimeOptions): PhoneBeautifyTemplateSourceModeRuntime;
     getBuiltinPhoneBeautifyTemplates(): PhoneBeautifyTemplate[];
@@ -1091,7 +981,6 @@ export interface PhoneBeautifyTemplatesModule {
     deletePhoneBeautifyUserTemplate(templateId: string): PhoneBeautifyTemplateBindingResult;
     exportPhoneBeautifyPack(options?: PhoneBeautifyTemplateExportOptions): PhoneBeautifyTemplateExportResult;
     importPhoneBeautifyPackFromData(input: string | object, options?: PhoneBeautifyTemplateImportOptions): PhoneBeautifyTemplateImportResult;
-    detectSpecialTemplateForTable(payload?: { sheetKey?: string; tableName?: string; headers?: string[] }): PhoneBeautifyTemplateMatchResult | null;
     detectGenericTemplateForTable(payload?: { sheetKey?: string; tableName?: string; headers?: string[] }): PhoneBeautifyTemplateMatchResult | null;
     bindSheetToBeautifyTemplate(sheetKey: string, templateId: string): PhoneBeautifyTemplateBindingResult;
     clearSheetBeautifyBinding(sheetKey: string): PhoneBeautifyTemplateBindingResult;

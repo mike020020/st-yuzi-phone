@@ -3,15 +3,6 @@ import {
     normalizeString,
 } from './core.js';
 
-export function inferSpecialRendererKeyByTableName(tableName) {
-    const name = normalizeString(tableName, 80);
-    if (!name) return '';
-
-    if (name.includes('消息') || name.includes('聊天')) return 'special_message';
-
-    return '';
-}
-
 export function scoreTemplateMatcher(matcher, tableName, headerSet) {
     const m = matcher || {};
     const normalizedTableName = normalizeString(tableName, 80);

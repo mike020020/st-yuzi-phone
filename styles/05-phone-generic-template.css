@@ -264,7 +264,6 @@
     border-radius: 0;
     background: transparent;
     box-shadow: none;
-    overflow: visible;
 }
 
 .phone-generic-root.phone-generic-template-scope[data-layout-list-item-mode="card"] .phone-generic-slot-list-item {
@@ -460,32 +459,6 @@
     position: sticky;
     top: 0;
     z-index: 16;
-    display: grid;
-    grid-template-columns: minmax(64px, auto) minmax(0, 1fr) minmax(64px, auto);
-    align-items: center;
-    column-gap: var(--_gt-gap-sm);
-    min-height: 56px;
-    padding: 10px var(--_gt-gap-lg) 10px;
-    padding-top: max(38px, calc(14px + env(safe-area-inset-top)));
-    box-sizing: border-box;
-}
-
-.phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav[data-generic-list-region="nav"]:not(.is-generic-delete-mode) {
-    --phone-generic-nav-side-reserve: 108px;
-    grid-template-columns:
-        minmax(var(--phone-generic-nav-side-reserve), 1fr)
-        minmax(0, max-content)
-        minmax(var(--phone-generic-nav-side-reserve), 1fr);
-}
-
-.phone-generic-root.phone-generic-template-scope .phone-nav-back {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    border-radius: 999px;
-    padding: 6px 10px;
-    transition: background 0.18s ease, color 0.18s ease;
 }
 
 .phone-generic-root.phone-generic-template-scope .phone-nav-back:hover {
@@ -493,110 +466,21 @@
     color: var(--_gt-accent-strong);
 }
 
-.phone-generic-root.phone-generic-template-scope .phone-nav-back svg {
-    width: 18px;
-    height: 18px;
-}
-
-.phone-generic-root.phone-generic-template-scope .phone-generic-title-navigation {
-    position: static;
-    display: grid;
-    grid-template-columns: 30px minmax(0, 1fr) 30px;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    margin-left: 0;
-}
-
-.phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav[data-generic-list-region="nav"]:not(.is-generic-delete-mode) .phone-generic-title-navigation {
-    grid-column: 2;
-    display: inline-grid;
-    grid-template-columns: 30px max-content 30px;
-    align-items: center;
-    gap: 4px;
-    width: fit-content;
-    max-width: none;
-    justify-self: center;
-}
-
-.phone-generic-root.phone-generic-template-scope .phone-generic-title-navigation.is-title-only {
-    grid-template-columns: minmax(0, 1fr);
-}
-
-.phone-generic-root.phone-generic-template-scope .phone-nav-title {
-    position: static;
-    flex: 1 1 auto;
-    min-width: 0;
-    margin: 0;
-    padding: 0 6px;
-    text-align: center;
-    font-size: var(--_gt-typo-nav-title-size);
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    pointer-events: none;
-}
-
-.phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav[data-generic-list-region="nav"]:not(.is-generic-delete-mode) .phone-generic-title-navigation > .phone-nav-title {
-    width: max-content;
-    min-width: max-content;
-    max-width: none;
-    padding: 0 2px;
-    overflow: visible;
-    text-overflow: clip;
-}
-
-.phone-generic-root.phone-generic-template-scope .phone-generic-nav-placeholder {
-    width: 64px;
-    min-width: 64px;
-    height: 1px;
-}
-
 .phone-generic-root.phone-generic-template-scope .phone-generic-table-navigation-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    border: 1px solid var(--_gt-action-btn-border);
-    border-radius: 999px;
-    background: var(--_gt-action-btn-bg);
     color: var(--_gt-muted-text);
-    font-size: 20px;
-    font-weight: 700;
-    line-height: 1;
-    cursor: pointer;
-    transition: border-color var(--_gt-motion-fast) ease, background var(--_gt-motion-fast) ease, color var(--_gt-motion-fast) ease, opacity var(--_gt-motion-fast) ease;
 }
 
 .phone-generic-root.phone-generic-template-scope .phone-generic-table-navigation-btn:hover,
 .phone-generic-root.phone-generic-template-scope .phone-generic-table-navigation-btn:focus-visible {
-    border-color: var(--_gt-accent-border);
     background: var(--_gt-accent-soft);
     color: var(--_gt-accent-strong);
 }
 
 .phone-generic-root.phone-generic-template-scope .phone-generic-table-navigation-btn:disabled,
 .phone-generic-root.phone-generic-template-scope .phone-generic-table-navigation-btn:disabled:hover {
-    border-color: var(--_gt-action-btn-border);
-    background: var(--_gt-action-btn-bg);
+    background: transparent;
     color: var(--_gt-muted-text);
-    cursor: not-allowed;
     opacity: 0.42;
-}
-
-.phone-generic-root.phone-generic-template-scope .phone-generic-nav-delete-actions {
-    display: inline-flex;
-    justify-self: end;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
-    min-width: 0;
-    max-width: 48%;
 }
 
 .phone-generic-root.phone-generic-template-scope .phone-generic-nav-delete-btn {
@@ -1250,37 +1134,6 @@
 }
 
 @media screen and (max-width: 640px) {
-    .phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav {
-        padding-left: var(--_gt-gap-md);
-        padding-right: var(--_gt-gap-md);
-        padding-top: max(42px, calc(18px + env(safe-area-inset-top)));
-    }
-
-    .phone-generic-root.phone-generic-template-scope .phone-generic-title-navigation {
-        gap: 4px;
-    }
-
-    .phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav.is-generic-delete-mode {
-        gap: 8px;
-    }
-
-    .phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav.is-generic-delete-mode .phone-nav-title {
-        padding: 0 4px;
-        font-size: calc(var(--_gt-typo-nav-title-size) - 1px);
-    }
-
-    .phone-generic-root.phone-generic-template-scope .phone-generic-nav-delete-actions {
-        gap: 4px;
-        max-width: 52%;
-    }
-
-    .phone-generic-root.phone-generic-template-scope .phone-generic-nav-delete-btn {
-        min-width: 34px;
-        min-height: 28px;
-        padding: 0 7px;
-        font-size: 10px;
-    }
-
     .phone-generic-root.phone-generic-template-scope .phone-generic-slot-body {
         padding: var(--_gt-gap-md);
         padding-bottom: calc(var(--_gt-gap-md) + 92px);
@@ -1401,21 +1254,6 @@
 }
 
 @media screen and (max-width: 520px) {
-    .phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav {
-        padding-left: 12px;
-        padding-right: 12px;
-    }
-
-    .phone-generic-root.phone-generic-template-scope .phone-nav-back {
-        padding: 6px 8px;
-    }
-
-    .phone-generic-root.phone-generic-template-scope .phone-nav-title {
-        text-align: center;
-        padding: 0 10px;
-        font-size: 15px;
-    }
-
     .phone-generic-root.phone-generic-template-scope .phone-generic-list-index {
         min-width: 28px;
     }
@@ -1427,15 +1265,6 @@
 }
 
 @media screen and (max-width: 420px) {
-    .phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav[data-generic-list-region="nav"]:not(.is-generic-delete-mode) {
-        --phone-generic-nav-side-reserve: 54px;
-        column-gap: 4px;
-    }
-
-    .phone-generic-root.phone-generic-template-scope .phone-nav-title {
-        font-size: 14px;
-    }
-
     .phone-generic-root.phone-generic-template-scope .phone-generic-slot-list-side {
         grid-template-columns: 1fr;
         align-items: stretch;
@@ -1447,29 +1276,15 @@
     }
 }
 
-@media screen and (max-width: 320px) {
-    .phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav[data-generic-list-region="nav"]:not(.is-generic-delete-mode) .phone-generic-title-navigation {
-        grid-template-columns: 26px max-content 26px;
-    }
-
-    .phone-generic-root.phone-generic-template-scope .phone-generic-slot-nav[data-generic-list-region="nav"]:not(.is-generic-delete-mode) .phone-generic-table-navigation-btn {
-        width: 26px;
-        height: 26px;
-        font-size: 18px;
-    }
-}
-
 .phone-generic-root.phone-generic-template-scope .phone-detail-pager-bar {
     position: relative;
     z-index: 2;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 18px;
     height: 0;
     padding: 0;
     margin: 0;
-    overflow: visible;
     pointer-events: none;
     background: transparent;
     border: 0;
@@ -1477,35 +1292,16 @@
 }
 
 .phone-generic-root.phone-generic-template-scope .phone-detail-pager-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    min-height: 28px;
-    border-radius: 999px;
-    border: 1px solid var(--_gt-action-btn-border);
-    background: var(--_gt-action-btn-bg);
     color: var(--_gt-action-btn-text);
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1;
-    cursor: pointer;
     user-select: none;
     pointer-events: auto;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
-    transition: border-color var(--_gt-motion-fast) ease, background var(--_gt-motion-fast) ease, color var(--_gt-motion-fast) ease, opacity var(--_gt-motion-fast) ease, box-shadow var(--_gt-motion-fast) ease;
 }
 
 .phone-generic-root.phone-generic-template-scope .phone-detail-pager-btn:hover:not(:disabled) {
-    border-color: var(--_gt-accent-border);
     background: var(--_gt-accent-soft);
     color: var(--_gt-accent-strong);
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--_gt-accent) 16%, transparent);
 }
 
 .phone-generic-root.phone-generic-template-scope .phone-detail-pager-btn:disabled {
     opacity: 0.42;
-    cursor: not-allowed;
 }

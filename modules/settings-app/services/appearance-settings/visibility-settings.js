@@ -11,6 +11,7 @@ import { escapeHtml, escapeHtmlAttr } from '../../../utils/dom-escape.js';
 import { Logger } from '../../../error-handler.js';
 import { showToast } from '../../ui/toast.js';
 import { VARIABLE_MANAGER_APP } from '../../../variable-manager/index.js';
+import { QQ_APP } from '../../../qq-v2/app-definition.js';
 import { TABLE_UPDATE_REVIEW_APP_ID, TABLE_UPDATE_REVIEW_APP_NAME } from '../../../table-update-review/constants.js';
 
 const logger = Logger.withScope({ scope: 'settings-app/services/appearance-settings/visibility-settings', feature: 'settings-app' });
@@ -74,6 +75,7 @@ export function renderHiddenTableAppsList(listEl) {
     const allItems = [
         { key: TABLE_UPDATE_REVIEW_APP_ID, name: TABLE_UPDATE_REVIEW_APP_NAME },
         { key: VARIABLE_MANAGER_APP.id, name: VARIABLE_MANAGER_APP.name },
+        { key: QQ_APP.id, name: QQ_APP.name },
         ...theaterItems,
         ...tableItems,
     ];

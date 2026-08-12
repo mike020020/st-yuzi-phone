@@ -17,13 +17,13 @@ export function buildHomeShellStyleText({
         styleChunks.push(bgStyle);
     }
 
-    styleChunks.push(`--phone-app-icon-size:${appIconSize}px`);
-    styleChunks.push(`--phone-app-icon-radius:${appIconRadius}px`);
-    styleChunks.push(`--phone-app-grid-columns:${appGridColumns}`);
-    styleChunks.push(`--phone-app-grid-gap:${appGridGap}px`);
-    styleChunks.push(`--phone-dock-icon-size:${dockIconSize}px`);
-    styleChunks.push(`--phone-home-app-label-color:${String(homeAppLabelColor || 'rgba(255, 255, 255, 0.96)')}`);
-    styleChunks.push(`--phone-home-app-label-shadow:${String(homeAppLabelShadow || '0 1px 3px rgba(0, 0, 0, 0.32)')}`);
+    styleChunks.push(`--yuzi-phone-home-app-icon-size:${appIconSize}px`);
+    styleChunks.push(`--yuzi-phone-home-app-icon-radius:${appIconRadius}px`);
+    styleChunks.push(`--yuzi-phone-home-grid-columns:${appGridColumns}`);
+    styleChunks.push(`--yuzi-phone-home-grid-column-gap:${appGridGap}px`);
+    styleChunks.push(`--yuzi-phone-home-dock-icon-size:${dockIconSize}px`);
+    styleChunks.push(`--yuzi-phone-home-app-label-color:${String(homeAppLabelColor || 'var(--yuzi-phone-home-app-label-color-on-dark)')}`);
+    styleChunks.push(`--yuzi-phone-home-app-label-shadow:${String(homeAppLabelShadow || 'var(--yuzi-phone-home-app-label-shadow-on-dark)')}`);
 
     return styleChunks.join('; ');
 }

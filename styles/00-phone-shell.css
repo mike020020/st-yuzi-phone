@@ -11,8 +11,8 @@
 .yuzi-phone-root .yuzi-phone-standalone {
     position: fixed;
     z-index: 8999;
-    width: 320px;
-    height: 640px;
+    width: var(--yuzi-phone-frame-reference-width);
+    height: var(--yuzi-phone-frame-reference-height);
     display: none;
     touch-action: auto;
     user-select: none;

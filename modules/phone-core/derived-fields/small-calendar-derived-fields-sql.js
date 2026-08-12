@@ -7,18 +7,6 @@ export const SMALL_CALENDAR_DERIVED_FIELDS_REQUIRED_COLUMNS = Object.freeze([
     'month_days',
 ]);
 
-function formatSqlStringLiteral(value) {
-    return `'${String(value).replaceAll("'", "''")}'`;
-}
-
-function buildRequiredColumnChecksSql() {
-    return SMALL_CALENDAR_DERIVED_FIELDS_REQUIRED_COLUMNS
-        .map((columnName) => (
-            `AND EXISTS (SELECT 1 FROM pragma_table_info(${formatSqlStringLiteral(SMALL_CALENDAR_DERIVED_FIELDS_TABLE)}) WHERE name = ${formatSqlStringLiteral(columnName)})`
-        ))
-        .join('\n    ');
-}
-
 const VALID_DATE_CONDITION = `date_text IS NOT NULL
     AND TRIM(date_text) <> ''
     AND TRIM(date_text) GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
@@ -36,15 +24,6 @@ const WEEKDAY_CASE_SQL = `CASE strftime('%w', date(TRIM(date_text)))
     END`;
 
 const MONTH_DAYS_SQL = `CAST(strftime('%d', date(TRIM(date_text), 'start of month', '+1 month', '-1 day')) AS INTEGER)`;
-
-export function buildSmallCalendarDerivedFieldsAvailabilitySql() {
-    return `SELECT CASE
-    WHEN EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ${formatSqlStringLiteral(SMALL_CALENDAR_DERIVED_FIELDS_TABLE)})
-    ${buildRequiredColumnChecksSql()}
-    THEN 1
-    ELSE 0
-END AS is_available`;
-}
 
 export function buildSmallCalendarDerivedFieldsSignatureSql() {
     return `WITH
@@ -101,7 +80,7 @@ export function buildSmallCalendarDerivedFieldsUpdateSql() {
     return `WITH
 computed_calendar_fields AS (
     SELECT
-        row_id,
+        row_id AS target_row_id,
         ${WEEKDAY_CASE_SQL} AS new_weekday_text,
         ${MONTH_DAYS_SQL} AS new_month_days
     FROM ${SMALL_CALENDAR_DERIVED_FIELDS_TABLE}
@@ -109,17 +88,10 @@ computed_calendar_fields AS (
 )
 UPDATE ${SMALL_CALENDAR_DERIVED_FIELDS_TABLE}
 SET
-    weekday_text = (
-        SELECT new_weekday_text
-        FROM computed_calendar_fields
-        WHERE computed_calendar_fields.row_id = ${SMALL_CALENDAR_DERIVED_FIELDS_TABLE}.row_id
-    ),
-    month_days = (
-        SELECT new_month_days
-        FROM computed_calendar_fields
-        WHERE computed_calendar_fields.row_id = ${SMALL_CALENDAR_DERIVED_FIELDS_TABLE}.row_id
-    )
-WHERE row_id IN (SELECT row_id FROM computed_calendar_fields)
-AND (COALESCE(weekday_text, '') <> COALESCE((SELECT new_weekday_text FROM computed_calendar_fields WHERE computed_calendar_fields.row_id = ${SMALL_CALENDAR_DERIVED_FIELDS_TABLE}.row_id), '')
-    OR COALESCE(CAST(month_days AS TEXT), '') <> COALESCE(CAST((SELECT new_month_days FROM computed_calendar_fields WHERE computed_calendar_fields.row_id = ${SMALL_CALENDAR_DERIVED_FIELDS_TABLE}.row_id) AS TEXT), ''))`;
+    weekday_text = computed_calendar_fields.new_weekday_text,
+    month_days = computed_calendar_fields.new_month_days
+FROM computed_calendar_fields
+WHERE row_id = computed_calendar_fields.target_row_id
+AND (COALESCE(weekday_text, '') <> COALESCE(computed_calendar_fields.new_weekday_text, '')
+    OR COALESCE(CAST(month_days AS TEXT), '') <> COALESCE(CAST(computed_calendar_fields.new_month_days AS TEXT), ''))`;
 }

@@ -7,87 +7,10 @@
 
 import {
     PHONE_TEMPLATE_TYPE_GENERIC,
-    PHONE_TEMPLATE_TYPE_SPECIAL,
 } from '../constants.js';
-import {
-    DEFAULT_SPECIAL_FIELD_BINDINGS_BY_RENDERER,
-    DEFAULT_SPECIAL_STYLE_OPTIONS_BY_RENDERER,
-    SPECIAL_MESSAGE_DEFAULT_STYLE_TOKENS,
-} from './special-field-bindings.js';
 import { DEFAULT_GENERIC_FIELD_BINDINGS } from './generic-field-bindings.js';
 
 export const BUILTIN_TEMPLATES = Object.freeze([
-    {
-        id: 'builtin.special.message.v1',
-        name: '默认-消息记录表',
-        templateType: PHONE_TEMPLATE_TYPE_SPECIAL,
-        source: 'builtin',
-        readOnly: true,
-        exportable: true,
-        enabled: true,
-        matcher: {
-            tableNameExact: ['消息记录表'],
-            tableNameIncludes: ['消息', '聊天'],
-            requiredHeaders: ['会话ID', '发送者', '消息内容'],
-            optionalHeaders: ['会话标题', '消息发送时间', '消息状态', '聊天对象', '请求ID', '回复到消息ID', '图片描述', '视频描述'],
-            minScore: 70,
-        },
-        render: {
-            rendererKey: 'special_message',
-            fieldBindings: {
-                ...DEFAULT_SPECIAL_FIELD_BINDINGS_BY_RENDERER.special_message,
-            },
-            styleOptions: {
-                ...DEFAULT_SPECIAL_STYLE_OPTIONS_BY_RENDERER.special_message,
-            },
-            styleTokens: {
-                ...SPECIAL_MESSAGE_DEFAULT_STYLE_TOKENS,
-            },
-            structureOptions: {
-                conversationList: {
-                    showSubtitle: true,
-                    showLastMessage: true,
-                },
-                detailHeader: {
-                    showSubtitle: true,
-                },
-                composeBar: {
-                    showStatusText: true,
-                    showRetryButton: true,
-                    showTemplateNote: true,
-                },
-            },
-            typographyOptions: {
-                navTitleFontSize: '16px',
-                navTitleFontWeight: '700',
-                conversationTitleFontSize: '14px',
-                conversationTitleFontWeight: '600',
-                conversationPreviewFontSize: '12px',
-                conversationMetaFontSize: '11px',
-                messageFontSize: '14px',
-                messageLineHeight: '1.6',
-                messageMetaFontSize: '11px',
-                composeStatusFontSize: '11px',
-            },
-            motionOptions: {
-                fastDuration: '0.15s',
-                normalDuration: '0.25s',
-                hoverLiftY: '-1px',
-            },
-            customCss: [
-                '.phone-special-message .phone-nav-bar { backdrop-filter: blur(6px); }',
-                '.phone-special-message .phone-special-conversation-item { border-radius: var(--sp-radius-sm, 10px); margin-bottom: 2px; }',
-                '.phone-special-message .phone-special-message-item.media-row .phone-special-message-bubble { font-style: italic; }',
-                '.phone-special-message .phone-special-media-preview-modal { max-width: 92%; }',
-            ].join('\n'),
-        },
-        meta: {
-            author: 'YuziPhone',
-            description: '内置默认专属模板：消息记录表（补齐聊天对象/请求链路字段，并接入结构/排版/动效配置）',
-            tags: ['builtin', 'special', 'message', 'structure-runtime'],
-            updatedAt: 1760000000000,
-        },
-    },
     {
         id: 'builtin.generic.table.v1',
         name: '默认-通用表格',

@@ -1,13 +1,8 @@
 import {
     buildAppearancePageHtml,
-    buildApiPromptConfigPageHtml,
-    buildAiInstructionPresetsPageHtml,
     buildBeautifyTemplatePageHtml,
     buildButtonStylePageHtml,
-    buildDatabasePageHtml,
-    buildDatabaseTableChecklistHtml,
     buildSettingsHomePageHtml,
-    buildPromptEditorPageHtml,
 } from './page-builders.js';
 import {
     SETTINGS_ENTRY_META,
@@ -35,11 +30,6 @@ export {
     buildShellRegionHtml,
     buildSettingsHomePageHtml,
     buildAppearancePageHtml,
-    buildDatabaseTableChecklistHtml,
-    buildDatabasePageHtml,
     buildButtonStylePageHtml,
-    buildPromptEditorPageHtml,
-    buildApiPromptConfigPageHtml,
-    buildAiInstructionPresetsPageHtml,
     buildBeautifyTemplatePageHtml,
 };

@@ -1,7 +1,7 @@
 /* ========================================
    玉子的手机 — Phone Base Modern Aggregator
    作用：只聚合 `styles/phone-base/` 下的现代基础层。
-   顶层入口 [`style.css`](style.css:1) 负责 shell / nav / special / generic 的总装配，
+   顶层入口 [`style.css`](style.css:1) 负责 shell / nav / generic / theater / QQ 的总装配，
    本文件不再承担 legacy CSS 的默认加载职责。
 
    Active modern layers
@@ -30,3 +30,4 @@
 /* patches / dialog helpers */
 @import url('./phone-base/10-scroll-generic-patches.css');
 @import url('./phone-base/11-api-dialog-worldbook.css');
+@import url('./phone-base/12-qq-app.css');

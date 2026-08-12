@@ -1,16 +1,22 @@
 import { Logger } from '../../error-handler.js';
-import { executeSqlMutationViaApi, probeSqliteCapabilityViaApi, querySqlViaApi } from '../data-api.js';
-import { subscribeTableUpdate } from '../callbacks.js';
+import { executeSqlMutationViaApi, querySqlViaApi, queryTableRowsViaApi } from '../data-api.js';
+import { subscribeTableFillStart, subscribeTableUpdate } from '../callbacks.js';
 import { createDerivedFieldService, readDerivedField } from './derived-field-service.js';
 import {
+    CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS,
     CHRONICLE_TODAY_RELATION_ANCHOR_TABLES,
-    buildChronicleTodayRelationSchemaGateSql,
+    CHRONICLE_TODAY_RELATION_REQUIRED_COLUMNS,
     buildChronicleTodayRelationSignatureSql,
     buildChronicleTodayRelationUpdateSql,
 } from './chronicle-today-relation-sql.js';
 
-export const ANCHOR_TABLE_SQL = buildChronicleTodayRelationSchemaGateSql();
 export { CHRONICLE_TODAY_RELATION_ANCHOR_TABLES };
+
+const STRUCTURAL_QUERY_FAILURE_CODES = new Set([
+    'alias_conflict',
+    'table_not_found',
+    'column_not_resolved',
+]);
 
 const defaultLogger = Logger.withScope({
     scope: 'phone-core/derived-fields/chronicle-today-relation',
@@ -20,8 +26,9 @@ const defaultLogger = Logger.withScope({
 const defaultDeps = Object.freeze({
     setTimeout: (...args) => globalThis.setTimeout(...args),
     clearTimeout: (...args) => globalThis.clearTimeout(...args),
-    subscribe: subscribeTableUpdate,
-    probe: probeSqliteCapabilityViaApi,
+    subscribeUpdate: subscribeTableUpdate,
+    subscribeFillStart: subscribeTableFillStart,
+    queryTableRows: queryTableRowsViaApi,
     query: querySqlViaApi,
     mutation: executeSqlMutationViaApi,
     logger: defaultLogger,
@@ -51,33 +58,67 @@ function normalizeSignature(result) {
     };
 }
 
+function buildSchemaBlockedResult(failures) {
+    const details = failures.map(({ tableName, result }) => ({
+        tableName,
+        code: result?.code || 'query_failed',
+        message: result?.message || '未知结构错误',
+    }));
+    const key = details.map((item) => `${item.tableName}:${item.code}:${item.message}`).join('|');
+    return {
+        status: 'completed',
+        warning: {
+            key,
+            action: 'chronicle-today-relation.schema-blocked',
+            message: '当前纪要表缺少相关表或字段，已跳过“与今天的关系”自动计算，不影响其他表格功能',
+            context: { failures: details },
+        },
+    };
+}
+
+function classifyContextQueryFailure(tableName, result) {
+    if (result?.code === 'runtime_not_ready') return { status: 'runtime-not-ready' };
+    if (STRUCTURAL_QUERY_FAILURE_CODES.has(result?.code)) {
+        return buildSchemaBlockedResult([{ tableName, result }]);
+    }
+    return { status: 'query-failed', result };
+}
+
+export async function resolveChronicleTodayRelationContext(deps, runtime = {}) {
+    const chronicle = await deps.queryTableRows({
+        tableName: 'chronicle',
+        columns: CHRONICLE_TODAY_RELATION_REQUIRED_COLUMNS,
+        limit: 1,
+    });
+    if (runtime.shouldPause?.()) return { status: 'fill-active' };
+    if (!chronicle?.ok) return classifyContextQueryFailure('chronicle', chronicle);
+
+    const anchorFailures = [];
+    for (const anchorTable of CHRONICLE_TODAY_RELATION_ANCHOR_TABLES) {
+        const result = await deps.queryTableRows({
+            tableName: anchorTable,
+            columns: CHRONICLE_TODAY_RELATION_ANCHOR_REQUIRED_COLUMNS,
+            limit: 1,
+        });
+        if (runtime.shouldPause?.()) return { status: 'fill-active' };
+        if (result?.ok) return { status: 'ready', context: { anchorTable } };
+        if (result?.code === 'runtime_not_ready') return { status: 'runtime-not-ready' };
+        if (!STRUCTURAL_QUERY_FAILURE_CODES.has(result?.code)) {
+            return { status: 'query-failed', result };
+        }
+        anchorFailures.push({ tableName: anchorTable, result });
+    }
+
+    return buildSchemaBlockedResult(anchorFailures);
+}
+
 const service = createDerivedFieldService({
     actionPrefix: 'chronicle-today-relation',
     defaultDeps,
     maxMutationAttempts: 2,
     mutationRetryDelayMs: 2000,
     maxSignatureRetry: 1,
-    buildContextSql: () => ANCHOR_TABLE_SQL,
-    normalizeContext(result) {
-        const schemaOk = Number(readDerivedField(result, 'schema_ok', 0)) === 1;
-        const anchorTable = normalizeText(readDerivedField(result, 'anchor_table', 1));
-        const missingRequirements = normalizeText(readDerivedField(result, 'missing_requirements', 2));
-        const fingerprint = normalizeText(readDerivedField(result, 'schema_fingerprint', 3));
-
-        if (!schemaOk || !anchorTable) {
-            return {
-                status: 'completed',
-                warning: {
-                    key: fingerprint || missingRequirements || 'schema-blocked',
-                    action: 'chronicle-today-relation.schema-blocked',
-                    message: '当前纪要表缺少相关字段，已跳过“与今天的关系”自动计算，不影响其他表格功能',
-                    context: { missingRequirements },
-                },
-            };
-        }
-
-        return { status: 'ready', context: { anchorTable } };
-    },
+    resolveContext: resolveChronicleTodayRelationContext,
     buildSignatureSql: (context) => buildChronicleTodayRelationSignatureSql(context.anchorTable),
     normalizeSignature,
     buildMutationSql: (context) => buildChronicleTodayRelationUpdateSql(context.anchorTable),
@@ -94,14 +135,13 @@ const service = createDerivedFieldService({
         };
     },
     messages: {
-        contextQueryFailed: '纪要表 schema gate 查询失败',
+        contextQueryFailed: '纪要表结构检查查询失败',
         signatureQueryFailed: '纪要表“与今天的关系”输入签名查询失败',
         mutationFailed: '纪要表“与今天的关系”SQL 批量写入未确认成功',
         mutationUnconfirmed: '纪要表派生写入返回成功，但写后仍存在待更新行',
         mutationCircuitOpen: '纪要表同一业务输入已连续写入失败两次，已暂停继续写入，等待时间、聊天或启用状态变化',
         sourceChanged: '纪要表派生写入期间源数据发生变化，将进行一次有界签名重跑',
         signatureRetryExhausted: '纪要表“与今天的关系”未能在有界重跑内确认源数据稳定',
-        probeFailed: '纪要 SQLite 能力探测失败，派生字段本轮跳过',
         runError: '纪要表“与今天的关系”SQL 派生异常',
     },
 });

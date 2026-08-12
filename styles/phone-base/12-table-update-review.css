@@ -60,4 +60,14 @@
 #yuzi-phone-standalone .tur-field-arrow { color: var(--tur-muted); }
 #yuzi-phone-standalone .tur-field-after { color: var(--tur-accent); }
 #yuzi-phone-standalone .tur-empty { padding: 18px 14px; color: var(--tur-muted); text-align: center; font-size: 13px; line-height: 1.5; }
-@media (max-width: 420px) { #yuzi-phone-standalone .tur-summary, #yuzi-phone-standalone .tur-table-header { flex-direction: column; align-items: stretch; } #yuzi-phone-standalone .tur-metrics { justify-content: flex-start; } }
+@container yuzi-phone-screen (max-width: 420px) {
+    #yuzi-phone-standalone .tur-summary,
+    #yuzi-phone-standalone .tur-table-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #yuzi-phone-standalone .tur-metrics {
+        justify-content: flex-start;
+    }
+}

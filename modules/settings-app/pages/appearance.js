@@ -2,6 +2,7 @@ import { buildAppearancePageHtml } from '../layout/frame.js';
 import { downloadTextFile } from '../services/media-upload.js';
 import { showConfirmDialog } from '../ui/confirm-dialog.js';
 import { escapeHtml, escapeHtmlAttr } from '../../utils/dom-escape.js';
+import { defaultSettings } from '../../settings.js';
 
 // Kept at module scope so a full appearance-page rerender can prefill the repository UI before IndexedDB finishes listing packs.
 // Repository structure changes must invalidate it before refreshRepositoryList() to avoid briefly showing removed or missing packs.
@@ -411,11 +412,11 @@ export function renderAppearancePage(ctx) {
     const setupPhoneThemeModeSettings = appearancePageService.setupPhoneThemeModeSettings;
 
     const layoutValues = {
-        appGridColumns: getLayoutValue('appGridColumns', 4),
-        appIconSize: getLayoutValue('appIconSize', 60),
-        appIconRadius: getLayoutValue('appIconRadius', 14),
-        appGridGap: getLayoutValue('appGridGap', 12),
-        dockIconSize: getLayoutValue('dockIconSize', 48),
+        appGridColumns: getLayoutValue('appGridColumns', defaultSettings.appGridColumns),
+        appIconSize: getLayoutValue('appIconSize', defaultSettings.appIconSize),
+        appIconRadius: getLayoutValue('appIconRadius', defaultSettings.appIconRadius),
+        appGridGap: getLayoutValue('appGridGap', defaultSettings.appGridGap),
+        dockIconSize: getLayoutValue('dockIconSize', defaultSettings.dockIconSize),
     };
 
     container.innerHTML = buildAppearancePageHtml({

@@ -1,0 +1,62 @@
+{
+  "format": "yuzi-beautify-workflow",
+  "version": 1,
+  "projectId": "yuzi-example-character-table",
+  "phase": "confirmed",
+  "tables": {
+    "originalFile": "tables/original/imported.json",
+    "sourceDir": "tables/source",
+    "generatedFile": "tables/generated/tables.json",
+    "originalSha256": "21b183981e774f5ea6cfa93848d13265d4b37e5bf174a3bd1b24d5c3d86929c4",
+    "generatedSha256": "ce512bf0d22e649e3bd96cfe54dcb15abb62d973d8bcf6aef60db6438a28bd94"
+  },
+  "queue": [
+    {
+      "sheetKey": "sheet_characters",
+      "tableName": "角色表",
+      "headers": [
+        "姓名",
+        "状态"
+      ],
+      "schemaHash": "be1fdc172ac1485c60fdc6d90d3da7ee0df96f667bd80c1479b28b899703ef11",
+      "status": "completed",
+      "itemId": "character-table",
+      "fields": [
+        "姓名",
+        "状态"
+      ],
+      "skipReason": null,
+      "completedAt": "2026-07-26T19:00:14.390Z",
+      "preview": {
+        "status": "passed",
+        "recordedAt": "2026-07-26T19:00:14.391Z",
+        "notes": "仓库示例已通过制作期模拟单元测试"
+      }
+    },
+    {
+      "sheetKey": "sheet_messages",
+      "tableName": "消息记录表",
+      "headers": [
+        "发送者",
+        "内容"
+      ],
+      "schemaHash": "d31d56dac65c1b30d54d01a6cd968d6f1f08666ef7f46d14c9a2ebdbadcf00e5",
+      "status": "skipped",
+      "itemId": null,
+      "fields": [],
+      "skipReason": "仓库基础示例只演示角色表，用户已明确跳过消息记录表",
+      "completedAt": null,
+      "preview": {
+        "status": "skipped",
+        "recordedAt": "2026-07-26T19:00:16.516Z",
+        "notes": "该表由用户明确跳过制作"
+      }
+    }
+  ],
+  "currentTable": null,
+  "confirmation": {
+    "confirmed": true,
+    "confirmedAt": "2026-07-26T19:00:18.718Z",
+    "summaryHash": "9b1098d6f6c6b32d599bb91332359fa441a6e5e5b93e7442e509383b8802cb17"
+  }
+}

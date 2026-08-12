@@ -4,6 +4,15 @@ import {
     normalizeCoverage,
     normalizeCropRect,
 } from './core.js';
+import {
+    getPhoneTemporaryLayerHost,
+    mountPhoneTemporaryLayer,
+} from '../../../phone-core/shell-temporary-layer-host.js';
+
+export function mountPhoneImageCropOverlay(overlay, onClose = null) {
+    if (!getPhoneTemporaryLayerHost()) return null;
+    return mountPhoneTemporaryLayer(overlay, onClose);
+}
 
 function buildInitialCropRect(preset, naturalWidth, naturalHeight, coverage = 0.78) {
     const safePreset = String(preset || '').trim();
@@ -325,8 +334,12 @@ export async function openImageCropDialog(rawDataUrl, options = {}) {
     let displayRect = null;
     let dragState = null;
     let resolvePromise;
+    let isClosed = false;
+    let unmountOverlay = () => {};
+    const isDialogActive = () => !isClosed && !runtime.isDisposed();
 
     const syncDisplayRect = () => {
+        if (!isDialogActive()) return;
         if (!(stageEl instanceof HTMLElement) || !(imageEl instanceof HTMLImageElement)) return;
         const stageBox = stageEl.getBoundingClientRect();
         const imageBox = imageEl.getBoundingClientRect();
@@ -342,6 +355,7 @@ export async function openImageCropDialog(rawDataUrl, options = {}) {
     };
 
     const renderCropBox = () => {
+        if (!isDialogActive()) return;
         if (!(boxEl instanceof HTMLElement) || !(metaEl instanceof HTMLElement) || !displayRect) return;
 
         boxEl.style.left = `${displayRect.left + cropRect.x * displayRect.width}px`;
@@ -360,6 +374,7 @@ export async function openImageCropDialog(rawDataUrl, options = {}) {
     };
 
     const startDragging = (type, event) => {
+        if (!isDialogActive()) return;
         if (!displayRect) return;
         dragState = {
             type,
@@ -372,6 +387,7 @@ export async function openImageCropDialog(rawDataUrl, options = {}) {
     };
 
     const handlePointerMove = (event) => {
+        if (!isDialogActive()) return;
         if (!dragState || !displayRect) return;
         const dx = (event.clientX - dragState.startX) / Math.max(1, displayRect.width);
         const dy = (event.clientY - dragState.startY) / Math.max(1, displayRect.height);
@@ -380,19 +396,21 @@ export async function openImageCropDialog(rawDataUrl, options = {}) {
     };
 
     const closeDialog = (result) => {
+        if (isClosed) return;
+        isClosed = true;
         stopDragging();
         runtime.cleanupAll();
+        unmountOverlay();
 
         overlay.classList.remove('is-visible');
-        runtime.setTimeout(() => {
-            try {
-                overlay.remove();
-            } catch {}
-        }, 180);
+        try {
+            overlay.remove();
+        } catch {}
         resolvePromise(result);
     };
 
     const handleKeydown = (event) => {
+        if (!isDialogActive()) return;
         if (event.key === 'Escape') {
             event.preventDefault();
             closeDialog(null);
@@ -415,12 +433,14 @@ export async function openImageCropDialog(rawDataUrl, options = {}) {
     });
 
     runtime.addEventListener(resetBtn, 'click', () => {
+        if (!isDialogActive()) return;
         cropRect = buildInitialCropRect(preset, naturalWidth, naturalHeight, initialCoverage);
         renderCropBox();
     });
 
     if (fullBtn) {
         runtime.addEventListener(fullBtn, 'click', () => {
+            if (!isDialogActive()) return;
             cropRect = normalizeCropRect({ x: 0, y: 0, w: 1, h: 1 }, constraints);
             renderCropBox();
         });
@@ -434,6 +454,7 @@ export async function openImageCropDialog(rawDataUrl, options = {}) {
     });
 
     runtime.addEventListener(confirmBtn, 'click', () => {
+        if (!isDialogActive()) return;
         try {
             const croppedDataUrl = buildCropDataUrl(sourceImage, cropRect);
             closeDialog(croppedDataUrl);
@@ -448,17 +469,31 @@ export async function openImageCropDialog(rawDataUrl, options = {}) {
 
     if (runtime.isDisposed()) return null;
 
-    document.body.appendChild(overlay);
+    unmountOverlay = mountPhoneImageCropOverlay(overlay, () => {
+        if (!isClosed) closeDialog(null);
+    });
+    if (!unmountOverlay) {
+        runtime.cleanupAll();
+        return null;
+    }
+
     runtime.addEventListener(window, 'pointermove', handlePointerMove);
     runtime.addEventListener(window, 'pointerup', stopDragging);
     runtime.addEventListener(window, 'keydown', handleKeydown);
     runtime.addEventListener(window, 'resize', syncDisplayRect);
-    runtime.registerCleanup(() => overlay.remove());
+    runtime.registerCleanup(() => {
+        unmountOverlay();
+        overlay.remove();
+    });
 
     runtime.requestAnimationFrame(() => {
+        if (!isDialogActive()) return;
         overlay.classList.add('is-visible');
         syncDisplayRect();
-        runtime.setTimeout(syncDisplayRect, 30);
+        runtime.setTimeout(() => {
+            if (!isDialogActive()) return;
+            syncDisplayRect();
+        }, 30);
     });
 
     if (imageEl instanceof HTMLImageElement) {
@@ -466,8 +501,12 @@ export async function openImageCropDialog(rawDataUrl, options = {}) {
             runtime.requestAnimationFrame(syncDisplayRect);
         } else {
             runtime.addEventListener(imageEl, 'load', () => {
+                if (!isDialogActive()) return;
                 runtime.requestAnimationFrame(syncDisplayRect);
-                runtime.setTimeout(syncDisplayRect, 30);
+                runtime.setTimeout(() => {
+                    if (!isDialogActive()) return;
+                    syncDisplayRect();
+                }, 30);
             }, { once: true });
         }
     }

@@ -4,6 +4,9 @@ import { getPhoneCoreState } from './state.js';
 
 const logger = Logger.withScope({ scope: 'phone-core/callbacks', feature: 'callbacks' });
 const tableUpdateSubscribers = new Set();
+const tableFillStartSubscribers = new Set();
+let registeredTableFillStartApi = null;
+let registeredTableFillStartNativeCallback = null;
 let viewingSheetOwnerCounter = 0;
 let activeViewingSheetOwner = null;
 
@@ -23,6 +26,20 @@ function dispatchTableUpdateToSubscribers(newData) {
             logger.warn({
                 action: 'table-update.subscriber-error',
                 message: '表格更新订阅回调执行失败',
+                error,
+            });
+        }
+    }
+}
+
+function dispatchTableFillStartToSubscribers() {
+    for (const subscriber of Array.from(tableFillStartSubscribers)) {
+        try {
+            subscriber();
+        } catch (error) {
+            logger.warn({
+                action: 'table-fill-start.subscriber-error',
+                message: '填表开始订阅回调执行失败',
                 error,
             });
         }
@@ -149,6 +166,78 @@ export function unregisterTableUpdateListener() {
 }
 registerTableUpdateListener.unsubscribe = null;
 
+function ensureTableFillStartNativeListener() {
+    const state = getPhoneCoreState();
+    const api = getDB();
+    if (registeredTableFillStartNativeCallback && registeredTableFillStartApi === api) {
+        state.registeredTableFillStartCallback = registeredTableFillStartNativeCallback;
+        return true;
+    }
+    if (!api || typeof api.registerTableFillStartCallback !== 'function') {
+        logger.debug({
+            action: 'table-fill-start.register',
+            message: '填表开始回调API不可用（可选 API 缺失，已降级）',
+        });
+        return false;
+    }
+
+    const nativeCallback = () => dispatchTableFillStartToSubscribers();
+
+    try {
+        registeredTableFillStartApi = api;
+        registeredTableFillStartNativeCallback = nativeCallback;
+        state.registeredTableFillStartCallback = nativeCallback;
+        api.registerTableFillStartCallback(nativeCallback);
+        logger.debug({
+            action: 'table-fill-start.register',
+            message: '填表开始底层回调已注册',
+        });
+        return true;
+    } catch (error) {
+        logger.warn({
+            action: 'table-fill-start.register',
+            message: '注册填表开始底层回调失败',
+            error,
+        });
+        registeredTableFillStartApi = null;
+        registeredTableFillStartNativeCallback = null;
+        clearRegisteredTableFillStartCallback(state);
+        return false;
+    }
+}
+
+export function subscribeTableFillStart(callback) {
+    if (typeof callback !== 'function') {
+        logger.warn({
+            action: 'table-fill-start.subscribe',
+            message: '填表开始订阅失败：回调必须是函数',
+        });
+        return null;
+    }
+
+    tableFillStartSubscribers.add(callback);
+    const registered = ensureTableFillStartNativeListener();
+    if (!registered) {
+        tableFillStartSubscribers.delete(callback);
+        return null;
+    }
+
+    logger.debug({
+        action: 'table-fill-start.subscribe',
+        message: '填表开始订阅已注册',
+        context: { subscriberCount: tableFillStartSubscribers.size },
+    });
+
+    return () => {
+        tableFillStartSubscribers.delete(callback);
+        logger.debug({
+            action: 'table-fill-start.unsubscribe',
+            message: '填表开始订阅已移除',
+            context: { subscriberCount: tableFillStartSubscribers.size },
+        });
+    };
+}
+
 export function registerTableFillStartListener(callback) {
     if (typeof callback !== 'function') {
         logger.warn({
@@ -158,44 +247,28 @@ export function registerTableFillStartListener(callback) {
         return false;
     }
 
-    const api = getDB();
-    if (!api || typeof api.registerTableFillStartCallback !== 'function') {
-        logger.warn({
-            action: 'table-fill-start.register',
-            message: '填表开始回调API不可用',
-        });
-        return false;
+    if (typeof registerTableFillStartListener.unsubscribe === 'function') {
+        registerTableFillStartListener.unsubscribe();
+        registerTableFillStartListener.unsubscribe = null;
     }
 
-    unregisterTableFillStartListener();
-
-    try {
-        const state = getPhoneCoreState();
-        state.registeredTableFillStartCallback = callback;
-        api.registerTableFillStartCallback(callback);
-        logger.debug({
-            action: 'table-fill-start.register',
-            message: '填表开始回调已注册',
-        });
-        return true;
-    } catch (error) {
-        logger.warn({
-            action: 'table-fill-start.register',
-            message: '注册填表开始回调失败',
-            error,
-        });
-        clearRegisteredTableFillStartCallback();
-        return false;
-    }
+    const unsubscribe = subscribeTableFillStart(callback);
+    registerTableFillStartListener.unsubscribe = unsubscribe;
+    return tableFillStartSubscribers.has(callback);
 }
 
 export function unregisterTableFillStartListener() {
     const api = getDB();
     const state = getPhoneCoreState();
-    const callback = state.registeredTableFillStartCallback;
+    const callback = state.registeredTableFillStartCallback || registeredTableFillStartNativeCallback;
+
+    if (typeof registerTableFillStartListener.unsubscribe === 'function') {
+        registerTableFillStartListener.unsubscribe();
+        registerTableFillStartListener.unsubscribe = null;
+    }
 
     if (!api || typeof api.unregisterTableFillStartCallback !== 'function') {
-        clearRegisteredTableFillStartCallback(state);
+        // 8.9.1 只提供注册接口；保留唯一 native dispatcher，避免再次注册造成重复通知。
         return;
     }
 
@@ -203,6 +276,9 @@ export function unregisterTableFillStartListener() {
 
     try {
         api.unregisterTableFillStartCallback(callback);
+        clearRegisteredTableFillStartCallback(state);
+        registeredTableFillStartApi = null;
+        registeredTableFillStartNativeCallback = null;
         logger.debug({
             action: 'table-fill-start.unregister',
             message: '填表开始回调已注销',
@@ -214,8 +290,8 @@ export function unregisterTableFillStartListener() {
             error,
         });
     }
-    clearRegisteredTableFillStartCallback(state);
 }
+registerTableFillStartListener.unsubscribe = null;
 
 export function setCurrentViewingSheet(sheetKey) {
     const normalizedSheetKey = String(sheetKey ?? '').trim();

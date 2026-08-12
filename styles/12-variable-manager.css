@@ -36,7 +36,6 @@
 }
 
 .vm-navbar.phone-nav-bar {
-    --yuzi-phone-nav-side-safe-width: clamp(98px, 28vw, 124px);
     background: var(--vm-surface-soft);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
@@ -47,8 +46,6 @@
 .vm-navbar .phone-nav-back {
     color: var(--vm-accent);
     background: transparent;
-    font-weight: 500;
-    gap: 4px;
 }
 
 .vm-navbar .phone-nav-back:hover,
@@ -60,12 +57,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    min-width: 0;
+    max-width: 100%;
     gap: 6px;
     color: var(--vm-text-primary);
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.1px;
     pointer-events: none;
+}
+
+.vm-nav-title-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vm-mvu-badge {
@@ -86,8 +89,8 @@
 .vm-nav-right-group {
     display: inline-flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 8px;
-    margin-left: auto;
     flex-shrink: 0;
     min-width: 0;
 }
@@ -125,6 +128,12 @@
 
 .vm-nav-refresh:active {
     transform: scale(0.96);
+}
+
+@container yuzi-phone-screen (max-width: 300px) {
+    .vm-floor-label {
+        display: none;
+    }
 }
 
 .vm-body.phone-app-body {
@@ -628,7 +637,7 @@
     justify-content: space-between;
     gap: 12px;
     padding: 12px 14px max(12px, env(safe-area-inset-bottom));
-    background: var(--vm-surface-soft);
+    background: var(--vm-surface-strong);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     border-top: 1px solid var(--vm-border);

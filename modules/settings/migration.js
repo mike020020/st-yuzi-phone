@@ -5,6 +5,7 @@ export function migrateLegacyPhoneSettingsWith(options = {}) {
         getContext,
         extensionName,
         defaultSettings,
+        removedSettingKeys = [],
         clone,
         validateSettings,
         showNotification,
@@ -16,13 +17,23 @@ export function migrateLegacyPhoneSettingsWith(options = {}) {
         return;
     }
 
-    const current = ctx.extensionSettings[extensionName];
-    if (current && typeof current === 'object' && Object.keys(current).length > 0) {
-        Logger.info('[玉子手机] 设置已存在，跳过迁移');
-        return;
-    }
-
     try {
+        const current = ctx.extensionSettings[extensionName];
+        if (current && typeof current === 'object' && Object.keys(current).length > 0) {
+            const hasRemovedSettings = Array.from(removedSettingKeys).some((key) => (
+                Object.prototype.hasOwnProperty.call(current, key)
+            ));
+            if (!hasRemovedSettings) {
+                Logger.info('[玉子手机] 设置已存在，跳过迁移');
+                return;
+            }
+
+            ctx.extensionSettings[extensionName] = validateSettings(current);
+            ctx.saveSettingsDebounced?.();
+            Logger.info('[玉子手机] 已清理废弃设置');
+            return;
+        }
+
         const legacy = ctx.extensionSettings?.TamakoMarket?.phone;
         if (legacy && typeof legacy === 'object') {
             Logger.info('[玉子手机] 从 TamakoMarket.phone 迁移设置...');

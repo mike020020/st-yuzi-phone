@@ -1,5 +1,10 @@
 import { escapeHtml, escapeHtmlAttr } from '../utils/dom-escape.js';
-import { PHONE_ICONS } from '../phone-home/icons.js';
+import {
+    buildPhoneBackButton,
+    buildPhoneNavBar,
+    buildPhoneNavTitleSwitcher,
+    buildPhoneSwitchButton,
+} from '../phone-core/navigation-ui.js';
 
 function buildDetailEditControlHtml(pair) {
     const fieldMetadata = pair.fieldMetadata;
@@ -31,15 +36,36 @@ export function buildGenericDetailPageHtml(options = {}) {
     const pagerDisabled = !!pagerInfo.disabled;
     const prevIndex = Number.isInteger(pagerInfo.prevIndex) ? pagerInfo.prevIndex : -1;
     const nextIndex = Number.isInteger(pagerInfo.nextIndex) ? pagerInfo.nextIndex : -1;
-    const pagerDisabledAttr = pagerDisabled ? 'disabled aria-disabled="true"' : 'aria-disabled="false"';
+    const navHtml = buildPhoneNavBar({
+        className: 'phone-generic-slot-nav',
+        leadingHtml: buildPhoneBackButton({ action: 'detail-back' }),
+        centerHtml: buildPhoneNavTitleSwitcher({ title }),
+    });
+    const previousHtml = buildPhoneSwitchButton('previous', {
+        className: 'phone-detail-pager-btn',
+        label: '上一条',
+        disabled: pagerDisabled,
+        attributes: {
+            'data-pager': 'prev',
+            'data-target-row-index': String(prevIndex),
+            'aria-disabled': pagerDisabled ? 'true' : 'false',
+        },
+    });
+    const nextHtml = buildPhoneSwitchButton('next', {
+        className: 'phone-detail-pager-btn',
+        label: '下一条',
+        disabled: pagerDisabled,
+        attributes: {
+            'data-pager': 'next',
+            'data-target-row-index': String(nextIndex),
+            'aria-disabled': pagerDisabled ? 'true' : 'false',
+        },
+    });
 
     return `
         <div class="phone-app-page phone-generic-root ${genericStylePayload.className}" data-generic-template-id="${escapeHtmlAttr(genericStylePayload.templateId)}" ${genericStylePayload.dataAttrs} style="${genericStylePayload.styleAttr}">
             ${genericStylePayload.scopedCss ? `<style class="phone-generic-template-inline-style">${genericStylePayload.scopedCss}</style>` : ''}
-            <div class="phone-nav-bar phone-generic-slot-nav">
-                <button type="button" class="phone-nav-back" data-action="detail-back">${PHONE_ICONS.back}<span>返回</span></button>
-                <span class="phone-nav-title">${escapeHtml(title)}</span>
-            </div>
+            ${navHtml}
             <div class="phone-app-body phone-table-body phone-generic-slot-body">
                 <div class="phone-generic-detail-page phone-generic-detail-page-flow">
                     <div class="phone-row-detail-card phone-generic-slot-detail phone-generic-detail-flow-list">
@@ -62,10 +88,10 @@ export function buildGenericDetailPageHtml(options = {}) {
                 </div>
             </div>
             <div class="phone-detail-pager-bar phone-generic-slot-pager" aria-label="详情页翻页">
-                <button type="button" class="phone-detail-pager-btn" data-pager="prev" data-target-row-index="${escapeHtmlAttr(String(prevIndex))}" aria-label="上一条" ${pagerDisabledAttr}>‹</button>
-                <button type="button" class="phone-detail-pager-btn" data-pager="next" data-target-row-index="${escapeHtmlAttr(String(nextIndex))}" aria-label="下一条" ${pagerDisabledAttr}>›</button>
+                ${previousHtml}
+                ${nextHtml}
             </div>
-            <div class="phone-detail-bottom-bar phone-generic-slot-actions">
+            <div class="phone-detail-bottom-bar phone-generic-slot-actions" data-phone-bottom-bar>
                 <button type="button" class="phone-detail-bottom-btn" id="phone-toggle-edit-mode">${state.editMode ? '退出编辑' : '进入编辑'}</button>
                 <button type="button" class="phone-detail-bottom-btn" id="phone-save-row" ${state.editMode && !rowLocked ? '' : 'disabled'}>${state.saving ? '保存中...' : '保存更改'}</button>
                 <button type="button" class="phone-detail-bottom-btn ${state.cellLockManageMode ? 'active' : ''}" id="phone-cell-lock-mode-btn">${state.cellLockManageMode ? '完成' : '字段锁定'}</button>

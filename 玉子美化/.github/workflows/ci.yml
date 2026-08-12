@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  verify:
+    name: Verify Yuzi Beautify Workshop (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['18', '22']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify workshop
+        run: npm run verify
+
+      - name: Audit dependencies
+        run: npm audit
+
+      - name: Verify formal artifacts stay byte-stable
+        run: |
+          changed="$(git status --porcelain -- \
+            'tables/generated/小剧场2.1.json' \
+            'tables/generated/纪要.json' \
+            'output/basic-preset.json')"
+          if [ -n "$changed" ]; then
+            echo "::error::npm run verify modified a committed formal artifact."
+            printf '%s\n' "$changed"
+            exit 1
+          fi

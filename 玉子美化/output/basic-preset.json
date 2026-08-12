@@ -1,6 +1,7 @@
 {
   "format": "yuzi-beautify-preset",
-  "formatVersion": 1,
+  "formatVersion": 2,
+  "apiVersion": 1,
   "manifest": {
     "id": "yuzi-example-character-table",
     "name": "角色表示例",
@@ -20,8 +21,7 @@
         "entry": {
           "html": "page.html",
           "css": "page.css",
-          "js": "page.js",
-          "scriptMode": "classic"
+          "mount": "page.js"
         },
         "assets": []
       }
@@ -31,17 +31,17 @@
     "page.css": {
       "mimeType": "text/css",
       "encoding": "text",
-      "content": ".character-card { padding: 16px; color: #f7f7fb; background: #242438; border-radius: 14px; }\n"
+      "content": ".character-page { min-height: 100%; padding: 16px; color: #f7f7fb; background: #242438; }\n.character-toolbar { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }\n.character-toolbar h2 { margin: 0; text-align: center; }\n.character-toolbar button { padding: 8px 12px; color: inherit; background: #3a3a56; border: 1px solid #66668c; border-radius: 8px; }\n.character-toolbar button:disabled { opacity: 0.45; }\n.character-status { min-height: 1.5em; color: #c8c8e8; }\n.character-rows { margin: 0; padding: 12px; overflow: auto; white-space: pre-wrap; background: #1b1b2b; border-radius: 10px; }\n"
     },
     "page.html": {
       "mimeType": "text/html",
       "encoding": "text",
-      "content": "<section class=\"character-card\"><h2>角色表</h2><div id=\"rows\"></div></section>\n"
+      "content": "<section class=\"character-page\">\n  <header class=\"character-toolbar\">\n    <button type=\"button\" data-action=\"back\">返回</button>\n    <button id=\"previous\" type=\"button\" data-action=\"previousTable\">上一张</button>\n    <h2 id=\"title\">角色表</h2>\n    <button id=\"next\" type=\"button\" data-action=\"nextTable\">下一张</button>\n    <button type=\"button\" data-action=\"editCurrentTable\">编辑</button>\n  </header>\n  <p id=\"status\" class=\"character-status\" aria-live=\"polite\"></p>\n  <pre id=\"rows\" class=\"character-rows\"></pre>\n</section>\n"
     },
     "page.js": {
       "mimeType": "text/javascript",
       "encoding": "text",
-      "content": "const context = window.__YUZI_BEAUTIFY_CURRENT_CONTEXT__;\nconst render = () => { context.container.querySelector('#rows').textContent = context.rows.map(row => row.join(' / ')).join('\\n'); };\nrender();\ncontext.updates.addEventListener('update', render);\n"
+      "content": "// page.js\nvar ACTION_LABELS = Object.freeze({\n  back: \"返回\",\n  previousTable: \"上一张\",\n  nextTable: \"下一张\",\n  editCurrentTable: \"编辑\"\n});\nfunction actionMessage(action, result) {\n  if (result?.ok) return `${ACTION_LABELS[action]}请求已提交`;\n  if (result?.status === \"unavailable\") return `${ACTION_LABELS[action]}不可用`;\n  if (result?.status === \"stale\") return \"页面已失效\";\n  return result?.message || `${ACTION_LABELS[action]}失败`;\n}\nexport function mount(context) {\n  const root = context.root;\n  const title = root.querySelector(\"#title\");\n  const rows = root.querySelector(\"#rows\");\n  const status = root.querySelector(\"#status\");\n  const previous = root.querySelector(\"#previous\");\n  const next = root.querySelector(\"#next\");\n  let disposed = false;\n  const render = (state = context.getState()) => {\n    if (disposed || !state) return;\n    title.textContent = state.tableName;\n    const header = state.headers.join(\" / \");\n    const body = state.rows.map((row) => row.map((value) => String(value ?? \"\")).join(\" / \"));\n    rows.textContent = [header, ...body].filter(Boolean).join(\"\\n\");\n    previous.disabled = !state.canPrevious;\n    next.disabled = !state.canNext;\n  };\n  const handleClick = async (event) => {\n    const button = event.target.closest?.(\"[data-action]\");\n    const action = button?.dataset?.action;\n    if (disposed || !action || typeof context.actions[action] !== \"function\") return;\n    button.disabled = true;\n    try {\n      const result = await context.actions[action]();\n      if (!disposed) status.textContent = actionMessage(action, result);\n    } catch (error) {\n      if (!disposed) status.textContent = error instanceof Error && error.message ? `${ACTION_LABELS[action]}失败：${error.message}` : `${ACTION_LABELS[action]}失败`;\n    } finally {\n      if (!disposed) {\n        render();\n        if (action !== \"previousTable\" && action !== \"nextTable\") button.disabled = false;\n      }\n    }\n  };\n  root.addEventListener(\"click\", handleClick);\n  const unsubscribe = context.subscribe(render);\n  render();\n  return () => {\n    if (disposed) return;\n    disposed = true;\n    root.removeEventListener(\"click\", handleClick);\n    unsubscribe();\n  };\n}\n"
     }
   }
 }

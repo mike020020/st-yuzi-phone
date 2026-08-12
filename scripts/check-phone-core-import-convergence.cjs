@@ -18,17 +18,23 @@ const FILES = {
     iconUploadService: 'modules/settings-app/services/appearance-settings/icon-upload-service.js',
     layoutSettings: 'modules/settings-app/services/appearance-settings/layout-settings.js',
     visibilitySettings: 'modules/settings-app/services/appearance-settings/visibility-settings.js',
-    manualUpdate: 'modules/settings-app/services/manual-update.js',
     tableViewerRender: 'modules/table-viewer/render.js',
     genericViewer: 'modules/table-viewer/generic-viewer.js',
     genericRuntime: 'modules/table-viewer/generic-runtime.js',
     viewerRuntime: 'modules/table-viewer/runtime.js',
-    specialMessageViewer: 'modules/table-viewer/special/message-viewer.js',
-    specialMessageViewerActions: 'modules/table-viewer/special/message-viewer-actions.js',
-    specialMessageViewerHelpers: 'modules/table-viewer/special/message-viewer-helpers.js',
     beautifyShared: 'modules/phone-beautify-templates/shared.js',
     beautifyRepository: 'modules/phone-beautify-templates/repository.js',
 };
+
+const REMOVED_FILES = [
+    'modules/phone-core/chat-support.js',
+    'modules/table-viewer/special/message-viewer.js',
+    'modules/table-viewer/special/message-viewer-actions.js',
+    'modules/table-viewer/special/message-viewer-helpers.js',
+    'modules/settings-app/services/manual-update.js',
+    'modules/phone-core/data-api/config-repository.js',
+    'modules/phone-core/data-api/preset-repository.js',
+];
 
 const FACADE_RELATIVE_PATH = 'modules/phone-core.js';
 
@@ -54,6 +60,13 @@ function main() {
     );
 
     const results = [];
+    for (const relativePath of REMOVED_FILES) {
+        results.push({
+            file: relativePath,
+            description: '已删除的旧运行时与数据库设置兼容文件不再存在',
+            ok: !fs.existsSync(path.join(ROOT, relativePath)),
+        });
+    }
 
     // façade 已删除：物理校验
     results.push({
@@ -77,7 +90,7 @@ function main() {
     check(results, 'phoneHomeRender', 'phone-home render 不再从 phone-core façade 导入', !has(contents.phoneHomeRender, "from '../phone-core.js';"));
 
     check(results, 'settingsAppRender', 'settings-app render 改为直接从 data-api 导入数据库相关能力', has(contents.settingsAppRender, "from '../phone-core/data-api.js';"));
-    check(results, 'settingsAppRender', 'settings-app render 改为直接从 chat-support 导入 AI 指令预设能力', has(contents.settingsAppRender, "from '../phone-core/chat-support.js';"));
+    check(results, 'settingsAppRender', 'settings-app render 不再导入旧 chat-support', !has(contents.settingsAppRender, '../phone-core/chat-support'));
     check(results, 'settingsAppRender', 'settings-app render 改为直接从 routing 导入 navigateBack()', has(contents.settingsAppRender, "from '../phone-core/routing.js';"));
     check(results, 'settingsAppRender', 'settings-app render 改为直接从 scroll-guards 导入 bindPhoneScrollGuards()', has(contents.settingsAppRender, "from '../phone-core/scroll-guards.js';"));
     check(results, 'settingsAppRender', 'settings-app render 改为直接从 settings 导入基础设置能力', has(contents.settingsAppRender, "from '../settings.js';"));
@@ -97,9 +110,6 @@ function main() {
     check(results, 'visibilitySettings', 'visibility-settings 改为直接从 settings 导入基础设置能力', has(contents.visibilitySettings, "from '../../../settings.js';"));
     check(results, 'visibilitySettings', 'visibility-settings 不再从 phone-core façade 导入', !has(contents.visibilitySettings, "from '../../../phone-core.js';"));
 
-    check(results, 'manualUpdate', 'manual-update 改为直接从 data-api 导入 triggerManualUpdate()', has(contents.manualUpdate, "from '../../phone-core/data-api.js';"));
-    check(results, 'manualUpdate', 'manual-update 不再从 phone-core façade 导入', !has(contents.manualUpdate, "from '../../phone-core.js';"));
-
     check(results, 'tableViewerRender', 'table-viewer render 改为直接从 routing 导入 navigateBack()', has(contents.tableViewerRender, "from '../phone-core/routing.js';"));
     check(results, 'tableViewerRender', 'table-viewer render 不再从 phone-core façade 取值', !has(contents.tableViewerRender, "from '../phone-core.js';"));
     check(results, 'tableViewerRender', 'table-viewer render 改为通过 table-viewer context 收口表格数据准备', has(contents.tableViewerRender, "from './context.js';"));
@@ -111,22 +121,12 @@ function main() {
 
     check(results, 'genericRuntime', 'generic-runtime 改为直接从 data-api 导入表格能力', has(contents.genericRuntime, "from '../phone-core/data-api.js';"));
     check(results, 'genericRuntime', 'generic-runtime 改为直接从 routing 导入 navigateBack()', has(contents.genericRuntime, "from '../phone-core/routing.js';"));
-    check(results, 'genericRuntime', 'generic-runtime 改为直接从 chat-support 导入 sheet 运行时能力', has(contents.genericRuntime, "from '../phone-core/chat-support.js';"));
+    check(results, 'genericRuntime', 'generic-runtime 不再导入旧 chat-support', !has(contents.genericRuntime, '../phone-core/chat-support'));
     check(results, 'genericRuntime', 'generic-runtime 不再从 phone-core façade 导入', !has(contents.genericRuntime, "from '../phone-core.js';"));
 
     check(results, 'viewerRuntime', 'viewer-runtime 改为直接从 callbacks 导入 currentViewingSheet lease', has(contents.viewerRuntime, "from '../phone-core/callbacks.js';")
         && has(contents.viewerRuntime, 'acquireCurrentViewingSheet,') && has(contents.viewerRuntime, 'releaseCurrentViewingSheet,'));
     check(results, 'viewerRuntime', 'viewer-runtime 不再从 phone-core façade 导入', !has(contents.viewerRuntime, "from '../phone-core.js';"));
-
-    check(results, 'specialMessageViewer', 'special message-viewer 改为直接从 chat-support 导入聊天运行时能力', has(contents.specialMessageViewer, "from '../../phone-core/chat-support.js';"));
-    check(results, 'specialMessageViewer', 'special message-viewer 详情返回由 detail-controller 本地 handleNavBack() 收口，不再强制导入 routing', has(contents.specialMessageViewer, "from './message-viewer/detail-controller.js';") && !has(contents.specialMessageViewer, "from '../../phone-core/routing.js';"));
-    check(results, 'specialMessageViewer', 'special message-viewer 不再从 phone-core façade 导入', !has(contents.specialMessageViewer, "from '../../phone-core.js';"));
-
-    check(results, 'specialMessageViewerActions', 'special message-viewer-actions 改为直接从 chat-support 导入动作依赖', has(contents.specialMessageViewerActions, "from '../../phone-core/chat-support.js';"));
-    check(results, 'specialMessageViewerActions', 'special message-viewer-actions 不再从 phone-core façade 导入', !has(contents.specialMessageViewerActions, "from '../../phone-core.js';"));
-
-    check(results, 'specialMessageViewerHelpers', 'special message-viewer-helpers 改为直接从 chat-support 导入角色显示能力', has(contents.specialMessageViewerHelpers, "from '../../phone-core/chat-support.js';"));
-    check(results, 'specialMessageViewerHelpers', 'special message-viewer-helpers 不再从 phone-core façade 导入', !has(contents.specialMessageViewerHelpers, "from '../../phone-core.js';"));
 
     check(results, 'beautifyShared', 'beautify shared 作为兼容导出层不再直接持有 settings 读写能力', !has(contents.beautifyShared, "from '../settings.js';") && has(contents.beautifyShared, "from './store.js';"));
     check(results, 'beautifyShared', 'beautify shared 不再从 phone-core façade 导入', !has(contents.beautifyShared, "from '../phone-core.js';"));

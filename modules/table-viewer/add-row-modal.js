@@ -1,6 +1,6 @@
 import { Logger } from '../error-handler.js';
 import { PHONE_ICONS } from '../phone-home/icons.js';
-import { dispatchPhoneTableUpdated, refreshPhoneTableProjection } from '../phone-core/chat-support.js';
+import { dispatchTableUpdated, refreshTableProjection } from '../phone-core/table-support.js';
 import { sleep } from '../phone-core/db-bridge.js';
 import { escapeHtml, escapeHtmlAttr } from '../utils/dom-escape.js';
 import { EventManager } from '../utils/event-manager.js';
@@ -189,7 +189,7 @@ async function reconcileInsertedRow(options = {}) {
     }
 
     if (!reachedExpected && isRuntimeActive(viewerRuntime)) {
-        recoveryRefreshed = await refreshPhoneTableProjection();
+        recoveryRefreshed = await refreshTableProjection();
         if (!isRuntimeActive(viewerRuntime)) {
             return {
                 reachedExpected,
@@ -210,7 +210,7 @@ async function reconcileInsertedRow(options = {}) {
     }
 
     if (isRuntimeActive(viewerRuntime)) {
-        dispatchPhoneTableUpdated(sheetKey);
+        dispatchTableUpdated(sheetKey);
     }
 
     return {

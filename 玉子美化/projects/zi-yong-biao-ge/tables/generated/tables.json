@@ -1,0 +1,373 @@
+{
+  "mate": {
+    "type": "chatSheets",
+    "version": 2,
+    "globalInjectionConfig": {
+      "readableEntryPlacement": {
+        "position": "before_character_definition",
+        "depth": 2,
+        "order": 99981
+      },
+      "wrapperPlacement": {
+        "position": "before_character_definition",
+        "depth": 2,
+        "order": 99980
+      }
+    },
+    "updateConfigUiSentinel": -1
+  },
+  "sheet_summary": {
+    "uid": "sheet_summary",
+    "name": "纪要表",
+    "sourceData": {
+      "note": "轮次日志。每轮交互结束后立刻插入一条新记录。\n\n- 列定义\n * 列1: 编码索引 code_index（AM0001起递增，全表唯一）\n * 列2: 时间跨度 time_span\n * 列3：与今天的关系 today_relation（前端派生字段，AI 不填写）\n * 列4: 概览 summary（40-60字）\n * 列5: 纪要 chronicle_text（300-500字）\n * 列6: 重要对话 key_dialogue（可NULL）\n\n- 强制约束\n * 编码索引格式 AMXXXX，从0001开始递增，不跳号。\n * 时间跨度格式为 \"YYYY-MM-DD HH:MM ~ YYYY-MM-DD HH:MM\"，覆盖本轮事件的实际时间范围。\n * 概览作用是概括本轮纪要内容，简单交代起因经过结果，40-60字。\n\n- 纪要规范：\n * 以第三方视角中立客观记录正文发生的一切，移除所有修辞。不滥用环境描写、不加评论、不抒情、不升华。\n * 用词直白生活化，避免正式措辞（如“达成协议”“确立计划”）。\n * 结尾必须开放，在事件自然流动中结束，不得归纳状态或做出封闭式收束。\n     违例：故事仍然在继续 / 新的篇章开启 / 二人关系迈入新阶段 / 未来等待着他们。\n * 多轮交互整合为一条记录。\n * 禁止内容：极端情绪（崩溃、狂喜、绝望等）、夸张、比喻、升华、情绪总结、支配欲、欲望、总结性收尾。\n * 字数不少于300字。\n\n- 重要对话仅摘录直接推动剧情转折、揭示关键信息、改变人物关系/决策或构成承诺/誓言/约定的原文台词，标明说话人。通常3句，最多5句。",
+      "initNode": "故事初始化时，插入一条新记录用于记录剧情。",
+      "deleteNode": "禁止。",
+      "updateNode": "禁止。",
+      "insertNode": "每轮交互结束后插入一条新记录。\n\n【强制约束】\n“与今天的关系”由前端派生注入，AI 插入时不得填写 today_relation。\ncode_index、time_span、summary、chronicle_text 均 NOT NULL，不可写 NULL 或空串。\ncode_index 从已存在的最大 AM 码递增（AM0001 → AM0002 → ...），不可跳号。\ntime_span 格式：本轮起始时间 ~ 本轮结束时间。\n\nSQL示例：INSERT INTO chronicle (row_id, code_index, time_span, summary, chronicle_text, key_dialogue) VALUES ((SELECT COALESCE(MAX(row_id), 0) + 1 FROM chronicle), 'AM0036', '2026-02-04 08:00 ~ 2026-02-04 08:30', '一句话概括', '本轮纪要内容...', NULL);",
+      "ddl": "CREATE TABLE chronicle ( -- 纪要表\n  row_id INTEGER PRIMARY KEY, -- 行号\n  code_index TEXT UNIQUE, -- 编码索引\n  time_span TEXT, -- 时间跨度\n  today_relation TEXT, -- 与今天的关系\n  summary TEXT, -- 概览\n  chronicle_text TEXT NOT NULL CHECK(length(chronicle_text) >= 200 AND length(chronicle_text) <= 520), -- 纪要\n  key_dialogue TEXT -- 重要对话\n);\n"
+    },
+    "content": [
+      [
+        "row_id",
+        "编码索引",
+        "时间跨度",
+        "与今天的关系",
+        "概览",
+        "纪要",
+        "重要对话"
+      ]
+    ],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": -1,
+      "updateFrequency": -1,
+      "batchSize": -1,
+      "skipFloors": -1,
+      "groupId": -1
+    },
+    "exportConfig": {
+      "enabled": true,
+      "splitByRow": true,
+      "entryName": "纪要",
+      "entryType": "keyword",
+      "keywords": "编码索引",
+      "preventRecursion": true,
+      "injectionTemplate": "<记忆回溯>\n$1\n</记忆回溯>",
+      "extraIndexEnabled": true,
+      "extraIndexEntryName": "纪要索引",
+      "extraIndexColumns": [
+        "编码索引",
+        "与今天的关系",
+        "概览"
+      ],
+      "extraIndexColumnModes": {
+        "编码索引": "both",
+        "与今天的关系": "both",
+        "概览": "index_only"
+      },
+      "extraIndexInjectionTemplate": "<已发生的事件概览>\n$1\n</已发生的事件概览>",
+      "sqlInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 999,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 1000,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 9999,
+        "order": 99987
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 9999,
+        "order": 99988
+      }
+    },
+    "orderNo": 6
+  },
+  "sheet_global_data": {
+    "uid": "sheet_global_data",
+    "name": "全局数据表",
+    "sourceData": {
+      "note": "记录当前时间、地点信息。此表有且仅有一行。\n\n- 列定义\n * 当前时间 / 上轮场景时间：YYYY-MM-DD HH:MM\n * 经过的时间：{数值}{单位}，如\"3小时20分\"\"2天\"\n * 当前位置：写具体空间，外出写地点名\n\n- 时间规则\n * cur_time = prev_scene_time + elapsed_time\n * 初始化时prev_scene_time为NULL，cur_time直接填初始时间。\n * 每轮推进时：将上一轮cur_time写入prev_scene_time → 填写elapsed_time → 计算新cur_time。",
+      "initNode": "故事初始化时插入唯一条目。",
+      "deleteNode": "禁止。",
+      "updateNode": "每轮推进时更新时间字段；地点状态变动时同步更新。\n\nSQL示例：\nUPDATE global_state SET prev_scene_time='2026-04-07 14:00', elapsed_time='2小时', cur_time='2026-04-07 16:00', current_location='别墅后巷' WHERE row_id=1;",
+      "insertNode": "禁止。",
+      "ddl": "CREATE TABLE global_state ( -- 全局状态表\n  row_id INTEGER PRIMARY KEY, -- 行号\n  cur_time TEXT, -- 当前时间\n  prev_scene_time TEXT, -- 上轮场景时间\n  elapsed_time TEXT, -- 经过的时间\n  current_location TEXT -- 当前位置\n);"
+    },
+    "content": [
+      [
+        "row_id",
+        "当前时间",
+        "上轮场景时间",
+        "经过的时间",
+        "当前位置"
+      ]
+    ],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": -1,
+      "updateFrequency": -1,
+      "batchSize": -1,
+      "skipFloors": -1,
+      "groupId": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "splitByRow": false,
+      "entryName": "全局数据表",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "全局数据表-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "sqlInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "before_character_definition",
+        "depth": 2,
+        "order": 99981
+      },
+      "fixedIndexPlacement": {
+        "position": "before_character_definition",
+        "depth": 2,
+        "order": 99982
+      }
+    },
+    "orderNo": 7
+  },
+  "sheet_protagonist": {
+    "uid": "sheet_protagonist",
+    "name": "主角信息",
+    "sourceData": {
+      "note": "记录主角核心信息。此表有且仅有一行。\n\n- 列说明\n * 性别\n * 外貌特征：≤60字\n * 身份：≤40字，逗号分隔\n * 近况：一句话身体/情绪状态。正常时填\"一切如常\"，异常时写具体感受\n    √ 左膝擦伤，有点烦躁\n    √ 抑制剂快到时间了，后颈发热\n * 基础属性：\"健康=数值；力量=数值；敏捷=数值；理智=数值；观察=数值；魅力=数值\"，范围10-90\n * 特有属性：\"属性名=数值；\"格式，可NULL，通常为主角的特殊技能或者其他",
+      "initNode": "故事初始化时插入主角条目。",
+      "deleteNode": "禁止。",
+      "updateNode": "字段变化时更新。\n\nSQL示例: \nUPDATE protagonist_info SET current_condition='左膝擦伤，有点烦躁', base_attributes='健康=60；力量=78；敏捷=80；理智=44；观察=62；魅力=58' WHERE row_id=1;",
+      "insertNode": "禁止。",
+      "ddl": "CREATE TABLE protagonist_info ( -- 主角信息表\n  row_id INTEGER PRIMARY KEY, -- 行号\n  name TEXT NOT NULL, -- 姓名\n  gender_desc TEXT NOT NULL, -- 性别\n  age INTEGER NOT NULL, -- 年龄\n  appearance TEXT NOT NULL, -- 外貌特征\n  identity_text TEXT NOT NULL, -- 身份\n  current_condition TEXT NOT NULL, -- 近况\n  base_attributes TEXT NOT NULL, -- 基础属性\n  special_attributes TEXT -- 特有属性\n);"
+    },
+    "content": [
+      [
+        "row_id",
+        "姓名",
+        "性别",
+        "年龄",
+        "外貌特征",
+        "身份",
+        "近况",
+        "基础属性",
+        "特有属性"
+      ]
+    ],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": -1,
+      "updateFrequency": -1,
+      "batchSize": -1,
+      "skipFloors": -1,
+      "groupId": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "splitByRow": false,
+      "entryName": "主角信息",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "主角信息-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "sqlInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
+    },
+    "orderNo": 8
+  },
+  "sheet_important_npc": {
+    "uid": "sheet_important_npc",
+    "name": "重要角色表",
+    "sourceData": {
+      "note": "记录所有NPC（不包括主角）的档案与动态状态。\n\n- 列说明\n * 角色类型：恋爱对象 / 家人 / 配角 等等\n * 一句话介绍：≤30字，仅客观事实，禁止性格标签\n    √ 集团唯一继承人，国民顶流偶像\n    × 温柔善良的国民偶像\n * 外貌特征：≤40字\n * 穿着打扮：≤40字，仅外在可见的服饰/饰品/妆容，禁止写气质气场\n    √ 纯白真丝衬衫\n    × 散发高贵气场\n * 基础属性：\"健康=数值；力量=数值；敏捷=数值；理智=数值；观察=数值；魅力=数值\"，范围10-90\n * 特有属性：\"属性名=数值；\"，可NULL，通常为角色的特殊技能或者其他\n * 在场状态：在场 / 离场\n * 人际关系：格式\"角色名:关系标签\"，多角色用分号分隔，同角色多标签用逗号\n    √ 爱丽丝:同学; 木下:未婚妻关系\n    × 和爱丽丝关系不好（缺角色名前缀）",
+      "initNode": "为已登场角色各插入一条。",
+      "deleteNode": "禁止。",
+      "updateNode": "各项状态变化时更新。",
+      "insertNode": "新角色登场时新增。",
+      "ddl": "CREATE TABLE important_characters ( -- 重要角色表\n  row_id INTEGER PRIMARY KEY, -- 行号\n  name TEXT UNIQUE, -- 姓名\n  role_type TEXT, -- 角色类型\n  gender TEXT, -- 性别\n  age TEXT, -- 年龄\n  brief_intro TEXT, -- 一句话介绍\n  appearance TEXT, -- 外貌特征\n  outfit_text TEXT, -- 穿着打扮\n  base_attributes TEXT, -- 基础属性\n  special_attributes TEXT, -- 特有属性\n  location_name TEXT, -- 所在地点\n  presence_status TEXT, -- 在场状态\n  relation_text TEXT  -- 人际关系\n);"
+    },
+    "content": [
+      [
+        "row_id",
+        "姓名",
+        "角色类型",
+        "性别",
+        "年龄",
+        "一句话介绍",
+        "外貌特征",
+        "穿着打扮",
+        "基础属性",
+        "特有属性",
+        "所在地点",
+        "在场状态",
+        "人际关系"
+      ]
+    ],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": -1,
+      "updateFrequency": -1,
+      "batchSize": -1,
+      "skipFloors": -1,
+      "groupId": 2
+    },
+    "exportConfig": {
+      "enabled": true,
+      "splitByRow": true,
+      "entryName": "重要角色表",
+      "entryType": "keyword",
+      "keywords": "姓名",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": true,
+      "extraIndexEntryName": "重要角色表-索引",
+      "extraIndexColumns": [
+        "姓名",
+        "一句话介绍"
+      ],
+      "extraIndexColumnModes": {
+        "姓名": "both",
+        "一句话介绍": "index_only"
+      },
+      "extraIndexInjectionTemplate": "以下为已经登场过的角色：\n<已登场角色>\n$1\n</已登场角色>",
+      "sqlInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 10000,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 10000,
+        "order": 8000
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 10000,
+        "order": 99983
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 10000,
+        "order": 99984
+      }
+    },
+    "orderNo": 9
+  },
+  "sheet_OptionsNew": {
+    "uid": "sheet_OptionsNew",
+    "name": "选项表",
+    "sourceData": {
+      "note": "记录每轮主角可以进行的动作选项。此表有且仅有一行。\n\n- 列说明\n * 选项一 – 以第三人称去描述主角的行动，语言，偏向策略或推进剧情，猜测主角下一步可能会干什么，最合理的选择。\n * 选项二 – 以第三人称描述主角可采取的中立行动，不偏向任何立场。\n * 选项三 – 以第三人称描述主角可采取的善意行动，体现帮助、保护或安抚。\n * 选项四 - 以第三人称描述一下，根据当前剧情，去写一个有意思的和剧情不相干的身边突发事件，偏向可以带出新剧情，新互动方面的。例如主角一行人散步，就可以写有鬼屋活动（可以增加主角和其余人好感度的活动），从而可以让主角一行人带出新剧情。可以适当去看‘小日历表中当天的内容表’\n * 选项五 - 一段当前剧情的天气，风景，周边景色的具体描述，单纯的废话，用来代替‘继续’的\n\n\n- 选项要求\n * 所有的选项不一定都是正面的，但都是根据当前user人设，char人设，最合理的推进剧情的方向，仅提供简练的客观动作或对话方向，不使用微表情、心理活动或环境描写，也不需要写出选项会造成的结果",
+      "initNode": "游戏初始化时，生成五个初始选项。",
+      "deleteNode": "禁止删除。",
+      "updateNode": "每轮交互后必须更新此表，根据当前剧情生成新的五个选项覆盖原有内容。",
+      "insertNode": "禁止操作。",
+      "ddl": "CREATE TABLE options ( -- 选项表\n  row_id INTEGER PRIMARY KEY, -- 行号\n  option_1 TEXT, -- 选项一\n  option_2 TEXT, -- 选项二\n  option_3 TEXT, -- 选项三\n  option_4 TEXT, -- 选项四\n  option_5 TEXT -- 选项五\n);"
+    },
+    "content": [
+      [
+        "row_id",
+        "选项一",
+        "选项二",
+        "选项三",
+        "选项四",
+        "选项五"
+      ]
+    ],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": -1,
+      "updateFrequency": -1,
+      "batchSize": -1,
+      "skipFloors": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "splitByRow": false,
+      "entryName": "选项表",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "选项表-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "sqlInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      },
+      "injectIntoWorldbook": false
+    },
+    "orderNo": 10
+  }
+}

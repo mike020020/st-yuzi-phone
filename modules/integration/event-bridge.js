@@ -31,10 +31,13 @@ export const EventTypes = {
     GENERATION_ENDED: 'generation_ended',
     GENERATION_AFTER_COMMANDS: 'GENERATION_AFTER_COMMANDS',
     CHAT_CHANGED: 'chat_id_changed',
+    CHAT_DELETED: 'chat_deleted',
+    GROUP_CHAT_DELETED: 'group_chat_deleted',
     CHAT_CREATED: 'chat_created',
     APP_READY: 'app_ready',
     SETTINGS_LOADED: 'settings_loaded_after',
     WORLDINFO_UPDATED: 'worldinfo_updated',
+    WORLD_INFO_ACTIVATED: 'world_info_activated',
     CHARACTER_PAGE_LOADED: 'character_page_loaded',
     CHARACTER_LOADED: 'character_page_loaded',
 };
@@ -253,8 +256,20 @@ export async function onWorldInfoUpdated(callback, options = {}) {
     return onEvent(EventTypes.WORLDINFO_UPDATED, callback, options);
 }
 
+export async function onWorldInfoActivated(callback, options = {}) {
+    return onEvent(EventTypes.WORLD_INFO_ACTIVATED, callback, options);
+}
+
 export async function onChatChanged(callback, options = {}) {
     return onEvent(EventTypes.CHAT_CHANGED, callback, options);
+}
+
+export async function onChatDeleted(callback, options = {}) {
+    return onEvent(EventTypes.CHAT_DELETED, callback, options);
+}
+
+export async function onGroupChatDeleted(callback, options = {}) {
+    return onEvent(EventTypes.GROUP_CHAT_DELETED, callback, options);
 }
 
 export async function onCharacterLoaded(callback, options = {}) {
