@@ -1,7 +1,7 @@
 import { QQ_V2_BUILT_IN_PROMPT_PRESET_IDS } from '../domain/prompt-preset-ids.js';
+import { createQQV2ApiKeyStore } from './api-key-store.js';
 
 const API_PRESETS_STORAGE_KEY = 'qq-v2.resources.api-presets';
-const API_KEY_STORAGE_KEY = 'qq-v2.resources.api-key-encryption-key';
 const PROMPT_PRESETS_STORAGE_KEY = 'qq-v2.resources.prompt-presets-v3';
 const STICKERS_STORAGE_KEY = 'qq-v2.resources.stickers';
 const PROMPT_MESSAGE_ROLES = new Set(['system', 'user', 'assistant']);
@@ -607,16 +607,9 @@ function requireStorage(storage) {
     return storage;
 }
 
-function requireCryptoApi(cryptoApi) {
-    if (!cryptoApi
-        || typeof cryptoApi.getRandomValues !== 'function'
-        || typeof cryptoApi.randomUUID !== 'function'
-        || typeof cryptoApi.subtle?.generateKey !== 'function'
-        || typeof cryptoApi.subtle?.encrypt !== 'function'
-        || typeof cryptoApi.subtle?.decrypt !== 'function') {
-        throw new TypeError('QQ v2 resource service needs WebCrypto AES-GCM support');
-    }
-    return cryptoApi;
+function createId(cryptoApi) {
+    if (typeof cryptoApi?.randomUUID === 'function') return cryptoApi.randomUUID();
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function normalizeApiEndpoint(value) {
@@ -724,26 +717,8 @@ function orderedStickers(stickers) {
  */
 export function createQQV2ResourceService(options = {}) {
     const storage = requireStorage(options.storage);
-    const cryptoApi = requireCryptoApi(options.cryptoApi ?? globalThis.crypto);
-    let encryptionKeyPromise = null;
-
-    const getEncryptionKey = () => {
-        if (!encryptionKeyPromise) {
-            encryptionKeyPromise = (async () => {
-                const storedKey = await storage.get(API_KEY_STORAGE_KEY);
-                if (storedKey) return storedKey;
-
-                const generatedKey = await cryptoApi.subtle.generateKey(
-                    { name: 'AES-GCM', length: 256 },
-                    false,
-                    ['encrypt', 'decrypt'],
-                );
-                await storage.set(API_KEY_STORAGE_KEY, generatedKey);
-                return generatedKey;
-            })();
-        }
-        return encryptionKeyPromise;
-    };
+    const cryptoApi = options.cryptoApi ?? globalThis.crypto;
+    const apiKeys = createQQV2ApiKeyStore({ storage, cryptoApi });
 
     const readApiState = async () => {
         const stored = await storage.get(API_PRESETS_STORAGE_KEY);
@@ -787,7 +762,7 @@ export function createQQV2ResourceService(options = {}) {
         }
 
         const record = {
-            id: existing?.id ?? cryptoApi.randomUUID(),
+            id: existing?.id ?? createId(cryptoApi),
             description,
             mimeType: blob.type,
             size: blob.size,
@@ -877,7 +852,7 @@ export function createQQV2ResourceService(options = {}) {
                 ? clonePromptMessages(input.messages)
                 : existing?.messages.map((block) => ({ ...block })) ?? [];
             const record = {
-                id: existing?.id ?? cryptoApi.randomUUID(),
+                id: existing?.id ?? createId(cryptoApi),
                 name: String(input?.name ?? existing?.name ?? ''),
                 isBuiltIn: existing?.isBuiltIn ?? false,
                 messages,
@@ -926,7 +901,7 @@ export function createQQV2ResourceService(options = {}) {
             const state = await readPromptState();
             const imported = importedSource.map((preset) => {
                 const record = {
-                    id: cryptoApi.randomUUID(),
+                    id: createId(cryptoApi),
                     name: nextPromptPresetCopyName(preset?.name, state.presets),
                     isBuiltIn: false,
                     messages: Array.isArray(preset?.messages)
@@ -976,29 +951,20 @@ export function createQQV2ResourceService(options = {}) {
 
             const existing = existingIndex === -1 ? null : state.presets[existingIndex];
             const apiKey = suppliedApiKey(input);
-            let iv = existing?.iv;
-            let ciphertext = existing?.ciphertext;
-            if (apiKey !== null) {
-                iv = new Uint8Array(12);
-                cryptoApi.getRandomValues(iv);
-                ciphertext = await cryptoApi.subtle.encrypt(
-                    { name: 'AES-GCM', iv },
-                    await getEncryptionKey(),
-                    new TextEncoder().encode(apiKey),
-                );
-                iv = iv.buffer;
-            }
+            const id = existing?.id ?? createId(cryptoApi);
             const record = {
-                id: existing?.id ?? cryptoApi.randomUUID(),
+                id,
                 name: String(input?.name ?? existing?.name ?? ''),
                 endpoint: normalizeApiEndpoint(input?.endpoint ?? existing?.endpoint),
                 model: String(input?.model ?? existing?.model ?? ''),
                 temperature: numberOrDefault(input?.temperature, existing?.temperature ?? 1),
                 maxOutput: numberOrDefault(input?.maxOutput, existing?.maxOutput ?? 4096),
                 hasApiKey: apiKey !== null ? true : Boolean(existing?.hasApiKey),
-                iv,
-                ciphertext,
+                ...(apiKey === null && existing?.iv && existing?.ciphertext
+                    ? { iv: existing.iv, ciphertext: existing.ciphertext }
+                    : {}),
             };
+            if (apiKey !== null) await apiKeys.set(id, apiKey);
             if (existingIndex === -1) {
                 state.presets.push(record);
             } else {
@@ -1023,14 +989,15 @@ export function createQQV2ResourceService(options = {}) {
                 });
             }
 
-            const plainBuffer = await cryptoApi.subtle.decrypt(
-                { name: 'AES-GCM', iv: record.iv },
-                await getEncryptionKey(),
-                record.ciphertext,
-            );
+            const apiKey = await apiKeys.get(record.id, record);
+            if (record.iv || record.ciphertext) {
+                delete record.iv;
+                delete record.ciphertext;
+                await storage.set(API_PRESETS_STORAGE_KEY, state);
+            }
             return Object.freeze({
                 ...publicApiPreset(record),
-                apiKey: new TextDecoder().decode(plainBuffer),
+                apiKey,
             });
         },
         async deleteApiPreset(id) {
@@ -1040,6 +1007,7 @@ export function createQQV2ResourceService(options = {}) {
 
             state.presets.splice(index, 1);
             await storage.set(API_PRESETS_STORAGE_KEY, state);
+            await apiKeys.delete(id);
             return true;
         },
     });

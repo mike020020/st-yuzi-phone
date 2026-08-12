@@ -29,30 +29,6 @@ function createMemoryStorage() {
     };
 }
 
-function createCryptoSpy() {
-    const generateKeyCalls = [];
-
-    return {
-        cryptoApi: {
-            getRandomValues: webcrypto.getRandomValues.bind(webcrypto),
-            randomUUID: webcrypto.randomUUID.bind(webcrypto),
-            subtle: {
-                generateKey(...args) {
-                    generateKeyCalls.push(args);
-                    return webcrypto.subtle.generateKey(...args);
-                },
-                encrypt(...args) {
-                    return webcrypto.subtle.encrypt(...args);
-                },
-                decrypt(...args) {
-                    return webcrypto.subtle.decrypt(...args);
-                },
-            },
-        },
-        generateKeyCalls,
-    };
-}
-
 function containsString(value, expected, visited = new Set()) {
     if (value === expected) return true;
     if (!value || typeof value !== 'object' || visited.has(value)) return false;
@@ -68,14 +44,15 @@ function containsString(value, expected, visited = new Set()) {
 /**
  * Public resource seam under test:
  * createQQV2ResourceService({ storage, cryptoApi })
- * - regular API preset reads expose metadata but never apiKey;
- * - getApiPresetForRequest(id) is the request-time decryption boundary.
+ * - regular API preset reads and exports never expose apiKey;
+ * - plaintext secrets live in a dedicated storage bucket;
+ * - legacy AES-GCM records migrate only at the request boundary.
  */
-async function testApiPresetKeepsKeyEncryptedAndHiddenFromNormalReads() {
+async function testApiPresetKeepsKeySeparateAndHiddenFromNormalReads() {
     const { createQQV2ResourceService } = await importModule('modules/qq-v2/resources/service.js');
+    const { API_KEY_SECRETS_STORAGE_KEY } = await importModule('modules/qq-v2/resources/api-key-store.js');
     const storage = createMemoryStorage();
-    const { cryptoApi, generateKeyCalls } = createCryptoSpy();
-    const resources = createQQV2ResourceService({ storage, cryptoApi });
+    const resources = createQQV2ResourceService({ storage, cryptoApi: {} });
     const apiKey = 'qq-v2-test-secret';
 
     const saved = await resources.saveApiPreset({
@@ -88,11 +65,106 @@ async function testApiPresetKeepsKeyEncryptedAndHiddenFromNormalReads() {
     assert.equal(saved.hasApiKey, true);
     assert.equal('apiKey' in saved, false);
     assert.equal('apiKey' in await resources.getApiPreset(saved.id), false);
-    assert.equal(containsString(storage.values(), apiKey), false);
-    assert.equal(generateKeyCalls.length, 1);
-    assert.deepEqual(generateKeyCalls[0][0], { name: 'AES-GCM', length: 256 });
-    assert.equal(generateKeyCalls[0][1], false);
-    assert.deepEqual(generateKeyCalls[0][2], ['encrypt', 'decrypt']);
+    assert.equal(containsString(await storage.get('qq-v2.resources.api-presets'), apiKey), false);
+    assert.equal((await storage.get(API_KEY_SECRETS_STORAGE_KEY))[saved.id], apiKey);
+    assert.equal(JSON.stringify(await resources.exportAllPromptPresets()).includes(apiKey), false);
+    assert.equal((await resources.getApiPresetForRequest(saved.id)).apiKey, apiKey);
+}
+
+async function testResourceServiceWorksWithoutWebCrypto() {
+    const { createQQV2ResourceService } = await importModule('modules/qq-v2/resources/service.js');
+    const resources = createQQV2ResourceService({ storage: createMemoryStorage(), cryptoApi: {} });
+
+    const apiPreset = await resources.saveApiPreset({
+        name: 'LAN HTTP',
+        endpoint: 'https://api.example.test/v1',
+        model: 'gpt-test',
+        apiKey: 'lan-http-key',
+    });
+    const promptPreset = await resources.savePromptPreset({
+        name: 'LAN prompt',
+        messages: [{ role: 'system', content: 'Works without WebCrypto.' }],
+    });
+    const sticker = await resources.saveSticker({
+        description: 'LAN sticker',
+        blob: new Blob(['lan'], { type: 'image/png' }),
+    });
+
+    assert.match(apiPreset.id, /.+/);
+    assert.match(promptPreset.id, /.+/);
+    assert.match(sticker.id, /.+/);
+    assert.equal((await resources.getApiPresetForRequest(apiPreset.id)).apiKey, 'lan-http-key');
+}
+
+async function testLegacyEncryptedApiKeyMigratesAtRequestBoundary() {
+    const { createQQV2ResourceService } = await importModule('modules/qq-v2/resources/service.js');
+    const {
+        API_KEY_SECRETS_STORAGE_KEY,
+        LEGACY_API_KEY_STORAGE_KEY,
+    } = await importModule('modules/qq-v2/resources/api-key-store.js');
+    const storage = createMemoryStorage();
+    const encryptionKey = await webcrypto.subtle.generateKey(
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt'],
+    );
+    const iv = webcrypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await webcrypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        encryptionKey,
+        new TextEncoder().encode('legacy-secret'),
+    );
+    await storage.set(LEGACY_API_KEY_STORAGE_KEY, encryptionKey);
+    await storage.set('qq-v2.resources.api-presets', {
+        presets: [{
+            id: 'legacy-api',
+            name: 'Legacy API',
+            endpoint: 'https://api.example.test/v1',
+            model: 'gpt-test',
+            temperature: 1,
+            maxOutput: 4096,
+            hasApiKey: true,
+            iv: iv.buffer,
+            ciphertext,
+        }],
+    });
+    const resources = createQQV2ResourceService({ storage, cryptoApi: webcrypto });
+
+    assert.equal((await resources.getApiPresetForRequest('legacy-api')).apiKey, 'legacy-secret');
+    assert.equal((await storage.get(API_KEY_SECRETS_STORAGE_KEY))['legacy-api'], 'legacy-secret');
+    const migrated = (await storage.get('qq-v2.resources.api-presets')).presets[0];
+    assert.equal('iv' in migrated, false);
+    assert.equal('ciphertext' in migrated, false);
+}
+
+async function testLegacyEncryptedApiKeyDoesNotBlockHttpStartup() {
+    const { createQQV2ResourceService } = await importModule('modules/qq-v2/resources/service.js');
+    const storage = createMemoryStorage();
+    await storage.set('qq-v2.resources.api-presets', {
+        presets: [{
+            id: 'legacy-api',
+            name: 'Legacy API',
+            endpoint: 'https://api.example.test/v1',
+            model: 'gpt-test',
+            temperature: 1,
+            maxOutput: 4096,
+            hasApiKey: true,
+            iv: new Uint8Array(12).buffer,
+            ciphertext: new Uint8Array([1, 2, 3]).buffer,
+        }],
+    });
+    const resources = createQQV2ResourceService({ storage, cryptoApi: {} });
+
+    assert.equal((await resources.listApiPresets())[0].hasApiKey, true);
+    await assert.rejects(
+        resources.getApiPresetForRequest('legacy-api'),
+        (error) => error?.code === 'api_key_reentry_required',
+    );
+    await resources.saveApiPreset({
+        id: 'legacy-api',
+        apiKey: 'replacement-secret',
+    });
+    assert.equal((await resources.getApiPresetForRequest('legacy-api')).apiKey, 'replacement-secret');
 }
 
 async function testApiPresetEndpointPolicyAndDefaults() {
@@ -167,7 +239,7 @@ async function testApiPresetEndpointPolicyAndDefaults() {
     );
 }
 
-async function testApiPresetDecryptsOnlyForRequestAssembly() {
+async function testApiPresetExposesKeyOnlyForRequestAssembly() {
     const { createQQV2ResourceService } = await importModule('modules/qq-v2/resources/service.js');
     const resources = createQQV2ResourceService({
         storage: createMemoryStorage(),
@@ -230,6 +302,30 @@ async function testApiPresetEditsPreserveOrReplaceTheKey() {
         model: 'gpt-final',
     });
     assert.equal((await resources.getApiPresetForRequest(initial.id)).apiKey, 'second-key');
+}
+
+async function testInvalidApiPresetEditDoesNotReplaceTheStoredKey() {
+    const { createQQV2ResourceService } = await importModule('modules/qq-v2/resources/service.js');
+    const resources = createQQV2ResourceService({
+        storage: createMemoryStorage(),
+        cryptoApi: webcrypto,
+    });
+    const saved = await resources.saveApiPreset({
+        name: 'Stable',
+        endpoint: 'https://api.example.test/v1',
+        model: 'gpt-test',
+        apiKey: 'stable-key',
+    });
+
+    await assert.rejects(
+        resources.saveApiPreset({
+            id: saved.id,
+            endpoint: 'http://api.example.test/v1',
+            apiKey: 'should-not-stick',
+        }),
+        (error) => error?.code === 'invalid_api_endpoint',
+    );
+    assert.equal((await resources.getApiPresetForRequest(saved.id)).apiKey, 'stable-key');
 }
 
 async function testDeletingApiPresetLeavesItsStableIdUnresolved() {
@@ -771,10 +867,14 @@ async function testStickersCanBeAddedInOneBatch() {
 }
 
 async function main() {
-    await testApiPresetKeepsKeyEncryptedAndHiddenFromNormalReads();
+    await testApiPresetKeepsKeySeparateAndHiddenFromNormalReads();
+    await testResourceServiceWorksWithoutWebCrypto();
+    await testLegacyEncryptedApiKeyMigratesAtRequestBoundary();
+    await testLegacyEncryptedApiKeyDoesNotBlockHttpStartup();
     await testApiPresetEndpointPolicyAndDefaults();
-    await testApiPresetDecryptsOnlyForRequestAssembly();
+    await testApiPresetExposesKeyOnlyForRequestAssembly();
     await testApiPresetEditsPreserveOrReplaceTheKey();
+    await testInvalidApiPresetEditDoesNotReplaceTheStoredKey();
     await testDeletingApiPresetLeavesItsStableIdUnresolved();
     await testFourBuiltInPromptPresetsAreAvailableAsEditableLibraryEntries();
     await testNewYuziDefaultLibraryDoesNotReadSupersededDevelopmentPresetStorage();

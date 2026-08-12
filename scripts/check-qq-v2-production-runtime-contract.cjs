@@ -902,6 +902,55 @@ async function testProductionFacadeOwnsApiPresetLifecycleAcrossScopes() {
     runtime.destroy();
 }
 
+async function testProductionRuntimeWorksWithoutWebCryptoAndKeepsKeysOutOfExports() {
+    const {
+        createMemoryQQV2StateStore,
+    } = await importModule('modules/qq-v2/storage/state-store.js');
+    const {
+        createQQV2ProductionRuntime,
+    } = await importModule('modules/qq-v2/application/production-runtime.js');
+    const scopeId = 'st:character:alice:chat-lan-http';
+    const runtime = createQQV2ProductionRuntime({
+        host: {
+            readScope() {
+                return {
+                    scopeId,
+                    chatId: 'chat-lan-http',
+                    chatFile: 'chat-lan-http',
+                    hostType: 'character',
+                    hostId: 'alice',
+                };
+            },
+            readUserIdentity() { return { name: 'Traveler', avatar: '' }; },
+            readStoryTime() { return '2042-05-20 09:30'; },
+            readStoryMessages() { return []; },
+            readRawContext() { return { getRequestHeaders: () => ({}) }; },
+        },
+        stateStore: createMemoryQQV2StateStore(),
+        cryptoApi: {},
+        backend: { async generate() {}, async loadModels() { return []; } },
+        worldbookGateway: { async loadBook() { return { entries: {} }; }, async saveBook() {} },
+        worldbookContextGateway: { async runDryRun() { return []; } },
+    });
+
+    await runtime.initialize();
+    const facade = runtime.getFacade();
+    const saved = await facade.intent.saveApiPreset({
+        preset: {
+            name: 'LAN HTTP API',
+            endpoint: 'https://api.example.test/v1',
+            apiKey: 'lan-http-secret',
+            model: 'manual-model',
+        },
+    });
+
+    assert.equal(saved.ok, true);
+    assert.equal(JSON.stringify(await facade.query.sharedResources()).includes('lan-http-secret'), false);
+    assert.equal(JSON.stringify(await facade.query.imageLibraryPack()).includes('lan-http-secret'), false);
+    assert.equal(JSON.stringify(await facade.intent.exportAllPromptPresets()).includes('lan-http-secret'), false);
+    runtime.destroy();
+}
+
 async function testProductionFacadeListsOnlyExistingWorldbooks() {
     const {
         createMemoryQQV2StateStore,
@@ -1807,6 +1856,7 @@ async function main() {
     await testProductionRuntimeCancelsLateSaveAndCleansOldScopeThroughCurrentHostContext();
     await testDefaultRuntimeEntryExposesTheProductionFacade();
     await testProductionFacadeOwnsApiPresetLifecycleAcrossScopes();
+    await testProductionRuntimeWorksWithoutWebCryptoAndKeepsKeysOutOfExports();
     await testProductionFacadeListsOnlyExistingWorldbooks();
     await testProductionRuntimeInitializesDefaultWorldbookOncePerScope();
     await testProductionRuntimeQueriesDoNotCreateOrThrowForAnUnseenScope();
