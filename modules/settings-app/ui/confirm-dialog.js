@@ -63,7 +63,7 @@ export function showConfirmDialog(container, title, message, onConfirm, confirmT
             <div class="phone-confirm-dialog-title">${escapeHtml(title)}</div>
             <div class="phone-confirm-dialog-message">${escapeHtml(message)}</div>
             <div class="phone-confirm-dialog-buttons">
-                <button type="button" class="phone-confirm-dialog-btn phone-confirm-dialog-cancel">${escapeHtml(cancelText)}</button>
+                ${options?.hideCancel ? '' : `<button type="button" class="phone-confirm-dialog-btn phone-confirm-dialog-cancel">${escapeHtml(cancelText)}</button>`}
                 <button type="button" class="phone-confirm-dialog-btn phone-confirm-dialog-confirm">${escapeHtml(confirmText)}</button>
             </div>
         </div>
@@ -83,4 +83,8 @@ export function showConfirmDialog(container, title, message, onConfirm, confirmT
 
     mountRoot.appendChild(overlay);
     runtimeApi.setTimeout(() => overlay.classList.add('phone-confirm-dialog-show'), 10);
+}
+
+export function showAlertDialog(container, title, message, confirmText = '知道了', runtime = null, options = {}) {
+    showConfirmDialog(container, title, message, null, confirmText, '', runtime, { ...options, hideCancel: true });
 }

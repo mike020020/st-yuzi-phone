@@ -10,16 +10,32 @@ function importModule(relativePath) {
 }
 
 async function testPlaceholdersHaveOneStableMeaningAndKeepUnknownText() {
-    const { materializeQQV2PromptBlocks } = await importModule('modules/qq-v2/prompt/materializer.js');
+    const {
+        materializeQQV2PromptBlocks,
+        QQ_V2_PROMPT_PLACEHOLDERS,
+    } = await importModule('modules/qq-v2/prompt/materializer.js');
+    const { QQ_V2_PROMPT_PLACEHOLDER_DEFINITIONS } = await importModule('modules/qq-v2/prompt/placeholders.js');
+    assert.deepEqual(
+        QQ_V2_PROMPT_PLACEHOLDERS,
+        QQ_V2_PROMPT_PLACEHOLDER_DEFINITIONS.map(({ token }) => token),
+        '运行时替换与设置页说明必须共享同一份占位符目录',
+    );
+    assert.equal(
+        QQ_V2_PROMPT_PLACEHOLDER_DEFINITIONS.find(({ token }) => token === '{{私聊人物}}')?.description,
+        '人物名字。',
+    );
+    assert.equal(
+        QQ_V2_PROMPT_PLACEHOLDER_DEFINITIONS.find(({ token }) => token === '{{私聊主动人物}}')?.description,
+        '联系人所有人名字。',
+    );
     const blocks = [{
         role: 'system',
-        content: '{{私聊人物}}|{{私聊主动人物}}|{{群聊成员}}|{{私聊记录}}|{{私聊主动记录}}|{{群聊记录}}|{{正文上下文}}|{{世界书内容}}|{{故事时间}}|{{可用表情}}|{{天气}}',
+        content: '{{私聊人物}}|{{私聊主动人物}}|{{群聊成员}}|{{私聊主动记录}}|{{群聊记录}}|{{正文上下文}}|{{世界书内容}}|{{故事时间}}|{{可用表情}}|{{天气}}',
     }];
     const result = materializeQQV2PromptBlocks(blocks, {
         privatePerson: '林知夏',
         privateProactivePeople: 'P1：林知夏\nP2：顾言',
         groupMembers: '',
-        privateHistory: '私聊历史',
         privateProactiveHistory: '全部私聊分区历史',
         groupHistory: '群聊历史',
         storyContext: '正文',
@@ -29,8 +45,9 @@ async function testPlaceholdersHaveOneStableMeaningAndKeepUnknownText() {
     });
     assert.deepEqual(result, [{
         role: 'system',
-        content: '林知夏|P1：林知夏\nP2：顾言|无|私聊历史|全部私聊分区历史|群聊历史|正文|世界书|2042-05-01 10:00|S1｜开心|{{天气}}',
+        content: '林知夏|P1：林知夏\nP2：顾言|无|全部私聊分区历史|群聊历史|正文|世界书|2042-05-01 10:00|S1｜开心|{{天气}}',
     }]);
+    assert.equal(QQ_V2_PROMPT_PLACEHOLDERS.includes('{{私聊记录}}'), false);
 }
 
 async function testManualHistoryHasOneCurrentUserMessageAndProactiveDoesNotAppendRoles() {
@@ -55,11 +72,11 @@ async function testManualHistoryHasOneCurrentUserMessageAndProactiveDoesNotAppen
     assert.equal(manual.filter((message) => message.content === '最新一句').length, 1);
 
     const proactive = buildProactiveQQV2Request({
-        preset: { blocks: [{ role: 'user', content: '{{私聊记录}}|{{私聊主动记录}}' }] },
+        preset: { blocks: [{ role: 'user', content: '{{私聊主动记录}}' }] },
         variables: { privateProactiveHistory: '<private id="P1">历史</private>' },
         history,
     });
-    assert.deepEqual(proactive, [{ role: 'user', content: '无|<private id="P1">历史</private>' }]);
+    assert.deepEqual(proactive, [{ role: 'user', content: '<private id="P1">历史</private>' }]);
 }
 
 async function testStickerCatalogUsesShortReferencesAndRemovesImageCode() {

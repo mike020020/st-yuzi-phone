@@ -16,7 +16,7 @@ function main() {
     const app = read('modules/qq-v2/ui/app.js');
     const css = read('styles/phone-base/12-qq-app.css');
     const tokens = read('styles/phone-base/00-phone-tokens.css');
-    const picker = read('modules/settings-app/services/media-upload/picker.js');
+    const rawPicker = read('modules/settings-app/services/media-upload/raw-picker.js');
 
     assert.match(app, /from '\.\.\/\.\.\/phone-core\/view-scroll-state\.js'/,
         'private chat must reuse the shared view-scroll state module');
@@ -37,10 +37,14 @@ function main() {
     assert.match(emoji, /data-qq-sticker-upload/, 'the emoji grid must include an upload tile');
     assert.ok(emoji.indexOf('data-qq-sticker-upload') < emoji.indexOf('resources?.stickers'),
         'the upload tile must stay in the first emoji-grid cell');
-    assert.match(app, /skipCrop:\s*true/, 'sticker upload must preserve the whole source image');
+    const stickerUpload = sourceSlice(app, 'const uploadSticker =', 'const confirmImageLibraryDeletion =');
+    assert.match(app, /import \{ pickImageFiles \}/, 'QQ uploads must use the raw multi-file picker');
+    assert.match(stickerUpload, /pickImageFiles\(/, 'sticker upload must preserve each original selected file');
+    assert.doesNotMatch(stickerUpload, /skipCrop|cropPreset|compress\s*:/,
+        'sticker upload must not enter a crop or compression path');
     assert.match(app, /title:\s*'\\u8868\\u60c5\\u4ed3\\u5e93'/, 'QQ image resources must include the global sticker repository');
-    assert.match(picker, /callback\(best, Object\.freeze\(\{[\s\S]*name: String\(file\.name/,
-        'the shared picker must expose filename metadata for sticker descriptions');
+    assert.match(rawPicker, /callback\(Object\.freeze\(files\.map\(imageFileRecord\)\)\)/,
+        'the raw picker must expose ordered original files and filename metadata for sticker descriptions');
 
     assert.match(app, /jumpLabel\.textContent = formatUnreadBadge\(jumpCount\)/,
         'the jump bubble must render only the dynamic count');

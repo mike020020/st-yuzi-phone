@@ -8,6 +8,7 @@ const FILES = {
     core: 'modules/settings-app/services/media-upload/core.js',
     crop: 'modules/settings-app/services/media-upload/crop.js',
     picker: 'modules/settings-app/services/media-upload/picker.js',
+    rawPicker: 'modules/settings-app/services/media-upload/raw-picker.js',
     imageCropCss: 'styles/phone-base/08-image-crop.css',
     download: 'modules/settings-app/services/media-upload/download.js',
     appearance: 'modules/settings-app/services/appearance-settings.js',
@@ -42,6 +43,7 @@ function main() {
     const results = [];
 
     check(results, 'facade', '继续 re-export pickImageFile()', has(contents.facade, 'export { pickImageFile } from'));
+    check(results, 'facade', 're-export pickImageFiles()', has(contents.facade, 'export { pickImageFiles } from'));
     check(results, 'facade', '继续 re-export estimateBase64Bytes()', has(contents.facade, 'estimateBase64Bytes,'));
     check(results, 'facade', '继续 re-export estimateIconsStorageBytes()', has(contents.facade, 'estimateIconsStorageBytes,'));
     check(results, 'facade', '继续 re-export downloadTextFile()', has(contents.facade, 'export { downloadTextFile } from'));
@@ -77,6 +79,21 @@ function main() {
     check(results, 'picker', 'pickImageFile 在异步节点后检查 disposed', has(contents.picker, 'const rawDataUrl = await fileToDataUrl(file);\n            if (isDisposed()) return;')
         && has(contents.picker, ': await openImageCropDialog(rawDataUrl, options);\n            if (isDisposed()) return;')
         && has(contents.picker, 'if (isDisposed()) return null;'));
+
+    check(results, 'rawPicker', '存在 pickImageFiles()', has(contents.rawPicker, 'export function pickImageFiles('));
+    check(results, 'rawPicker', '原图选择器默认允许多选且支持显式单选', has(contents.rawPicker, 'input.multiple = options.multiple !== false;'));
+    check(results, 'rawPicker', '原图选择器按 FileList 顺序返回原始 File', has(contents.rawPicker, 'const files = [...(input.files || [])];')
+        && has(contents.rawPicker, 'file,')
+        && has(contents.rawPicker, 'files.map(imageFileRecord)'));
+    check(results, 'rawPicker', '原图选择器在回调前整批校验图片类型和单文件大小', has(contents.rawPicker, 'files.find((file) => !String(file.type || \'\').startsWith(\'image/\'))')
+        && has(contents.rawPicker, 'files.find((file) => Number(file.size) > maxBytes)')
+        && contents.rawPicker.indexOf('const invalidFile =') < contents.rawPicker.indexOf('callback(Object.freeze(')
+        && contents.rawPicker.indexOf('const oversizedFile =') < contents.rawPicker.indexOf('callback(Object.freeze('));
+    check(results, 'rawPicker', '原图选择器不经过 Data URL、裁剪或压缩', !has(contents.rawPicker, 'fileToDataUrl')
+        && !has(contents.rawPicker, 'openImageCropDialog')
+        && !has(contents.rawPicker, 'compressDataUrl'));
+    check(results, 'rawPicker', '文件选择取消或页面销毁时清理临时 input', has(contents.rawPicker, "window.addEventListener('focus', cleanupAfterPickerCloses")
+        && has(contents.rawPicker, 'runtime?.registerCleanup?.(cleanup);'));
     check(results, 'imageCropCss', '裁剪 overlay 限制在小手机壳内', has(contents.imageCropCss, 'position: absolute;') && has(contents.imageCropCss, 'min-height: 100%;') && !has(contents.imageCropCss, 'min-height: 100dvh;'));
     check(results, 'imageCropCss', '裁剪按钮区支持 secondary 分组', has(contents.imageCropCss, '.phone-image-crop-actions-secondary'));
     check(results, 'imageCropCss', '裁剪按钮区保持 sticky 操作区', has(contents.imageCropCss, 'position: sticky;') && has(contents.imageCropCss, 'bottom: 0;'));

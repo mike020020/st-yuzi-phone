@@ -14,4 +14,5 @@ export {
 } from './media-upload/crop.js';
 
 export { pickImageFile } from './media-upload/picker.js';
+export { pickImageFiles } from './media-upload/raw-picker.js';
 export { downloadTextFile } from './media-upload/download.js';

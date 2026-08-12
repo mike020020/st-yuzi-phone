@@ -898,6 +898,31 @@ export function createQQV2Facade(options = {}) {
                     return failed(error);
                 }
             },
+            async saveImageLibraryAssets(input = {}) {
+                if (typeof runtime.getSnapshot !== 'function') return unavailable('getSnapshot');
+                if (typeof runtime.saveImageLibraryAssets !== 'function') return unavailable('saveImageLibraryAssets');
+                const assets = asArray(input.assets).map((asset) => ({
+                    library: asText(asset?.library, 64),
+                    blob: asset?.blob,
+                    mimeType: asText(asset?.mimeType, 128),
+                }));
+                if (assets.length === 0 || assets.some((asset) => !asset.library)) {
+                    return Object.freeze({ ok: false, status: 'invalid', reason: 'image-assets-required' });
+                }
+                try {
+                    const snapshot = asObject(await runtime.getSnapshot());
+                    const context = cloneContext(snapshot.context);
+                    if (!context.scopeId) return unavailable('currentScope');
+                    const saved = await runtime.saveImageLibraryAssets({ scopeId: context.scopeId, assets });
+                    return Object.freeze({
+                        ok: true,
+                        status: 'accepted',
+                        assets: Object.freeze(asArray(saved).map(cloneMedia)),
+                    });
+                } catch (error) {
+                    return failed(error);
+                }
+            },
             async deleteImageLibraryAssets(input = {}) {
                 if (typeof runtime.getSnapshot !== 'function') return unavailable('getSnapshot');
                 if (typeof runtime.deleteImageLibraryAssets !== 'function') return unavailable('deleteImageLibraryAssets');
@@ -1086,6 +1111,23 @@ export function createQQV2Facade(options = {}) {
                         ok: true,
                         status: 'accepted',
                         sticker: cloneSticker(sticker),
+                    });
+                } catch (error) {
+                    return failed(error);
+                }
+            },
+            async saveStickers(input = {}) {
+                if (typeof runtime.saveStickers !== 'function') return unavailable('saveStickers');
+                const stickers = asArray(input.stickers).map(asObject);
+                if (stickers.length === 0) {
+                    return Object.freeze({ ok: false, status: 'invalid', reason: 'stickers-required' });
+                }
+                try {
+                    const saved = await runtime.saveStickers({ stickers });
+                    return Object.freeze({
+                        ok: true,
+                        status: 'accepted',
+                        stickers: Object.freeze(asArray(saved).map(cloneSticker)),
                     });
                 } catch (error) {
                     return failed(error);

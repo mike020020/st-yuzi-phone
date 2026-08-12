@@ -672,13 +672,6 @@ export function createQQV2ProductionRuntime(options = {}) {
             groupMembers: conversation.kind === 'group'
                 ? buildGroupIdentity(conversation, facts.group, facts.peopleById, referenceByPersonId)
                 : '无',
-            privateHistory: conversation.kind === 'private'
-                ? visibleHistory.map((message, index) => formatPromptHistoryMessage(
-                    message,
-                    `M${index + 1}`,
-                    facts.peopleById,
-                )).join('\n') || '无'
-                : '无',
             groupHistory: conversation.kind === 'group'
                 ? visibleHistory.map((message, index) => formatPromptHistoryMessage(
                     message,
@@ -1087,6 +1080,7 @@ export function createQQV2ProductionRuntime(options = {}) {
             return revokeStickerRenderLease(asText(leaseId, 256));
         },
         saveSticker: ({ sticker } = {}) => resources.saveSticker(asObject(sticker)),
+        saveStickers: ({ stickers } = {}) => resources.saveStickers(asArray(stickers).map(asObject)),
         moveSticker: ({ stickerId, targetIndex } = {}) => resources.moveSticker(
             asText(stickerId, 256),
             Number(targetIndex),
@@ -1297,6 +1291,15 @@ export function createQQV2ProductionRuntime(options = {}) {
             const asset = await repository.saveImageLibraryAsset(normalizedScopeId, { library, blob, mimeType });
             await notifySubscribers(normalizedScopeId);
             return asset;
+        },
+        async saveImageLibraryAssets({ scopeId, assets = [] }) {
+            const normalizedScopeId = await ensureScope(scopeId);
+            const saved = await repository.saveImageLibraryAssets(
+                normalizedScopeId,
+                asArray(assets).map(asObject),
+            );
+            await notifySubscribers(normalizedScopeId);
+            return saved;
         },
         async deleteImageLibraryAssets({ scopeId, assetIds }) {
             const normalizedScopeId = await ensureScope(scopeId);

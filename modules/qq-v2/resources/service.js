@@ -681,7 +681,7 @@ function clonePromptPreset(record) {
 
 function nextPromptPresetCopyName(requestedName, presets) {
     const baseName = String(requestedName ?? '').trim() || 'Imported preset';
-    const usedNames = new Set(presets.map((preset) => preset.name));
+    const usedNames = new Set(presets.map((preset) => String(preset?.name ?? '').trim()));
     if (!usedNames.has(baseName)) return baseName;
 
     let copyNumber = 1;
@@ -691,6 +691,25 @@ function nextPromptPresetCopyName(requestedName, presets) {
         candidate = `${baseName} (copy ${copyNumber})`;
     }
     return candidate;
+}
+
+function uniquePromptPresetName(value, presets, ignoredId = '') {
+    const name = String(value ?? '').trim();
+    if (!name) {
+        throw resourceError('prompt_preset_name_required', 'AI 指令预设名称不能为空');
+    }
+    const conflict = presets.some((preset) => (
+        preset.id !== ignoredId
+        && String(preset.name ?? '').trim() === name
+    ));
+    const reservedConflict = BUILT_IN_PROMPT_PRESETS.some((preset) => (
+        preset.id !== ignoredId
+        && preset.name === name
+    ));
+    if (conflict || reservedConflict) {
+        throw resourceError('prompt_preset_name_conflict', '已经存在同名 AI 指令预设');
+    }
+    return name;
 }
 
 function publicSticker(record) {
@@ -848,12 +867,17 @@ export function createQQV2ResourceService(options = {}) {
             }
 
             const existing = index === -1 ? null : state.presets[index];
+            const name = uniquePromptPresetName(
+                input?.name ?? existing?.name,
+                state.presets,
+                existing?.id,
+            );
             const messages = Array.isArray(input?.messages)
                 ? clonePromptMessages(input.messages)
                 : existing?.messages.map((block) => ({ ...block })) ?? [];
             const record = {
                 id: existing?.id ?? createId(cryptoApi),
-                name: String(input?.name ?? existing?.name ?? ''),
+                name,
                 isBuiltIn: existing?.isBuiltIn ?? false,
                 messages,
             };
@@ -872,6 +896,7 @@ export function createQQV2ResourceService(options = {}) {
             }
 
             const state = await readPromptState();
+            uniquePromptPresetName(factoryPreset.name, state.presets, id);
             const record = clonePromptPreset(factoryPreset);
             const index = state.presets.findIndex((preset) => preset.id === id);
             if (index === -1) {
@@ -886,6 +911,7 @@ export function createQQV2ResourceService(options = {}) {
             const state = await readPromptState();
             const customPresets = state.presets.filter((preset) => !preset.isBuiltIn);
             const restoredPresets = BUILT_IN_PROMPT_PRESETS.map(clonePromptPreset);
+            restoredPresets.forEach((preset) => uniquePromptPresetName(preset.name, customPresets, preset.id));
             state.presets = [...restoredPresets, ...customPresets];
             await storage.set(PROMPT_PRESETS_STORAGE_KEY, state);
             return Object.freeze(restoredPresets.map(publicPromptPreset));

@@ -1625,6 +1625,65 @@
     line-height: var(--yuzi-qq-root-title-line-height);
 }
 
+.yuzi-qq-sticker-upload-dialog {
+    max-block-size: calc(100% - (var(--yuzi-qq-page-padding) * 2));
+    min-block-size: 0;
+}
+
+.yuzi-qq-sticker-upload-form,
+.yuzi-qq-sticker-upload-list,
+.yuzi-qq-sticker-upload-details {
+    min-block-size: 0;
+}
+
+.yuzi-qq-sticker-upload-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yuzi-qq-dialog-gap);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.yuzi-qq-sticker-upload-row {
+    display: grid;
+    grid-template-columns: var(--yuzi-qq-avatar-size) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--yuzi-qq-dialog-gap);
+}
+
+.yuzi-qq-sticker-upload-preview {
+    inline-size: var(--yuzi-qq-avatar-size);
+    block-size: var(--yuzi-qq-avatar-size);
+    object-fit: contain;
+    border-radius: var(--yuzi-qq-radius);
+    background: var(--yuzi-qq-control);
+}
+
+.yuzi-qq-sticker-upload-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--yuzi-qq-tool-gap);
+}
+
+.yuzi-qq-sticker-upload-name {
+    overflow: hidden;
+    color: var(--yuzi-qq-muted);
+    font-size: var(--yuzi-qq-row-preview-size);
+    line-height: var(--yuzi-qq-row-preview-line-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.yuzi-qq-sticker-upload-details .yuzi-qq-sticker-description-input {
+    resize: vertical;
+}
+
+@container yuzi-phone-screen (max-width: 240px) {
+    .yuzi-qq-sticker-upload-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 .yuzi-qq-dialog-menu {
     align-self: center;
     inline-size: var(--yuzi-qq-dialog-menu-width);

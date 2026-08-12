@@ -763,6 +763,46 @@ export function createQQV2Repository(options = {}) {
         throw new TypeError('QQ v2 repository 需要 stateStore');
     }
 
+    const saveImageLibraryAssets = async (scopeId, inputs = []) => {
+        if (!Array.isArray(inputs) || inputs.length === 0) {
+            throw new QQV2DomainError('Image library assets must be a non-empty array', 'image_assets_required');
+        }
+        return stateStore.transact((state) => {
+            getScope(state, scopeId, false);
+            const records = inputs.map((input) => {
+                const { library, kind } = imageLibraryKind(input?.library);
+                const blob = input?.blob instanceof Blob ? input.blob : null;
+                if (!blob) throw new QQV2DomainError('Image library asset must provide a Blob', 'asset_blob_required');
+                return { input, library, kind, blob };
+            });
+            if (!state.sharedResources || typeof state.sharedResources !== 'object' || Array.isArray(state.sharedResources)) {
+                state.sharedResources = {};
+            }
+            if (!state.sharedResources[SHARED_IMAGE_LIBRARY_KEY]
+                || typeof state.sharedResources[SHARED_IMAGE_LIBRARY_KEY] !== 'object'
+                || Array.isArray(state.sharedResources[SHARED_IMAGE_LIBRARY_KEY])) {
+                state.sharedResources[SHARED_IMAGE_LIBRARY_KEY] = {};
+            }
+            const latestCreatedAt = Object.values(state.sharedResources[SHARED_IMAGE_LIBRARY_KEY])
+                .reduce((latest, asset) => Math.max(latest, Number(asset?.createdAt || 0)), 0);
+            const newestCreatedAt = Math.max(Date.now(), latestCreatedAt + records.length);
+            const assets = records.map(({ input, library, kind, blob }, index) => ({
+                assetId: createId('asset'),
+                scopeId: '',
+                conversationId: '',
+                kind,
+                library,
+                blob,
+                mimeType: asText(input.mimeType || blob.type, 128),
+                createdAt: newestCreatedAt - index,
+            }));
+            assets.forEach((asset) => {
+                state.sharedResources[SHARED_IMAGE_LIBRARY_KEY][asset.assetId] = asset;
+            });
+            return assets.map(copy);
+        });
+    };
+
     return Object.freeze({
         async ensureScope(scopeId, hostMetadata = null) {
             return stateStore.transact((state) => {
@@ -1379,33 +1419,9 @@ export function createQQV2Repository(options = {}) {
             const id = asText(assetId, 256);
             return copy(scope.assets[id] || findImageLibraryAsset(state, id));
         },
+        saveImageLibraryAssets,
         async saveImageLibraryAsset(scopeId, input = {}) {
-            return stateStore.transact((state) => {
-                getScope(state, scopeId, false);
-                const { library, kind } = imageLibraryKind(input.library);
-                const blob = input.blob instanceof Blob ? input.blob : null;
-                if (!blob) throw new QQV2DomainError('Image library asset must provide a Blob', 'asset_blob_required');
-                if (!state.sharedResources || typeof state.sharedResources !== 'object' || Array.isArray(state.sharedResources)) {
-                    state.sharedResources = {};
-                }
-                if (!state.sharedResources[SHARED_IMAGE_LIBRARY_KEY]
-                    || typeof state.sharedResources[SHARED_IMAGE_LIBRARY_KEY] !== 'object'
-                    || Array.isArray(state.sharedResources[SHARED_IMAGE_LIBRARY_KEY])) {
-                    state.sharedResources[SHARED_IMAGE_LIBRARY_KEY] = {};
-                }
-                const asset = {
-                    assetId: createId('asset'),
-                    scopeId: '',
-                    conversationId: '',
-                    kind,
-                    library,
-                    blob,
-                    mimeType: asText(input.mimeType || blob.type, 128),
-                    createdAt: Date.now(),
-                };
-                state.sharedResources[SHARED_IMAGE_LIBRARY_KEY][asset.assetId] = asset;
-                return copy(asset);
-            });
+            return (await saveImageLibraryAssets(scopeId, [input]))[0];
         },
         async listImageLibraryAssets(scopeId, library) {
             const state = await stateStore.read();

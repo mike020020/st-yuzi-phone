@@ -547,6 +547,32 @@ async function testBuiltInPromptPresetIsEditableAndPreservesUnknownPlaceholders(
     assert.deepEqual(await resources.getPromptPreset(saved.id), saved);
 }
 
+async function testPromptPresetNamesMustBeUnique() {
+    const { createQQV2ResourceService } = await importModule('modules/qq-v2/resources/service.js');
+    const resources = createQQV2ResourceService({
+        storage: createMemoryStorage(),
+        cryptoApi: webcrypto,
+    });
+    const saved = await resources.savePromptPreset({
+        name: '唯一名称',
+        messages: [{ id: 'first', name: '规则', role: 'system', content: '内容' }],
+    });
+
+    await assert.rejects(
+        resources.savePromptPreset({
+            name: ' 唯一名称 ',
+            messages: [{ id: 'copy', name: '规则', role: 'system', content: '副本' }],
+        }),
+        (error) => error?.code === 'prompt_preset_name_conflict',
+    );
+    const renamed = await resources.savePromptPreset({
+        id: saved.id,
+        name: '唯一名称',
+        messages: saved.messages,
+    });
+    assert.equal(renamed.id, saved.id, '保存当前预设时允许保留自己的名称');
+}
+
 async function testBuiltInPromptPresetCanBeRestored() {
     const { createQQV2ResourceService } = await importModule('modules/qq-v2/resources/service.js');
     const resources = createQQV2ResourceService({
@@ -864,6 +890,19 @@ async function testStickersCanBeAddedInOneBatch() {
         { description: 'The second batch sticker.', order: 1 },
     ]);
     assert.equal(await (await resources.getStickerBlob(saved[1].id)).text(), 'batch second');
+
+    await assert.rejects(
+        resources.saveStickers([
+            { description: 'This must roll back.', blob: new Blob(['never written'], { type: 'image/png' }) },
+            { description: '', blob: new Blob(['invalid'], { type: 'image/png' }) },
+        ]),
+        (error) => error?.code === 'sticker_description_required',
+    );
+    assert.deepEqual(
+        (await resources.listStickers()).map((sticker) => sticker.description),
+        ['The first batch sticker.', 'The second batch sticker.'],
+        'one invalid sticker must roll back the complete batch',
+    );
 }
 
 async function main() {
@@ -880,6 +919,7 @@ async function main() {
     await testNewYuziDefaultLibraryDoesNotReadSupersededDevelopmentPresetStorage();
     await testBuiltInPromptPresetsRetainYuziBlocksAndEditableXmlOutput();
     await testBuiltInPromptPresetIsEditableAndPreservesUnknownPlaceholders();
+    await testPromptPresetNamesMustBeUnique();
     await testBuiltInPromptPresetCanBeRestored();
     await testCustomPromptPresetsCanBeDeletedButBuiltInsCannot();
     await testRestoringAllBuiltInPromptPresetsKeepsCustomPresets();

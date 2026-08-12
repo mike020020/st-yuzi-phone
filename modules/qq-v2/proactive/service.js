@@ -306,7 +306,6 @@ export function createQQV2ProactiveService(options = {}) {
             privatePerson: '无',
             privateProactivePeople: kind === 'private' ? buildPrivateProactiveIdentity(candidates) : '无',
             groupMembers: kind === 'group' ? buildGroupIdentity(candidates, friendReferences) : '无',
-            privateHistory: '无',
             privateProactiveHistory: kind === 'private' ? sections : '无',
             groupHistory: kind === 'group' ? sections : '无',
             storyTime: asText(promptContext.storyTime || storyTime, 128),

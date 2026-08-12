@@ -47,6 +47,7 @@ function validateSettingsRendererDeps(deps = {}) {
         'rerenderAppearanceKeepScroll',
         'rerenderApiPresetsKeepScroll',
         'rerenderBeautifyKeepScroll',
+        'rerenderAiInstructionPresetsKeepScroll',
     ]);
     assertFunctionDeps('appearance', deps.appearance, [
         'getLayoutValue',

@@ -46,7 +46,7 @@ assert.match(currentProfileUpload, /saved\.media\?\.assetId/, 'current profile u
 assert.doesNotMatch(currentProfileUpload, /saveImageLibraryAsset/, 'current profile uploads must not enter the image library');
 
 const libraryUpload = slice('const uploadImageLibraryAsset =', 'const confirmImageLibraryDeletion =');
-assert.match(libraryUpload, /facade\.intent\.saveImageLibraryAsset\(/, 'image library uploads must keep the shared library storage path');
+assert.match(libraryUpload, /facade\.intent\.saveImageLibraryAssets\(/, 'image library uploads must keep the shared batch-library storage path');
 assert.doesNotMatch(libraryUpload, /facade\.intent\.saveMedia\(/, 'image library uploads must not use dedicated profile media storage');
 
 console.log('[qq-profile-media-controls-contract] passed');

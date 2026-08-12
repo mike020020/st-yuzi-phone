@@ -5,6 +5,7 @@ const path = require('node:path');
 (async () => {
     const root = path.resolve(__dirname, '..');
     const source = await fs.readFile(path.join(root, 'modules/qq-v2/ui/app.js'), 'utf8');
+    const uploadDialogSource = await fs.readFile(path.join(root, 'modules/qq-v2/ui/sticker-upload-dialog.js'), 'utf8');
     const facadeSource = await fs.readFile(path.join(root, 'modules/qq-v2/application/facade.js'), 'utf8');
     const runtimeSource = await fs.readFile(path.join(root, 'modules/qq-v2/application/production-runtime.js'), 'utf8');
     const css = await fs.readFile(path.join(root, 'styles/phone-base/12-qq-app.css'), 'utf8');
@@ -64,10 +65,26 @@ const path = require('node:path');
     const uploadStart = source.indexOf('const openStickerUploadDialog =');
     const uploadEnd = source.indexOf('const uploadSticker =', uploadStart);
     const uploadSource = source.slice(uploadStart, uploadEnd);
-    assert.match(uploadSource, /description\.placeholder = '\u8868\u60c5\u542b\u4e49'/,
-        'sticker upload must expose one meaning field');
-    assert.doesNotMatch(uploadSource, /sticker-name|\bname\s*=\s*createElement/,
-        'sticker upload must not expose a second name field');
+    assert.match(uploadSource, /createStickerUploadDialog\(/,
+        'both sticker upload entries must use the shared batch dialog module');
+    assert.match(uploadSource, /facade\.intent\.saveStickers\(\{ stickers \}\)/,
+        'the shared dialog must save all selected stickers in one batch');
+    assert.match(uploadSource, /render\(\{ preserveEmoji: reopenPanel \}\)/,
+        'chat uploads must restore the emoji panel after a successful batch save');
+    assert.equal((source.match(/data-qq-sticker-upload/g) || []).length, 2,
+        'the chat plus button and sticker repository must expose the same upload action');
+    assert.match(uploadDialogSource, /files\.map\(\(record, index\) =>/,
+        'the batch dialog must render rows in file-selection order');
+    assert.match(uploadDialogSource, /description\.value = defaultDescription\(record\?\.name, index\)/,
+        'each sticker description must default from its own file name');
+    assert.match(uploadDialogSource, /descriptions\.findIndex\(\(description\) => !description\)/,
+        'empty descriptions must prevent the batch save');
+    assert.match(uploadDialogSource, /URL\.createObjectURL\(file\)/,
+        'the batch dialog must preview each selected file');
+    assert.match(uploadDialogSource, /URL\.revokeObjectURL\(previewUrl\)/,
+        'closing the batch dialog must release every preview URL');
+    assert.match(css, /\.yuzi-qq-sticker-upload-preview\s*\{[^}]*object-fit:\s*contain;/s,
+        'batch sticker previews must retain the complete image');
     assert.match(source, /facade\.intent\.releaseStickerRender\?\.\(\{ leaseId: render\.leaseId \}\)/,
         'QQ render cleanup must release sticker object URL leases');
     assert.match(facadeSource, /async stickerRender\(input = \{\}\)[\s\S]{0,500}runtime\.acquireStickerRender\(\{ stickerId \}\)/,

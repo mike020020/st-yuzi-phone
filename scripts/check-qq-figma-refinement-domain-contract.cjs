@@ -98,6 +98,62 @@ async function testProfilesLibrariesAndReferenceFallback() {
     assert.equal(otherPerson.profileBackgroundAssetId, '', 'global library deletion clears cross-chat profile-background references');
 }
 
+async function testImageLibraryBatchPreservesSelectionOrderAndRollsBackInvalidInput() {
+    const repository = await createRepository();
+    await repository.ensureScope('scope-a');
+    const originalNow = Date.now;
+    Date.now = () => 1_000;
+    let saved;
+    try {
+        saved = await repository.saveImageLibraryAssets('scope-a', [
+            { library: 'avatar', blob: image('first') },
+            { library: 'avatar', blob: image('second') },
+            { library: 'avatar', blob: image('third') },
+        ]);
+    } finally {
+        Date.now = originalNow;
+    }
+
+    assert.deepEqual(
+        await Promise.all(saved.map((asset) => asset.blob.text())),
+        ['first', 'second', 'third'],
+        'batch results preserve the system file-selection order',
+    );
+    assert.deepEqual(
+        await Promise.all((await repository.listImageLibraryAssets('scope-a', 'avatar'))
+            .map((asset) => asset.blob.text())),
+        ['first', 'second', 'third'],
+        'newest-first library rendering must not reverse one selected batch',
+    );
+
+    Date.now = () => 1_000;
+    try {
+        await repository.saveImageLibraryAsset('scope-a', { library: 'avatar', blob: image('newest') });
+    } finally {
+        Date.now = originalNow;
+    }
+    assert.deepEqual(
+        await Promise.all((await repository.listImageLibraryAssets('scope-a', 'avatar'))
+            .map((asset) => asset.blob.text())),
+        ['newest', 'first', 'second', 'third'],
+        'a later upload must stay ahead of an earlier batch even within the same millisecond',
+    );
+
+    await assert.rejects(
+        repository.saveImageLibraryAssets('scope-a', [
+            { library: 'avatar', blob: image('never-written') },
+            { library: 'avatar', blob: null },
+        ]),
+        (error) => error?.code === 'asset_blob_required',
+    );
+    assert.deepEqual(
+        await Promise.all((await repository.listImageLibraryAssets('scope-a', 'avatar'))
+            .map((asset) => asset.blob.text())),
+        ['newest', 'first', 'second', 'third'],
+        'one invalid item must roll back the complete image batch',
+    );
+}
+
 
 async function testCurrentProfileAvatarDrivesNewSelfMessages() {
     const repository = await createRepository();
@@ -172,6 +228,10 @@ async function testFacadeExposesRefinementSeamsWithoutNormalizingNames() {
         async updateCurrentProfile(input) { calls.push(['updateCurrentProfile', input]); return input.profile; },
         async listImageLibraryAssets(input) { calls.push(['listImageLibraryAssets', input]); return []; },
         async saveImageLibraryAsset(input) { calls.push(['saveImageLibraryAsset', input]); return { assetId: 'asset-1', library: input.library, kind: 'avatar' }; },
+        async saveImageLibraryAssets(input) {
+            calls.push(['saveImageLibraryAssets', input]);
+            return input.assets.map((asset, index) => ({ assetId: `asset-batch-${index}`, kind: 'avatar', ...asset }));
+        },
         async deleteImageLibraryAssets(input) { calls.push(['deleteImageLibraryAssets', input]); return { deletedAssetIds: input.assetIds }; },
         async createPrivateConversation(input) {
             calls.push(['createPrivateConversation', input]);
@@ -183,6 +243,17 @@ async function testFacadeExposesRefinementSeamsWithoutNormalizingNames() {
     await facade.intent.updateCurrentProfile({ profile: { signature: '???' } });
     await facade.query.imageLibrary({ library: 'avatar' });
     await facade.intent.saveImageLibraryAsset({ library: 'avatar', blob: image('avatar') });
+    const batchBlobs = [image('first'), image('second')];
+    await facade.intent.saveImageLibraryAssets({
+        assets: batchBlobs.map((blob) => ({ library: 'avatar', blob, mimeType: blob.type })),
+    });
+    assert.deepEqual(calls.at(-1), ['saveImageLibraryAssets', {
+        scopeId: 'scope-a',
+        assets: [
+            { library: 'avatar', blob: batchBlobs[0], mimeType: 'image/png' },
+            { library: 'avatar', blob: batchBlobs[1], mimeType: 'image/png' },
+        ],
+    }], 'Facade forwards one ordered image batch through the current QQ scope');
     await facade.intent.deleteImageLibraryAssets({ assetIds: ['asset-1'] });
     await facade.intent.createPrivateConversation({ name: 'Alice ' });
     assert.deepEqual(calls.at(-1), ['createPrivateConversation', { scopeId: 'scope-a', name: 'Alice ', userName: '???', storyTime: '' }], 'Facade preserves the literal contact name for exact-match routing');
@@ -191,6 +262,7 @@ async function testFacadeExposesRefinementSeamsWithoutNormalizingNames() {
 async function main() {
     await testRefinementDefaultsAndExactContactRoute();
     await testProfilesLibrariesAndReferenceFallback();
+    await testImageLibraryBatchPreservesSelectionOrderAndRollsBackInvalidInput();
     await testCurrentProfileAvatarDrivesNewSelfMessages();
     await testIndependentConversationInjectionOverrides();
     await testFacadeExposesRefinementSeamsWithoutNormalizingNames();

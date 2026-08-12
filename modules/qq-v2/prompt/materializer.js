@@ -1,17 +1,12 @@
 import { formatQQV2MessageSemantic, qqV2MessageType } from '../domain/message-semantics.js';
+import {
+    QQ_V2_PROMPT_PLACEHOLDER_DEFINITIONS,
+    QQ_V2_PROMPT_PLACEHOLDERS,
+} from './placeholders.js';
 
-const BUILT_IN_PLACEHOLDERS = Object.freeze({
-    '{{私聊人物}}': 'privatePerson',
-    '{{私聊主动人物}}': 'privateProactivePeople',
-    '{{群聊成员}}': 'groupMembers',
-    '{{私聊记录}}': 'privateHistory',
-    '{{私聊主动记录}}': 'privateProactiveHistory',
-    '{{群聊记录}}': 'groupHistory',
-    '{{正文上下文}}': 'storyContext',
-    '{{世界书内容}}': 'worldbookContent',
-    '{{故事时间}}': 'storyTime',
-    '{{可用表情}}': 'availableStickers',
-});
+const BUILT_IN_PLACEHOLDERS = Object.freeze(Object.fromEntries(
+    QQ_V2_PROMPT_PLACEHOLDER_DEFINITIONS.map(({ token, variable }) => [token, variable]),
+));
 
 function asText(value) {
     return String(value ?? '');
@@ -121,8 +116,7 @@ export function materializeQQV2PromptBlocks(blocks, variables = {}) {
 }
 
 /**
- * 手动回复的角色历史只来自当前 QQ 会话。消息块中的历史占位符由用户自行控制，
- * 不在这里试图去重它们。
+ * 手动回复的角色历史只来自当前 QQ 会话，并作为真实角色消息追加一次。
  */
 export function buildManualQQV2Request({ preset, variables = {}, history = [], currentMessage } = {}) {
     const request = [...materializeQQV2PromptBlocks(preset, variables)];
@@ -194,4 +188,4 @@ export function buildQQV2ProactiveSections({ kind, conversations = [] } = {}) {
     }).join('\n') || '无';
 }
 
-export const QQ_V2_PROMPT_PLACEHOLDERS = Object.freeze([...Object.keys(BUILT_IN_PLACEHOLDERS)]);
+export { QQ_V2_PROMPT_PLACEHOLDERS };

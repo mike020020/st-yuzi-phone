@@ -313,6 +313,14 @@
     min-width: 96px;
 }
 
+.phone-ai-preset-management-actions {
+    align-items: stretch;
+}
+
+.phone-ai-preset-save-actions {
+    margin-bottom: 2px;
+}
+
 .phone-ai-preset-segment-stack {
     display: flex;
     flex-direction: column;
@@ -398,33 +406,33 @@
     min-height: 132px;
 }
 
-.phone-ai-preset-placeholder-note {
-    margin-top: 12px;
-    overflow-wrap: anywhere;
+.phone-ai-preset-placeholder-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
-.phone-ai-preset-placeholder-note code {
+.phone-ai-preset-placeholder-list li {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--yuzi-settings-text-secondary, #7A7772);
+}
+
+.phone-ai-preset-placeholder-list code {
+    max-width: 100%;
+    padding: 2px 5px;
+    border-radius: 3px;
     color: var(--yuzi-settings-accent-strong, #4B6648);
     background: var(--yuzi-settings-accent-soft, rgba(91, 122, 106, 0.1));
-}
-
-.phone-ai-instruction-presets-section .phone-settings-section-side {
-    min-width: 0;
-    max-width: 100%;
-}
-
-@media (max-width: 430px) {
-    .phone-ai-instruction-presets-section .phone-settings-section-head {
-        flex-wrap: wrap;
-    }
-
-    .phone-ai-instruction-presets-section .phone-settings-section-side {
-        flex: 1 1 100%;
-    }
-
-    .phone-ai-instruction-presets-section .phone-settings-action {
-        justify-content: flex-start;
-    }
+    overflow-wrap: anywhere;
 }
 
 @media screen and (max-width: 720px) {
@@ -443,6 +451,10 @@
     .phone-ai-preset-segment-toolbar-main,
     .phone-ai-preset-segment-toolbar-actions {
         width: 100%;
+    }
+
+    .phone-ai-preset-placeholder-list {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 

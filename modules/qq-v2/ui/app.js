@@ -1,8 +1,9 @@
-import { pickImageFile } from '../../settings-app/services/media-upload.js';
+import { pickImageFiles } from '../../settings-app/services/media-upload.js';
 import { createPhoneNavIconElement } from '../../phone-core/navigation-ui.js';
 import { isScrollContainerNearBottom } from '../../phone-core/stable-scroll-anchor.js';
 import { createPhoneViewScrollState } from '../../phone-core/view-scroll-state.js';
 import { createEmojiPanelTemporaryLayerController } from './emoji-panel.js';
+import { createStickerUploadDialog } from './sticker-upload-dialog.js';
 import {
     bindConversationSwipeGesture,
     resolveConversationSwipe,
@@ -625,6 +626,7 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
     let disposed = false;
     let renderEpoch = 0;
     let overlay = null;
+    let overlayCleanup = null;
     let restoreOverlayFocus = null;
     let tab = 'messages';
     let page = null;
@@ -711,6 +713,10 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
     const leaseSessionFor = (token = renderEpoch) => renderLeaseSessions.get(token);
 
     const clearOverlay = () => {
+        try {
+            overlayCleanup?.();
+        } catch {}
+        overlayCleanup = null;
         overlay?.remove();
         overlay = null;
         const focusTarget = restoreOverlayFocus;
@@ -2140,9 +2146,9 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
             titleClassName: 'yuzi-qq-image-library-title',
         });
         const stores = [
-            { library: 'avatar', title: '\u5934\u50cf', cropPreset: 'icon' },
-            { library: 'profile-background', title: '\u8d44\u6599\u80cc\u666f', cropPreset: 'background' },
-            { library: 'chat-background', title: '\u804a\u5929\u80cc\u666f', cropPreset: 'background' },
+            { library: 'avatar', title: '\u5934\u50cf' },
+            { library: 'profile-background', title: '\u8d44\u6599\u80cc\u666f' },
+            { library: 'chat-background', title: '\u804a\u5929\u80cc\u666f' },
             { library: 'sticker', title: '\u8868\u60c5\u4ed3\u5e93', sticker: true },
         ];
         const results = await Promise.all(stores.map(({ library, sticker }) => (
@@ -2177,7 +2183,7 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
                 item.classList.toggle('is-selected', selectedStickerIds.has(item.dataset.qqStickerLibraryItem));
             });
         };
-        cards.forEach(({ library, title, cropPreset, sticker, assets }) => {
+        cards.forEach(({ library, title, sticker, assets }) => {
             const card = createElement('section', 'yuzi-qq-image-library-card');
             card.setAttribute('aria-label', title);
             const heading = createElement('h2', 'yuzi-qq-image-library-heading');
@@ -2240,7 +2246,6 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
             const upload = createButton('', 'yuzi-qq-image-library-item yuzi-qq-image-library-upload-action', sticker
                 ? { 'aria-label': '\u4e0a\u4f20\u8868\u60c5', title: '\u4e0a\u4f20\u8868\u60c5', 'data-qq-sticker-upload': '1' }
                 : { 'aria-label': '\u4e0a\u4f20\u56fe\u7247', title: '\u4e0a\u4f20\u56fe\u7247', 'data-qq-image-library-upload': library });
-            if (!sticker) upload.dataset.qqImageLibraryCropPreset = cropPreset;
             upload.append(createIcon('arrow-up-from-bracket'));
             grid.append(upload);
             card.append(heading, grid);
@@ -2769,9 +2774,9 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
     };
     void openTransferActionLegacy;
 
-    const updatePrivateProfileAsset = (conversationId, fieldName, kind, cropPreset) => {
-        pickImageFile(async (dataUrl) => {
-            const blob = await fetch(dataUrl).then((response) => response.blob());
+    const updatePrivateProfileAsset = (conversationId, fieldName, kind) => {
+        pickImageFiles(async ([selected]) => {
+            const blob = selected.file;
             const saved = await facade.intent.saveMedia({
                 media: {
                     kind,
@@ -2788,9 +2793,7 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
             if (!updated?.ok) throw new Error(updated?.error?.message || '资料更新失败');
             await render();
         }, {
-            cropTitle: cropPreset === 'icon' ? '\u88c1\u526a\u5934\u50cf' : '\u88c1\u526a\u80cc\u666f',
-            cropPreset,
-            compress: cropPreset !== 'icon',
+            multiple: false,
             maxSizeMB: 8,
             onError: (message) => report(new Error(message)),
         });
@@ -2802,9 +2805,9 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
         await render();
     };
 
-    const updateCurrentProfileAsset = (fieldName, kind, cropPreset) => {
-        pickImageFile(async (dataUrl) => {
-            const blob = await fetch(dataUrl).then((response) => response.blob());
+    const updateCurrentProfileAsset = (fieldName, kind) => {
+        pickImageFiles(async ([selected]) => {
+            const blob = selected.file;
             const saved = await facade.intent.saveMedia({
                 media: {
                     kind,
@@ -2819,9 +2822,7 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
             if (!updated?.ok) throw new Error(updated?.error?.message || '\u8d44\u6599\u66f4\u65b0\u5931\u8d25');
             await render();
         }, {
-            cropTitle: cropPreset === 'background' ? '\u88c1\u526a\u8d44\u6599\u80cc\u666f' : '\u88c1\u526a\u5934\u50cf',
-            cropPreset,
-            compress: cropPreset !== 'icon',
+            multiple: false,
             maxSizeMB: 8,
             onError: (message) => report(new Error(message)),
         });
@@ -2834,73 +2835,47 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
     };
 
     const uploadImageLibraryAsset = (library) => {
-        const cropPreset = library === 'avatar' ? 'icon' : 'background';
-        pickImageFile(async (dataUrl) => {
-            const blob = await fetch(dataUrl).then((response) => response.blob());
-            const saved = await facade.intent.saveImageLibraryAsset({
-                library,
-                blob,
-                mimeType: blob.type || 'image/png',
+        pickImageFiles(async (files) => {
+            const saved = await facade.intent.saveImageLibraryAssets({
+                assets: files.map(({ file }) => ({
+                    library,
+                    blob: file,
+                    mimeType: file.type,
+                })),
             });
             if (!saved?.ok) throw new Error(saved?.error?.message || '\u56fe\u7247\u4fdd\u5b58\u5931\u8d25');
             await render();
         }, {
-            cropTitle: cropPreset === 'icon' ? '\u88c1\u526a\u5934\u50cf' : '\u88c1\u526a\u56fe\u7247',
-            cropPreset,
-            compress: cropPreset !== 'icon',
             maxSizeMB: 8,
             onError: (message) => report(new Error(message)),
         });
     };
 
-    const openStickerUploadDialog = ({ blob, fileName } = {}) => {
-        const content = createElement('div', 'yuzi-qq-dialog-form yuzi-qq-sticker-upload-form');
-        const defaultDescription = asText(fileName).replace(/\.[^.]+$/u, '') || '新表情';
-        const description = createElement('textarea', 'yuzi-qq-sticker-description-input');
-        description.placeholder = '表情含义';
-        description.value = defaultDescription;
-        description.maxLength = 4000;
-        description.rows = 3;
-        const status = createElement('p', 'yuzi-qq-form-error');
-        content.append(description, status);
-        const cancel = createButton('取消', 'yuzi-qq-secondary-button');
-        cancel.addEventListener('click', clearOverlay);
-        const confirm = createButton('保存', 'yuzi-qq-primary-button');
-        confirm.addEventListener('click', async () => {
-            const readableDescription = asText(description.value);
-            if (!readableDescription) {
-                status.textContent = '请填写表情含义';
-                description.focus();
-                return;
-            }
-            confirm.disabled = true;
-            const result = await facade.intent.saveSticker({
-                sticker: {
-                    description: readableDescription,
-                    blob,
-                },
-            });
-            if (!result?.ok) {
-                confirm.disabled = false;
-                status.textContent = result?.error?.message || '表情保存失败';
-                return;
-            }
-            const reopenPanel = page?.type === 'chat';
-            clearOverlay();
-            emojiOpen = reopenPanel;
-            await render({ preserveEmoji: reopenPanel });
+    const openStickerUploadDialog = (files) => {
+        const reopenPanel = page?.type === 'chat';
+        const dialog = createStickerUploadDialog({
+            files,
+            close: clearOverlay,
+            save: (stickers) => facade.intent.saveStickers({ stickers }),
+            onSaved: async () => {
+                emojiOpen = reopenPanel;
+                await render({ preserveEmoji: reopenPanel });
+            },
         });
-        showDialog({ title: '添加表情', content, actions: [cancel, confirm], className: 'yuzi-qq-sticker-upload-dialog' });
-        description.select();
+        showDialog({
+            title: files.length === 1 ? '添加表情' : `添加 ${files.length} 个表情`,
+            content: dialog.content,
+            actions: dialog.actions,
+            className: 'yuzi-qq-sticker-upload-dialog',
+        });
+        overlayCleanup = dialog.dispose;
+        dialog.focus();
     };
 
     const uploadSticker = () => {
-        pickImageFile(async (dataUrl, metadata) => {
-            const blob = await fetch(dataUrl).then((response) => response.blob());
-            openStickerUploadDialog({ blob, fileName: metadata?.name });
+        pickImageFiles((files) => {
+            openStickerUploadDialog(files);
         }, {
-            skipCrop: true,
-            compress: false,
             maxSizeMB: 8,
             onError: (message) => report(new Error(message)),
         });
@@ -3146,12 +3121,12 @@ export function createQQApp({ facade, shell = {}, onError = () => {}, scopeId = 
         if (target.dataset.qqAddContact) return openAddContact(target);
         if (target.dataset.qqCurrentProfile) return go({ type: 'current-profile' });
         if (target.dataset.qqCurrentProfileEdit) return go({ type: 'current-profile-edit' });
-        if (target.dataset.qqCurrentProfilePickAvatar) return updateCurrentProfileAsset('avatarAssetId', 'avatar', 'icon');
-        if (target.dataset.qqCurrentProfilePickBackground) return updateCurrentProfileAsset('profileBackgroundAssetId', 'profile-background', 'background');
+        if (target.dataset.qqCurrentProfilePickAvatar) return updateCurrentProfileAsset('avatarAssetId', 'avatar');
+        if (target.dataset.qqCurrentProfilePickBackground) return updateCurrentProfileAsset('profileBackgroundAssetId', 'profile-background');
         if (target.dataset.qqCurrentProfileClearAvatar) return clearCurrentProfileAsset('avatarAssetId').catch(report);
         if (target.dataset.qqCurrentProfileClearBackground) return clearCurrentProfileAsset('profileBackgroundAssetId').catch(report);
-        if (target.dataset.qqProfilePickAvatar) return updatePrivateProfileAsset(target.dataset.qqProfilePickAvatar, 'avatarAssetId', 'avatar', 'icon');
-        if (target.dataset.qqProfilePickBackground) return updatePrivateProfileAsset(target.dataset.qqProfilePickBackground, 'profileBackgroundAssetId', 'profile-background', 'background');
+        if (target.dataset.qqProfilePickAvatar) return updatePrivateProfileAsset(target.dataset.qqProfilePickAvatar, 'avatarAssetId', 'avatar');
+        if (target.dataset.qqProfilePickBackground) return updatePrivateProfileAsset(target.dataset.qqProfilePickBackground, 'profileBackgroundAssetId', 'profile-background');
         if (target.dataset.qqProfileClearAvatar) return clearPrivateProfileAsset(target.dataset.qqProfileClearAvatar, 'avatarAssetId').catch(report);
         if (target.dataset.qqProfileClearBackground) return clearPrivateProfileAsset(target.dataset.qqProfileClearBackground, 'profileBackgroundAssetId').catch(report);
         if (target.dataset.qqImageLibraryPackMenu) return openImageLibraryPackMenu(target);
