@@ -78,6 +78,7 @@ import {
 } from './modules/public-api/index.js';
 import { navigateTo } from './modules/phone-core/routing.js';
 import { requestCurrentPhoneRouteRender } from './modules/phone-core/route-runtime.js';
+import { getQQV2PublicMessageRuntime } from './modules/qq-v2/runtime/default-runtime.js';
 
 // 全局事件管理器 - 用于统一管理事件监听器的清理
 const EXTENSION_VERSION = '2.0.0';
@@ -527,6 +528,7 @@ async function doInitialize() {
     configureYuziPhonePublicApiRuntime({
         navigate: (route) => navigateTo(route),
         refresh: () => requestCurrentPhoneRouteRender({ reason: 'public-api-scene-refresh' }),
+        getMessageRuntime: getQQV2PublicMessageRuntime,
     });
 
     // 配置错误处理器

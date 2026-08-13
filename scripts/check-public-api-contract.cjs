@@ -27,9 +27,9 @@ async function main() {
             ['public-api.capabilities', true],
             ['app.register', true],
             ['scene.register', true],
-            ['message.import', false],
-            ['context.read', false],
-            ['action.execute', false],
+            ['message.import', true],
+            ['context.read', true],
+            ['action.execute', true],
         ],
     );
     assert.equal(api.hasCapability('public-api.version'), true);
@@ -42,13 +42,13 @@ async function main() {
     assert.equal(typeof api.unregisterScene, 'function');
     assert.equal(typeof api.navigate, 'function');
     assert.equal(typeof api.refreshScene, 'function');
-    assert.equal(typeof api.importMessages, 'undefined');
-    assert.equal(typeof api.getContext, 'undefined');
-    assert.equal(typeof api.executeAction, 'undefined');
-    assert.equal(
-        firstCapabilities.find(({ name }) => name === 'message.import').errorCode,
-        'YUZI_PHONE_API_NOT_IMPLEMENTED',
-    );
+    assert.equal(typeof api.getMessageRuntime, 'function');
+    assert.equal(typeof api.appendMessage, 'function');
+    assert.equal(typeof api.importMessageHistory, 'function');
+    assert.equal(typeof api.registerPromptContextProvider, 'function');
+    assert.equal(typeof api.registerProactiveCandidateProvider, 'function');
+    assert.equal(typeof api.registerActionHandler, 'function');
+    assert.equal(typeof api.executeAction, 'function');
 
     const events = [];
     const listener = (event) => events.push(event.eventName);
@@ -60,6 +60,38 @@ async function main() {
     assert.equal(await api.unregisterApp('contract.app'), true);
     assert.equal(await api.unregisterScene('contract.scene'), true);
     assert.equal(api.off('app.registered', listener), true);
+
+    const removePrompt = api.registerPromptContextProvider(() => ({ source: 'contract', text: 'context' }));
+    const removeProactive = api.registerProactiveCandidateProvider(() => [{ candidateId: 'candidate-1' }]);
+    const removeAction = api.registerActionHandler('contract.action', ({ value }) => ({ value }));
+    assert.deepEqual(await api.getPromptContext({}), [{ source: 'contract', text: 'context' }]);
+    assert.deepEqual(await api.getProactiveCandidates({}), [{ candidateId: 'candidate-1' }]);
+    assert.deepEqual(await api.executeAction('contract.action', { value: 1 }), { value: 1 });
+    assert.equal(removePrompt(), true);
+    assert.equal(removeProactive(), true);
+    assert.equal(removeAction(), true);
+
+    const { createMemoryQQV2StateStore } = await import(pathToFileURL(path.join(ROOT, 'modules/qq-v2/storage/state-store.js')).href);
+    const { createQQV2Repository } = await import(pathToFileURL(path.join(ROOT, 'modules/qq-v2/domain/repository.js')).href);
+    const repository = createQQV2Repository({ stateStore: createMemoryQQV2StateStore() });
+    await repository.ensureScope('scope-a');
+    await repository.ensureScope('scope-b');
+    const firstConversation = await repository.createPrivateConversation('scope-a', { name: 'External sender' });
+    const secondConversation = await repository.createPrivateConversation('scope-b', { name: 'External sender' });
+    const externalMessage = {
+        externalKey: 'external-event-001',
+        senderId: '__self__',
+        senderType: 'self',
+        type: 'text',
+        content: 'Imported once',
+    };
+    const imported = await repository.appendPublicMessages('scope-a', firstConversation.conversation.conversationId, [externalMessage]);
+    const replayed = await repository.appendPublicMessages('scope-a', firstConversation.conversation.conversationId, [externalMessage]);
+    assert.equal(imported[0].imported, true);
+    assert.equal(replayed[0].imported, false);
+    assert.equal(imported[0].message.messageId, replayed[0].message.messageId);
+    const isolated = await repository.appendPublicMessages('scope-b', secondConversation.conversation.conversationId, [externalMessage]);
+    assert.equal(isolated[0].imported, true, 'idempotency keys are isolated by QQ scope and conversation');
 
     assert.equal(publicApi.uninstallYuziPhonePublicApi(host), true);
     assert.equal('YuziPhoneAPI' in host, false, 'destroy cleanup must remove the owned API');

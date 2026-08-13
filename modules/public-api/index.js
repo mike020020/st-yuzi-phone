@@ -18,6 +18,16 @@ import {
     unregisterPublicApp,
     unregisterPublicScene,
 } from './app-scene-registry.js';
+import { createQQV2PublicMessageRuntime } from '../qq-v2/application/public-message-runtime.js';
+import {
+    collectPublicProactiveCandidates,
+    collectPublicPromptContext,
+    destroyPublicIntegrationHooks,
+    executePublicAction,
+    registerPublicActionHandler,
+    registerPublicProactiveCandidateProvider,
+    registerPublicPromptContextProvider,
+} from './integration-hooks.js';
 
 export const PublicApiCapabilities = Object.freeze({
     VERSION: 'public-api.version',
@@ -32,7 +42,7 @@ export const PublicApiCapabilities = Object.freeze({
 const API_OWNER = Symbol('yuzi-phone.public-api.owner');
 const API_OWNER_MARKER = Symbol.for('st-yuzi-phone.public-api.owner');
 const PUBLIC_API_PROPERTY = 'YuziPhoneAPI';
-let runtimeAdapters = Object.freeze({ navigate: null, refresh: null });
+let runtimeAdapters = Object.freeze({ navigate: null, refresh: null, getMessageRuntime: null });
 
 const capabilityDefinitions = Object.freeze([
     Object.freeze({ name: PublicApiCapabilities.VERSION, available: true }),
@@ -47,18 +57,15 @@ const capabilityDefinitions = Object.freeze([
     }),
     Object.freeze({
         name: PublicApiCapabilities.MESSAGE_IMPORT,
-        available: false,
-        errorCode: PublicApiErrorCodes.API_NOT_IMPLEMENTED,
+        available: true,
     }),
     Object.freeze({
         name: PublicApiCapabilities.CONTEXT_READ,
-        available: false,
-        errorCode: PublicApiErrorCodes.API_NOT_IMPLEMENTED,
+        available: true,
     }),
     Object.freeze({
         name: PublicApiCapabilities.ACTION_EXECUTE,
-        available: false,
-        errorCode: PublicApiErrorCodes.API_NOT_IMPLEMENTED,
+        available: true,
     }),
 ]);
 
@@ -99,6 +106,33 @@ function createPublicApi() {
             const result = await refreshPublicScene(sceneId);
             await runtimeAdapters.refresh?.(sceneId);
             return result;
+        },
+        getMessageRuntime() {
+            return createQQV2PublicMessageRuntime({ getRuntime: runtimeAdapters.getMessageRuntime });
+        },
+        async appendMessage(payload) {
+            return this.getMessageRuntime().append(payload);
+        },
+        async importMessageHistory(payload) {
+            return this.getMessageRuntime().importHistory(payload);
+        },
+        registerPromptContextProvider(provider) {
+            return registerPublicPromptContextProvider(provider);
+        },
+        async getPromptContext(input) {
+            return collectPublicPromptContext(input);
+        },
+        registerProactiveCandidateProvider(provider) {
+            return registerPublicProactiveCandidateProvider(provider);
+        },
+        async getProactiveCandidates(input) {
+            return collectPublicProactiveCandidates(input);
+        },
+        registerActionHandler(actionType, handler) {
+            return registerPublicActionHandler(actionType, handler);
+        },
+        async executeAction(actionType, input) {
+            return executePublicAction(actionType, input);
         },
         on(eventName, handler) {
             return addPublicEventListener(eventName, handler);
@@ -159,10 +193,12 @@ export function configureYuziPhonePublicApiRuntime(adapters = {}) {
     runtimeAdapters = Object.freeze({
         navigate: typeof adapters.navigate === 'function' ? adapters.navigate : null,
         refresh: typeof adapters.refresh === 'function' ? adapters.refresh : null,
+        getMessageRuntime: typeof adapters.getMessageRuntime === 'function' ? adapters.getMessageRuntime : null,
     });
 }
 
 export function destroyYuziPhonePublicApiRuntime() {
-    runtimeAdapters = Object.freeze({ navigate: null, refresh: null });
+    runtimeAdapters = Object.freeze({ navigate: null, refresh: null, getMessageRuntime: null });
     destroyPublicAppSceneRegistry();
+    destroyPublicIntegrationHooks();
 }
