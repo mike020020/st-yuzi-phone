@@ -28,8 +28,8 @@ async function main() {
             ['app.register', true],
             ['scene.register', true],
             ['message.import', true],
-            ['context.read', false],
-            ['action.execute', false],
+            ['context.read', true],
+            ['action.execute', true],
         ],
     );
     assert.equal(api.hasCapability('public-api.version'), true);
@@ -45,12 +45,10 @@ async function main() {
     assert.equal(typeof api.getMessageRuntime, 'function');
     assert.equal(typeof api.appendMessage, 'function');
     assert.equal(typeof api.importMessageHistory, 'function');
-    assert.equal(typeof api.getContext, 'undefined');
-    assert.equal(typeof api.executeAction, 'undefined');
-    assert.equal(
-        firstCapabilities.find(({ name }) => name === 'context.read').errorCode,
-        'YUZI_PHONE_API_NOT_IMPLEMENTED',
-    );
+    assert.equal(typeof api.registerPromptContextProvider, 'function');
+    assert.equal(typeof api.registerProactiveCandidateProvider, 'function');
+    assert.equal(typeof api.registerActionHandler, 'function');
+    assert.equal(typeof api.executeAction, 'function');
 
     const events = [];
     const listener = (event) => events.push(event.eventName);
@@ -62,6 +60,16 @@ async function main() {
     assert.equal(await api.unregisterApp('contract.app'), true);
     assert.equal(await api.unregisterScene('contract.scene'), true);
     assert.equal(api.off('app.registered', listener), true);
+
+    const removePrompt = api.registerPromptContextProvider(() => ({ source: 'contract', text: 'context' }));
+    const removeProactive = api.registerProactiveCandidateProvider(() => [{ candidateId: 'candidate-1' }]);
+    const removeAction = api.registerActionHandler('contract.action', ({ value }) => ({ value }));
+    assert.deepEqual(await api.getPromptContext({}), [{ source: 'contract', text: 'context' }]);
+    assert.deepEqual(await api.getProactiveCandidates({}), [{ candidateId: 'candidate-1' }]);
+    assert.deepEqual(await api.executeAction('contract.action', { value: 1 }), { value: 1 });
+    assert.equal(removePrompt(), true);
+    assert.equal(removeProactive(), true);
+    assert.equal(removeAction(), true);
 
     const { createMemoryQQV2StateStore } = await import(pathToFileURL(path.join(ROOT, 'modules/qq-v2/storage/state-store.js')).href);
     const { createQQV2Repository } = await import(pathToFileURL(path.join(ROOT, 'modules/qq-v2/domain/repository.js')).href);
