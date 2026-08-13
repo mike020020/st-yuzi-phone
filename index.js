@@ -531,6 +531,12 @@ async function doInitialize() {
         navigate: (route) => navigateTo(route),
         refresh: () => requestCurrentPhoneRouteRender({ reason: 'public-api-scene-refresh' }),
         getMessageRuntime: getQQV2PublicMessageRuntime,
+        getSqlApi: () => {
+            // shujuku 通常挂在父窗口；预览或同页运行时再使用当前窗口。每次调用重新解析，
+            // 以免公共 API 在聊天/插件重载后持有已失效的 AutoCardUpdaterAPI。
+            const host = getInstanceHost();
+            return host?.parent?.AutoCardUpdaterAPI || host?.AutoCardUpdaterAPI || null;
+        },
     });
 
     // 配置错误处理器

@@ -32,6 +32,7 @@ async function main() {
             ['message.import', true],
             ['context.read', true],
             ['action.execute', true],
+            ['transaction.execute', true],
         ],
     );
     assert.equal(api.hasCapability('public-api.version'), true);
@@ -51,6 +52,7 @@ async function main() {
     assert.equal(typeof api.registerProactiveCandidateProvider, 'function');
     assert.equal(typeof api.registerActionHandler, 'function');
     assert.equal(typeof api.executeAction, 'function');
+    assert.equal(typeof api.executeSqlTransaction, 'function');
 
     // App/Scene 注册和注销验证生命周期事件不会阻断宿主，并检查公开路由格式。
     const events = [];
@@ -74,6 +76,46 @@ async function main() {
     assert.equal(removePrompt(), true);
     assert.equal(removeProactive(), true);
     assert.equal(removeAction(), true);
+
+    // 事务契约：所有 statement 合并为一次宿主 batch 调用，业务写入与 externalKey 收据
+    // 不能降级为两个独立 executeSqlMutation 调用。
+    const transactionCalls = [];
+    publicApi.configureYuziPhonePublicApiRuntime({
+        getSqlApi: () => ({
+            async executeSqlBatch(request) {
+                transactionCalls.push(request);
+                return { success: true, changes: 2, errors: [] };
+            },
+        }),
+    });
+    const transactionResult = await api.executeSqlTransaction({
+        statements: [
+            { sql: 'INSERT INTO ledger (external_key, note, amount, enabled) VALUES (?, ?, ?, ?)', params: ['event-001', "O'Brien", 2.5, true] },
+            { sql: 'INSERT INTO receipts (external_key) VALUES (?)', params: ['event-001'] },
+        ],
+        options: { targetSheetKeys: ['sheet_1', 'sheet_2'] },
+    });
+    assert.equal(transactionResult.success, true);
+    assert.deepEqual(transactionCalls, [{
+        sql: "INSERT INTO ledger (external_key, note, amount, enabled) VALUES ('event-001', 'O''Brien', 2.5, 1);\nINSERT INTO receipts (external_key) VALUES ('event-001')",
+        targetSheetKeys: ['sheet_1', 'sheet_2'],
+    }]);
+    // SQL 文本、字符串或注释中的问号不是绑定点，只有代码区的 ? 才消耗一个参数。
+    await api.executeSqlTransaction({
+        statements: [{ sql: "INSERT INTO notes (body, template) VALUES (?, 'literal ?') -- comment ?", params: ['safe'] }],
+    });
+    assert.equal(transactionCalls[1].sql, "INSERT INTO notes (body, template) VALUES ('safe', 'literal ?') -- comment ?");
+    // 参数不匹配必须在调用宿主前被拒绝，避免依赖底层的非一致错误形状。
+    await assert.rejects(
+        () => api.executeSqlTransaction({ statements: [{ sql: 'INSERT INTO receipts (external_key) VALUES (?)', params: ['event-001', 'unexpected'] }] }),
+        (error) => error?.code === publicApi.PublicApiErrorCodes.INVALID_ARGUMENT,
+    );
+    // destroy 后不能继续写入旧 runtime；调用方得到明确的 API_UNAVAILABLE 降级信号。
+    publicApi.destroyYuziPhonePublicApiRuntime();
+    await assert.rejects(
+        () => api.executeSqlTransaction({ statements: [{ sql: 'INSERT INTO receipts (external_key) VALUES (?)', params: ['event-001'] }] }),
+        (error) => error?.code === publicApi.PublicApiErrorCodes.API_UNAVAILABLE,
+    );
 
     const { createMemoryQQV2StateStore } = await import(pathToFileURL(path.join(ROOT, 'modules/qq-v2/storage/state-store.js')).href);
     const { createQQV2Repository } = await import(pathToFileURL(path.join(ROOT, 'modules/qq-v2/domain/repository.js')).href);
