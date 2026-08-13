@@ -7,6 +7,7 @@ import { registerRoutePageCleanup, removeRoutePage } from './route-page-lifecycl
 import { clearRouteHistory } from './routing.js';
 import { bindPhoneScrollGuards, hardenPhoneInteractionDefaults, logRouteScrollDebugSnapshot } from './scroll-guards.js';
 import { getPhoneCoreState, phoneRuntime } from './state.js';
+import { getPublicAppForRoute, renderPublicScene } from '../public-api/app-scene-registry.js';
 
 const logger = Logger.withScope({ scope: 'phone-core/route-renderer', feature: 'route' });
 const EXIT_ANIM_MS = 220;
@@ -84,6 +85,30 @@ export function __test__discardReviewNavigationAttemptForRoute(route, opts = {})
 }
 
 async function loadRouteRenderer(route, renderToken, deps = {}, opts = {}) {
+    const publicApp = getPublicAppForRoute(route);
+    if (publicApp) {
+        return {
+            routeType: 'public-app',
+            async render(page) {
+                const rendered = await renderPublicScene(publicApp, route);
+                const view = rendered.view || {};
+                const heading = String(view.title || rendered.app.name).slice(0, 160);
+                const body = String(view.text || view.message || '').slice(0, 4000);
+                page.replaceChildren();
+                const title = document.createElement('h1');
+                title.className = 'phone-public-app-title';
+                title.textContent = heading;
+                page.append(title);
+                if (body) {
+                    const content = document.createElement('p');
+                    content.className = 'phone-public-app-content';
+                    content.textContent = body;
+                    page.append(content);
+                }
+            },
+        };
+    }
+
     if (route === 'home') {
         const { renderHomeScreen } = await import('../phone-home/render.js');
         return {

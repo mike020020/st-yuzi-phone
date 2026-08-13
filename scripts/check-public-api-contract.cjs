@@ -25,25 +25,41 @@ async function main() {
         [
             ['public-api.version', true],
             ['public-api.capabilities', true],
-            ['app.register', false],
-            ['scene.register', false],
+            ['app.register', true],
+            ['scene.register', true],
             ['message.import', false],
             ['context.read', false],
             ['action.execute', false],
         ],
     );
     assert.equal(api.hasCapability('public-api.version'), true);
-    assert.equal(api.hasCapability('app.register'), false);
+    assert.equal(api.hasCapability('app.register'), true);
+    assert.equal(api.hasCapability('scene.register'), true);
     assert.equal(api.hasCapability('unknown.capability'), false);
-    assert.equal(typeof api.registerApp, 'undefined');
-    assert.equal(typeof api.registerScene, 'undefined');
+    assert.equal(typeof api.registerApp, 'function');
+    assert.equal(typeof api.unregisterApp, 'function');
+    assert.equal(typeof api.registerScene, 'function');
+    assert.equal(typeof api.unregisterScene, 'function');
+    assert.equal(typeof api.navigate, 'function');
+    assert.equal(typeof api.refreshScene, 'function');
     assert.equal(typeof api.importMessages, 'undefined');
     assert.equal(typeof api.getContext, 'undefined');
     assert.equal(typeof api.executeAction, 'undefined');
     assert.equal(
-        firstCapabilities.find(({ name }) => name === 'app.register').errorCode,
+        firstCapabilities.find(({ name }) => name === 'message.import').errorCode,
         'YUZI_PHONE_API_NOT_IMPLEMENTED',
     );
+
+    const events = [];
+    const listener = (event) => events.push(event.eventName);
+    assert.equal(api.on('app.registered', listener), true);
+    const scene = await api.registerScene({ sceneId: 'contract.scene', render: () => ({ title: 'Contract' }) });
+    const app = await api.registerApp({ appId: 'contract.app', name: 'Contract app', sceneId: scene.sceneId });
+    assert.equal(app.route, 'public-app:contract.app');
+    assert.deepEqual(events, ['app.registered']);
+    assert.equal(await api.unregisterApp('contract.app'), true);
+    assert.equal(await api.unregisterScene('contract.scene'), true);
+    assert.equal(api.off('app.registered', listener), true);
 
     assert.equal(publicApi.uninstallYuziPhonePublicApi(host), true);
     assert.equal('YuziPhoneAPI' in host, false, 'destroy cleanup must remove the owned API');
