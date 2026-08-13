@@ -12,6 +12,7 @@ import {
     TABLE_UPDATE_REVIEW_APP_NAME,
     TABLE_UPDATE_REVIEW_ROUTE,
 } from '../table-update-review/constants.js';
+import { listPublicApps } from '../public-api/app-scene-registry.js';
 
 function buildTheaterAppIconHtml(scene, customIcon = '') {
     const name = String(scene?.name || '小剧场');
@@ -90,6 +91,22 @@ export function buildHomeScreenViewModel(rawData, phoneSettings, options = {}) {
             route: QQ_APP.route,
             sortOrder: Number.POSITIVE_INFINITY,
             sortName: QQ_APP.name,
+        });
+    }
+
+    for (const publicApp of listPublicApps()) {
+        if (hiddenTableApps[publicApp.appId]) continue;
+        apps.push({
+            key: publicApp.appId,
+            name: publicApp.name,
+            iconHtml: `<div class="phone-app-icon-svg">${getTextIcon(publicApp.iconText, '#5AC8FA', '#5856D6')}</div>`,
+            badgeText: '',
+            totalCount: 0,
+            animationDelay: '0s',
+            isSystemApp: false,
+            route: publicApp.route,
+            sortOrder: Number.POSITIVE_INFINITY,
+            sortName: publicApp.name,
         });
     }
 

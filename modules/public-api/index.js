@@ -6,11 +6,18 @@
  */
 export const PUBLIC_API_VERSION = '1.0.0';
 
-export const PublicApiErrorCodes = Object.freeze({
-    API_UNAVAILABLE: 'YUZI_PHONE_API_UNAVAILABLE',
-    CAPABILITY_NOT_AVAILABLE: 'YUZI_PHONE_CAPABILITY_NOT_AVAILABLE',
-    API_NOT_IMPLEMENTED: 'YUZI_PHONE_API_NOT_IMPLEMENTED',
-});
+export { PublicApiErrorCodes } from './errors.js';
+import { PublicApiErrorCodes } from './errors.js';
+import {
+    addPublicEventListener,
+    destroyPublicAppSceneRegistry,
+    registerPublicApp,
+    registerPublicScene,
+    removePublicEventListener,
+    refreshPublicScene,
+    unregisterPublicApp,
+    unregisterPublicScene,
+} from './app-scene-registry.js';
 
 export const PublicApiCapabilities = Object.freeze({
     VERSION: 'public-api.version',
@@ -25,19 +32,18 @@ export const PublicApiCapabilities = Object.freeze({
 const API_OWNER = Symbol('yuzi-phone.public-api.owner');
 const API_OWNER_MARKER = Symbol.for('st-yuzi-phone.public-api.owner');
 const PUBLIC_API_PROPERTY = 'YuziPhoneAPI';
+let runtimeAdapters = Object.freeze({ navigate: null, refresh: null });
 
 const capabilityDefinitions = Object.freeze([
     Object.freeze({ name: PublicApiCapabilities.VERSION, available: true }),
     Object.freeze({ name: PublicApiCapabilities.CAPABILITIES, available: true }),
     Object.freeze({
         name: PublicApiCapabilities.APP_REGISTER,
-        available: false,
-        errorCode: PublicApiErrorCodes.API_NOT_IMPLEMENTED,
+        available: true,
     }),
     Object.freeze({
         name: PublicApiCapabilities.SCENE_REGISTER,
-        available: false,
-        errorCode: PublicApiErrorCodes.API_NOT_IMPLEMENTED,
+        available: true,
     }),
     Object.freeze({
         name: PublicApiCapabilities.MESSAGE_IMPORT,
@@ -70,6 +76,35 @@ function createPublicApi() {
         },
         hasCapability(name) {
             return capabilityDefinitions.some((capability) => capability.name === name && capability.available);
+        },
+        async registerApp(definition) {
+            return registerPublicApp(definition);
+        },
+        async unregisterApp(appId) {
+            return unregisterPublicApp(appId);
+        },
+        async registerScene(definition) {
+            return registerPublicScene(definition);
+        },
+        async unregisterScene(sceneId) {
+            return unregisterPublicScene(sceneId);
+        },
+        async navigate(route) {
+            if (typeof runtimeAdapters.navigate !== 'function') {
+                throw new Error(PublicApiErrorCodes.API_UNAVAILABLE);
+            }
+            return runtimeAdapters.navigate(route);
+        },
+        async refreshScene(sceneId) {
+            const result = await refreshPublicScene(sceneId);
+            await runtimeAdapters.refresh?.(sceneId);
+            return result;
+        },
+        on(eventName, handler) {
+            return addPublicEventListener(eventName, handler);
+        },
+        off(eventName, handler) {
+            return removePublicEventListener(eventName, handler);
         },
     };
 
@@ -118,4 +153,16 @@ export function installYuziPhonePublicApi(host) {
 export function uninstallYuziPhonePublicApi(host) {
     if (!host || !isOwnedPublicApi(host[PUBLIC_API_PROPERTY])) return false;
     return delete host[PUBLIC_API_PROPERTY];
+}
+
+export function configureYuziPhonePublicApiRuntime(adapters = {}) {
+    runtimeAdapters = Object.freeze({
+        navigate: typeof adapters.navigate === 'function' ? adapters.navigate : null,
+        refresh: typeof adapters.refresh === 'function' ? adapters.refresh : null,
+    });
+}
+
+export function destroyYuziPhonePublicApiRuntime() {
+    runtimeAdapters = Object.freeze({ navigate: null, refresh: null });
+    destroyPublicAppSceneRegistry();
 }
