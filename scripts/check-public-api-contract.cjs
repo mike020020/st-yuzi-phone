@@ -15,7 +15,7 @@ async function main() {
     const api = publicApi.installYuziPhonePublicApi(host);
     assert.ok(api, 'install must create the public API');
     assert.equal(host.YuziPhoneAPI, api, 'API must be installed on the supplied host');
-    assert.equal(api.getVersion(), '1.0.0');
+    assert.equal(api.getVersion(), '1.1.0');
     assert.equal(publicApi.installYuziPhonePublicApi(host), api, 'repeat install must be idempotent');
 
     // 每次读取能力都必须返回独立快照，防止调用方修改内部能力定义。

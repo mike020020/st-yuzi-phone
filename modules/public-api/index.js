@@ -4,7 +4,8 @@
  * This module deliberately exposes capability metadata instead of leaking UI or
  * runtime modules. New public operations must be added only when implemented.
  */
-export const PUBLIC_API_VERSION = '1.0.0';
+// 新增 transaction.execute 是向后兼容的公共能力扩展，因此按语义化版本提升 minor。
+export const PUBLIC_API_VERSION = '1.1.0';
 
 export { PublicApiErrorCodes } from './errors.js';
 import { PublicApiErrorCodes } from './errors.js';
