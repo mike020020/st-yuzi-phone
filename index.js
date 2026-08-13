@@ -70,6 +70,10 @@ import {
     handleQQV2WorldInfoActivated,
     initializeQQV2Runtime,
 } from './modules/qq-v2/runtime/default-runtime.js';
+import {
+    installYuziPhonePublicApi,
+    uninstallYuziPhonePublicApi,
+} from './modules/public-api/index.js';
 
 // 全局事件管理器 - 用于统一管理事件监听器的清理
 const EXTENSION_VERSION = '2.0.0';
@@ -515,6 +519,8 @@ async function doInitialize() {
 (function init() {
     if (!acquireSingletonGuard()) return;
 
+    installYuziPhonePublicApi(getInstanceHost());
+
     // 配置错误处理器
     configureErrorHandler({
         enableLogging: true,
@@ -539,6 +545,7 @@ async function doInitialize() {
             setOwnedInstanceStatus('failed', { lastError: error?.message || String(error) });
             stopPhoneBackgroundServices('initialize-failed');
             destroyQQV2Runtime();
+            uninstallYuziPhonePublicApi(getInstanceHost());
             releaseSingletonGuard();
             handleError(error, '玉子手机初始化失败');
             // 重置初始化状态，允许重试
@@ -626,6 +633,7 @@ export function destroy() {
     } catch (error) {
         handleError(error, '卸载错误');
     } finally {
+        uninstallYuziPhonePublicApi(getInstanceHost());
         setOwnedInstanceStatus('destroyed');
         cancelPendingHomeRefresh('destroy-finally');
         clearInitRetryTimeout();

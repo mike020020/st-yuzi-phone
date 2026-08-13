@@ -9,6 +9,7 @@
     "build:dev": "node build.mjs --dev",
     "build:watch": "node build.mjs --watch",
     "check": "node scripts/run-contract-checks.cjs",
+    "check:public-api": "node scripts/check-public-api-contract.cjs",
     "check:ci": "node scripts/run-contract-checks-ci.cjs",
     "check:qq-v1-removal": "node scripts/check-qq-v1-removal-contract.cjs",
     "lint": "eslint modules/ index.js build.mjs",
