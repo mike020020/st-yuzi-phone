@@ -9,6 +9,8 @@ import { bindPhoneScrollGuards, hardenPhoneInteractionDefaults, logRouteScrollDe
 import { getPhoneCoreState, phoneRuntime } from './state.js';
 import { getPublicAppForRoute, renderPublicScene } from '../public-api/app-scene-registry.js';
 
+// 公开 App 路由只在注册表命中时接管；未命中则继续走内置路由，避免改变原有页面分派。
+
 const logger = Logger.withScope({ scope: 'phone-core/route-renderer', feature: 'route' });
 const EXIT_ANIM_MS = 220;
 const ROUTE_COMMIT_DELAY_MS = 16;

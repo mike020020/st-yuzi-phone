@@ -107,7 +107,7 @@ function createPublicApi() {
         },
         async refreshScene(sceneId) {
             const result = await refreshPublicScene(sceneId);
-            // 先刷新已注册场景，再请求宿主 UI 重绘，确保渲染总能读取场景最新状态。
+            // 先刷新已注册场景，再请求宿主 UI 重绘，使重绘能够读取本次刷新后的场景状态。
             await runtimeAdapters.refresh?.(sceneId);
             return result;
         },
@@ -204,8 +204,8 @@ export function configureYuziPhonePublicApiRuntime(adapters = {}) {
 }
 
 export function destroyYuziPhonePublicApiRuntime() {
-    // 清理注册表时，每个场景会在注销前恰好执行一次 destroy；钩子和适配器不得
-    // 比手机实例存活得更久。
+    // 清理注册表时，每个仍在注册的场景只会尝试执行一次 destroy；场景会先从注册表
+    // 移除，避免 destroy 钩子重新访问已注销的场景。钩子和适配器不得比手机实例存活更久。
     runtimeAdapters = Object.freeze({ navigate: null, refresh: null, getMessageRuntime: null });
     destroyPublicAppSceneRegistry();
     destroyPublicIntegrationHooks();

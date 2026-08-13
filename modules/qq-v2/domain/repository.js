@@ -1359,6 +1359,7 @@ export function createQQV2Repository(options = {}) {
                         : null,
                 }));
         },
+        // externalKey 的去重范围包含 scope 与 conversation，避免不同会话复用同一外部事件时误判重复。
         async appendMessages(scopeId, conversationId, inputs) {
             return stateStore.transact((state) => {
                 const scope = getScope(state, scopeId, false);

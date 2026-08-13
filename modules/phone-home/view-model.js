@@ -14,6 +14,8 @@ import {
 } from '../table-update-review/constants.js';
 import { listPublicApps } from '../public-api/app-scene-registry.js';
 
+// 首页读取的是注册表快照，不持有 App 内部记录，避免页面渲染跨越注销生命周期。
+
 function buildTheaterAppIconHtml(scene, customIcon = '') {
     const name = String(scene?.name || '小剧场');
     if (customIcon) {

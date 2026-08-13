@@ -524,7 +524,9 @@ async function doInitialize() {
 (function init() {
     if (!acquireSingletonGuard()) return;
 
+    // 先取得实例单例所有权，再安装公开 API；失败和销毁路径会统一卸载它。
     installYuziPhonePublicApi(getInstanceHost());
+    // 适配器绑定当前实例的导航、重绘和消息运行时，公开 API 不直接依赖内部模块。
     configureYuziPhonePublicApiRuntime({
         navigate: (route) => navigateTo(route),
         refresh: () => requestCurrentPhoneRouteRender({ reason: 'public-api-scene-refresh' }),

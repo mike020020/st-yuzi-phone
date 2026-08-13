@@ -116,6 +116,7 @@ export const handleQQV2GroupChatDeleted = (...args) => defaultRuntimeEntry.handl
 export const handleQQV2CharacterMessageRendered = (...args) => defaultRuntimeEntry.handleCharacterMessageRendered(...args);
 export const handleQQV2WorldInfoActivated = (...args) => defaultRuntimeEntry.handleWorldInfoActivated(...args);
 export const getQQV2RuntimeStatus = () => defaultRuntimeEntry.getStatus();
+// 默认运行时负责提供可替换的消息运行时入口；公开层按调用时解析，支持销毁后重建。
 export const getQQV2WorldInfoLifecycle = () => defaultRuntimeEntry.getWorldInfoLifecycle();
 export const getQQV2Facade = () => defaultRuntimeEntry.getFacade();
 export const getQQV2PublicMessageRuntime = () => defaultRuntimeEntry.getPublicMessageRuntime();

@@ -6,6 +6,7 @@ const { pathToFileURL } = require('node:url');
 const ROOT = process.cwd();
 
 async function main() {
+    // 该脚本验证的是公开契约和生命周期边界，不依赖浏览器 DOM 或真实宿主环境。
     const moduleUrl = pathToFileURL(path.join(ROOT, 'modules/public-api/index.js')).href;
     const publicApi = await import(moduleUrl);
     const indexSource = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
@@ -17,6 +18,7 @@ async function main() {
     assert.equal(api.getVersion(), '1.0.0');
     assert.equal(publicApi.installYuziPhonePublicApi(host), api, 'repeat install must be idempotent');
 
+    // 每次读取能力都必须返回独立快照，防止调用方修改内部能力定义。
     const firstCapabilities = api.getCapabilities();
     const secondCapabilities = api.getCapabilities();
     assert.notEqual(firstCapabilities, secondCapabilities, 'capability snapshots must not expose internal storage');
@@ -50,6 +52,7 @@ async function main() {
     assert.equal(typeof api.registerActionHandler, 'function');
     assert.equal(typeof api.executeAction, 'function');
 
+    // App/Scene 注册和注销验证生命周期事件不会阻断宿主，并检查公开路由格式。
     const events = [];
     const listener = (event) => events.push(event.eventName);
     assert.equal(api.on('app.registered', listener), true);
@@ -61,6 +64,7 @@ async function main() {
     assert.equal(await api.unregisterScene('contract.scene'), true);
     assert.equal(api.off('app.registered', listener), true);
 
+    // provider disposer、动作处理器和顶层输入冻结共同构成扩展接入边界。
     const removePrompt = api.registerPromptContextProvider(() => ({ source: 'contract', text: 'context' }));
     const removeProactive = api.registerProactiveCandidateProvider(() => [{ candidateId: 'candidate-1' }]);
     const removeAction = api.registerActionHandler('contract.action', ({ value }) => ({ value }));
@@ -85,6 +89,7 @@ async function main() {
         type: 'text',
         content: 'Imported once',
     };
+    // 相同 externalKey 在同一 scope+conversation 内必须幂等；换到另一会话则应重新导入。
     const imported = await repository.appendPublicMessages('scope-a', firstConversation.conversation.conversationId, [externalMessage]);
     const replayed = await repository.appendPublicMessages('scope-a', firstConversation.conversation.conversationId, [externalMessage]);
     assert.equal(imported[0].imported, true);
@@ -104,6 +109,7 @@ async function main() {
     assert.equal(host.YuziPhoneAPI, foreign);
     assert.equal(publicApi.uninstallYuziPhonePublicApi(host), false, 'cleanup must preserve another owner');
 
+    // 入口契约确保先取得单例所有权，再安装公开 API，并在失败/销毁路径清理。
     const guard = indexSource.indexOf('if (!acquireSingletonGuard()) return;');
     const install = indexSource.indexOf('installYuziPhonePublicApi(getInstanceHost());');
     const configure = indexSource.indexOf('configureErrorHandler({');

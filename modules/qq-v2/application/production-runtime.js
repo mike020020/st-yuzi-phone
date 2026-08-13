@@ -299,6 +299,7 @@ function buildGroupIdentity(conversation, group, peopleById, referenceByPersonId
  * the host, persistence, request pipeline, worldbook services and the UI
  * facade. Domain modules remain independently testable through their seams.
  */
+// 生产运行时只实现公开消息适配器需要的 append/importHistory 能力，其他内部方法不外泄。
 export function createQQV2ProductionRuntime(options = {}) {
     const host = options.host;
     if (!host || typeof host.readScope !== 'function') {

@@ -30,6 +30,12 @@ function validatePayload(payload = {}, multiple = false) {
     return { scopeId, conversationId, messages };
 }
 
+/**
+ * 创建面向 QQ V2 的消息公开适配器。运行时按调用时延迟解析，避免缓存已销毁实例。
+ * 每条消息必须有 externalKey；幂等性由底层以 scopeId+conversationId+externalKey 作用域保证。
+ * @param {{getRuntime?: () => {append:Function,importHistory:Function}|null}} [options]
+ * @returns {Readonly<{append:Function,importHistory:Function}>} 冻结的公开消息接口。
+ */
 export function createQQV2PublicMessageRuntime({ getRuntime } = {}) {
     const resolve = () => {
         // 延迟解析：QQ 运行时在扩展启动后创建并于销毁时释放，绝不缓存过期实例。
