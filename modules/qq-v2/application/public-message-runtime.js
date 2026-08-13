@@ -17,6 +17,8 @@ function validatePayload(payload = {}, multiple = false) {
         error.code = PublicApiErrorCodes.INVALID_ARGUMENT;
         throw error;
     }
+    // 底层运行时使用 externalKey 保证导入可安全重试；公开边界拒绝含糊消息，绝不
+    // 擅自生成键。
     for (const message of messages) {
         if (!String(message?.externalKey || '').trim()) {
             const error = new Error('每条消息都必须提供外部幂等键');
@@ -30,6 +32,7 @@ function validatePayload(payload = {}, multiple = false) {
 
 export function createQQV2PublicMessageRuntime({ getRuntime } = {}) {
     const resolve = () => {
+        // 延迟解析：QQ 运行时在扩展启动后创建并于销毁时释放，绝不缓存过期实例。
         const runtime = getRuntime?.();
         if (!runtime || typeof runtime.append !== 'function' || typeof runtime.importHistory !== 'function') throw unavailable();
         return runtime;
@@ -38,6 +41,8 @@ export function createQQV2PublicMessageRuntime({ getRuntime } = {}) {
     return Object.freeze({
         async append(payload = {}) {
             const normalized = validatePayload(payload, false);
+            // append 与 importHistory 有意共用校验，使单条消息和批量迁移遵循相同
+            // 的作用域边界。
             return resolve().append({ ...normalized, message: normalized.messages[0] });
         },
         async importHistory(payload = {}) {

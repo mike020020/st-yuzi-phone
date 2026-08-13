@@ -39,6 +39,8 @@ export const PublicApiCapabilities = Object.freeze({
     ACTION_EXECUTE: 'action.execute',
 });
 
+// 私有标记防止无关扩展伪装成此 API；Symbol.for 让第二份模块副本能够识别
+// 已有安装，且不会替换它。
 const API_OWNER = Symbol('yuzi-phone.public-api.owner');
 const API_OWNER_MARKER = Symbol.for('st-yuzi-phone.public-api.owner');
 const PUBLIC_API_PROPERTY = 'YuziPhoneAPI';
@@ -70,6 +72,7 @@ const capabilityDefinitions = Object.freeze([
 ]);
 
 function copyCapabilities() {
+    // 不暴露冻结的源定义；调用方可标注返回副本，不能改变其他调用方的能力检测。
     return capabilityDefinitions.map((capability) => ({ ...capability }));
 }
 
@@ -104,6 +107,7 @@ function createPublicApi() {
         },
         async refreshScene(sceneId) {
             const result = await refreshPublicScene(sceneId);
+            // 先刷新已注册场景，再请求宿主 UI 重绘，确保渲染总能读取场景最新状态。
             await runtimeAdapters.refresh?.(sceneId);
             return result;
         },
@@ -190,6 +194,8 @@ export function uninstallYuziPhonePublicApi(host) {
 }
 
 export function configureYuziPhonePublicApiRuntime(adapters = {}) {
+    // 每次生命周期启动都整体替换适配器集合；保留缺失回调会在旧手机实例销毁后
+    // 意外调用它。
     runtimeAdapters = Object.freeze({
         navigate: typeof adapters.navigate === 'function' ? adapters.navigate : null,
         refresh: typeof adapters.refresh === 'function' ? adapters.refresh : null,
@@ -198,6 +204,8 @@ export function configureYuziPhonePublicApiRuntime(adapters = {}) {
 }
 
 export function destroyYuziPhonePublicApiRuntime() {
+    // 清理注册表时，每个场景会在注销前恰好执行一次 destroy；钩子和适配器不得
+    // 比手机实例存活得更久。
     runtimeAdapters = Object.freeze({ navigate: null, refresh: null, getMessageRuntime: null });
     destroyPublicAppSceneRegistry();
     destroyPublicIntegrationHooks();

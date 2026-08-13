@@ -41,6 +41,8 @@ export function registerPublicActionHandler(actionType, handler) {
 
 export async function collectPublicPromptContext(input = {}) {
     const values = [];
+    // 先快照集合，使 provider 可以自行注销而不会在本次收集中漏掉或重复；provider
+    // 按稳定的注册顺序执行，因为提示词组合可能依赖顺序。
     for (const provider of [...promptProviders]) {
         const value = await provider(Object.freeze({ ...input }));
         if (value !== undefined && value !== null) values.push(value);
@@ -50,6 +52,8 @@ export async function collectPublicPromptContext(input = {}) {
 
 export async function collectPublicProactiveCandidates(input = {}) {
     const values = [];
+    // 候选项收集同样使用快照规则；返回副本，防止调用方在交付后修改 provider 所有的
+    // 候选对象。
     for (const provider of [...proactiveProviders]) {
         const provided = await provider(Object.freeze({ ...input }));
         if (Array.isArray(provided)) values.push(...provided);
@@ -61,10 +65,12 @@ export async function executePublicAction(actionType, input = {}) {
     const type = String(actionType || '').trim();
     const handler = actionHandlers.get(type);
     if (!handler) fail('action handler 未注册', PublicApiErrorCodes.NOT_FOUND, { actionType: type });
+    // 处理器接收不可变的顶层输入快照；动作路由由扩展独占，因此注册阶段拒绝重复项。
     return handler(Object.freeze({ ...input }));
 }
 
 export function destroyPublicIntegrationHooks() {
+    // 已销毁手机实例不得保留外部闭包，也不得把后续实例的动作路由到旧实例的处理器。
     promptProviders.clear();
     proactiveProviders.clear();
     actionHandlers.clear();

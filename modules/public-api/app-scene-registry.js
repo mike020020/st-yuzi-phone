@@ -21,6 +21,8 @@ function asId(value, label) {
 }
 
 function copyApp(app) {
+    // 公开调用方只拿到值快照，不会取得注册表中的可变记录，路由解析与生命周期事件
+    // 因而始终以注册表为准。
     return Object.freeze({
         appId: app.appId,
         name: app.name,
@@ -48,6 +50,7 @@ export function registerPublicApp(definition = {}) {
     const name = String(definition.name || '').trim();
     if (!name) throw publicApiError('App 名称不能为空', PublicApiErrorCodes.INVALID_ARGUMENT, { appId });
     const sceneId = asId(definition.sceneId || appId, 'sceneId');
+    // 公开路由由 appId 推导而不是接受调用方传入，避免侵入手机内置路由命名空间。
     const app = Object.freeze({
         appId,
         name: name.slice(0, 120),
@@ -92,6 +95,7 @@ export function unregisterPublicScene(sceneId) {
     const normalizedSceneId = asId(sceneId, 'sceneId');
     const scene = scenes.get(normalizedSceneId);
     if (!scene) return false;
+    // 先删除再清理，避免 destroy 钩子渲染或刷新一个已离开手机生命周期的场景。
     scenes.delete(normalizedSceneId);
     try {
         scene.destroy?.();
@@ -119,6 +123,8 @@ export async function renderPublicScene(app, route) {
             sceneId: app?.sceneId || '',
         });
     }
+    // 不向场景提供注册表对象；场景代码可能在本次渲染后仍保留输入，而注册随时可能
+    // 被移除。
     const view = await scene.render(Object.freeze({
         app: copyApp(app),
         route: String(route || app.route),
@@ -155,6 +161,7 @@ export function removePublicEventListener(eventName, handler) {
 }
 
 export function destroyPublicAppSceneRegistry() {
+    // 场景拥有自己的资源；先注销可确保可选 destroy 钩子在监听器和记录清空前执行。
     for (const sceneId of [...scenes.keys()]) unregisterPublicScene(sceneId);
     for (const appId of [...apps.keys()]) unregisterPublicApp(appId);
     listeners.clear();
