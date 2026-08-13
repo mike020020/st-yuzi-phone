@@ -1543,6 +1543,22 @@ export function createQQV2ProductionRuntime(options = {}) {
             await notifySubscribers(scopeId);
             return result;
         },
+        async appendPublicMessages({ scopeId, conversationId, messages }) {
+            const normalizedScopeId = await ensureScope(scopeId);
+            const conversation = await repository.getConversation(normalizedScopeId, asText(conversationId, 256));
+            if (!conversation) {
+                const error = new Error('目标 QQ 会话不存在');
+                error.code = 'conversation_not_found';
+                throw error;
+            }
+            const result = await repository.appendPublicMessages(normalizedScopeId, conversation.conversationId, messages);
+            await notifySubscribers(normalizedScopeId);
+            return Object.freeze(result.map(({ message, imported }) => Object.freeze({
+                messageId: message.messageId,
+                sequence: message.sequence,
+                imported,
+            })));
+        },
         async retryManual({ scopeId, conversationId }) {
             assertConversationWritable(scopeId, conversationId);
             const result = await requestService.retry({ scopeId, conversationId });
@@ -1646,9 +1662,22 @@ export function createQQV2ProductionRuntime(options = {}) {
     };
 
     const facade = createQQV2Facade({ runtime: application });
+    const publicMessageRuntime = Object.freeze({
+        append: (payload = {}) => application.appendPublicMessages({
+            scopeId: payload.scopeId,
+            conversationId: payload.conversationId,
+            messages: [payload.message || payload],
+        }).then(([result]) => result),
+        importHistory: (payload = {}) => application.appendPublicMessages({
+            scopeId: payload.scopeId,
+            conversationId: payload.conversationId,
+            messages: Array.isArray(payload.messages) ? payload.messages : [],
+        }),
+    });
 
     return Object.freeze({
         ...application,
         getFacade: () => facade,
+        getPublicMessageRuntime: () => publicMessageRuntime,
     });
 }

@@ -534,6 +534,7 @@ function appendOneMessage(scope, conversation, input, options = {}) {
     const senderType = requireText(input?.senderType, '消息发送者类型', 32);
     const storyTime = asText(input?.storyTime, 128);
     const content = String(input?.content ?? '');
+    const externalKey = asText(input?.externalKey, 256);
     const sender = messageSenderSnapshot(scope, input, senderId, senderType);
 
     if (!options.skipSenderValidation && conversation.kind === 'group') {
@@ -591,6 +592,7 @@ function appendOneMessage(scope, conversation, input, options = {}) {
         stickerId: asText(input?.stickerId, 256),
         assetId: asText(input?.assetId, 256),
         selectedForInjection: input?.selectedForInjection === true,
+        externalKey,
     };
     scope.messages[message.messageId] = message;
     conversation.nextSequence = sequence + 1;
@@ -1363,6 +1365,24 @@ export function createQQV2Repository(options = {}) {
                 const conversation = getConversation(scope, conversationId);
                 if (!Array.isArray(inputs) || inputs.length === 0) throw new QQV2DomainError('至少需要一条消息', 'message_required');
                 return inputs.map((input) => appendOneMessage(scope, conversation, input));
+            });
+        },
+        async appendPublicMessages(scopeId, conversationId, inputs) {
+            return stateStore.transact((state) => {
+                const scope = getScope(state, scopeId, false);
+                const conversation = getConversation(scope, conversationId);
+                if (!Array.isArray(inputs) || inputs.length === 0) throw new QQV2DomainError('至少需要一条消息', 'message_required');
+                const seenKeys = new Map(Object.values(scope.messages)
+                    .filter((message) => message.conversationId === conversation.conversationId && message.externalKey)
+                    .map((message) => [message.externalKey, message]));
+                return inputs.map((input) => {
+                    const externalKey = requireText(input?.externalKey, '外部幂等键', 256);
+                    const existing = seenKeys.get(externalKey);
+                    if (existing) return { message: copy(existing), imported: false };
+                    const message = appendOneMessage(scope, conversation, { ...input, externalKey });
+                    seenKeys.set(externalKey, message);
+                    return { message, imported: true };
+                });
             });
         },
         async deleteMessages(scopeId, conversationId, messageIds) {

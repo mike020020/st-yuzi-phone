@@ -27,7 +27,7 @@ async function main() {
             ['public-api.capabilities', true],
             ['app.register', true],
             ['scene.register', true],
-            ['message.import', false],
+            ['message.import', true],
             ['context.read', false],
             ['action.execute', false],
         ],
@@ -42,11 +42,13 @@ async function main() {
     assert.equal(typeof api.unregisterScene, 'function');
     assert.equal(typeof api.navigate, 'function');
     assert.equal(typeof api.refreshScene, 'function');
-    assert.equal(typeof api.importMessages, 'undefined');
+    assert.equal(typeof api.getMessageRuntime, 'function');
+    assert.equal(typeof api.appendMessage, 'function');
+    assert.equal(typeof api.importMessageHistory, 'function');
     assert.equal(typeof api.getContext, 'undefined');
     assert.equal(typeof api.executeAction, 'undefined');
     assert.equal(
-        firstCapabilities.find(({ name }) => name === 'message.import').errorCode,
+        firstCapabilities.find(({ name }) => name === 'context.read').errorCode,
         'YUZI_PHONE_API_NOT_IMPLEMENTED',
     );
 
@@ -60,6 +62,28 @@ async function main() {
     assert.equal(await api.unregisterApp('contract.app'), true);
     assert.equal(await api.unregisterScene('contract.scene'), true);
     assert.equal(api.off('app.registered', listener), true);
+
+    const { createMemoryQQV2StateStore } = await import(pathToFileURL(path.join(ROOT, 'modules/qq-v2/storage/state-store.js')).href);
+    const { createQQV2Repository } = await import(pathToFileURL(path.join(ROOT, 'modules/qq-v2/domain/repository.js')).href);
+    const repository = createQQV2Repository({ stateStore: createMemoryQQV2StateStore() });
+    await repository.ensureScope('scope-a');
+    await repository.ensureScope('scope-b');
+    const firstConversation = await repository.createPrivateConversation('scope-a', { name: 'External sender' });
+    const secondConversation = await repository.createPrivateConversation('scope-b', { name: 'External sender' });
+    const externalMessage = {
+        externalKey: 'external-event-001',
+        senderId: '__self__',
+        senderType: 'self',
+        type: 'text',
+        content: 'Imported once',
+    };
+    const imported = await repository.appendPublicMessages('scope-a', firstConversation.conversation.conversationId, [externalMessage]);
+    const replayed = await repository.appendPublicMessages('scope-a', firstConversation.conversation.conversationId, [externalMessage]);
+    assert.equal(imported[0].imported, true);
+    assert.equal(replayed[0].imported, false);
+    assert.equal(imported[0].message.messageId, replayed[0].message.messageId);
+    const isolated = await repository.appendPublicMessages('scope-b', secondConversation.conversation.conversationId, [externalMessage]);
+    assert.equal(isolated[0].imported, true, 'idempotency keys are isolated by QQ scope and conversation');
 
     assert.equal(publicApi.uninstallYuziPhonePublicApi(host), true);
     assert.equal('YuziPhoneAPI' in host, false, 'destroy cleanup must remove the owned API');
