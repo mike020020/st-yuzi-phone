@@ -162,12 +162,14 @@ async function main() {
     assert.equal(host.YuziPhoneAPI, foreign);
     assert.equal(publicApi.uninstallYuziPhonePublicApi(host), false, 'cleanup must preserve another owner');
 
-    // 入口契约确保先取得单例所有权，再安装公开 API，并在失败/销毁路径清理。
+    // 入口契约确保先取得单例所有权，再在扩展窗口和同源父窗口安装公开 API；
+    // Tavern Helper 的 about:srcdoc 脚本可以通过 parent 使用该公开边界。
     const guard = indexSource.indexOf('if (!acquireSingletonGuard()) return;');
-    const install = indexSource.indexOf('installYuziPhonePublicApi(getInstanceHost());');
+    const install = indexSource.indexOf('installPublicApiOnHosts();');
     const configure = indexSource.indexOf('configureErrorHandler({');
     assert.ok(guard >= 0 && install > guard && configure > install, 'entry must install after singleton ownership is acquired');
-    assert.ok(indexSource.includes('uninstallYuziPhonePublicApi(getInstanceHost());'), 'failure and destroy paths must clean up the public API');
+    assert.ok(indexSource.includes('function getPublicApiHosts()'), 'entry must expose the public API to the same-origin parent host');
+    assert.ok(indexSource.includes('uninstallPublicApiFromHosts();'), 'failure and destroy paths must clean up the public API');
 
     console.log('[public-api-contract] passed');
 }

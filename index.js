@@ -107,6 +107,27 @@ function getInstanceHost() {
     return typeof window !== 'undefined' ? window : globalThis;
 }
 
+function getPublicApiHosts() {
+    const host = getInstanceHost();
+    const hosts = [host];
+    // Tavern Helper 导入脚本运行在 about:srcdoc iframe；将受控公开 API 挂到共同的
+    // 父窗口，避免让业务脚本导入手机内部模块，也不能假定跨源 parent 可访问。
+    try {
+        if (host?.parent && host.parent !== host) hosts.push(host.parent);
+    } catch (_) {
+        // 跨源嵌入时保留当前窗口 API，公开能力仍可在本窗口内正常使用。
+    }
+    return [...new Set(hosts)];
+}
+
+function installPublicApiOnHosts() {
+    return getPublicApiHosts().map(host => installYuziPhonePublicApi(host));
+}
+
+function uninstallPublicApiFromHosts() {
+    return getPublicApiHosts().map(host => uninstallYuziPhonePublicApi(host));
+}
+
 function findLegacyInstanceTraces() {
     if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return [];
     return LEGACY_INSTANCE_TRACE_IDS.filter(id => !!document.getElementById(id));
@@ -525,7 +546,7 @@ async function doInitialize() {
     if (!acquireSingletonGuard()) return;
 
     // 先取得实例单例所有权，再安装公开 API；失败和销毁路径会统一卸载它。
-    installYuziPhonePublicApi(getInstanceHost());
+    installPublicApiOnHosts();
     // 适配器绑定当前实例的导航、重绘和消息运行时，公开 API 不直接依赖内部模块。
     configureYuziPhonePublicApiRuntime({
         navigate: (route) => navigateTo(route),
@@ -563,7 +584,7 @@ async function doInitialize() {
             setOwnedInstanceStatus('failed', { lastError: error?.message || String(error) });
             stopPhoneBackgroundServices('initialize-failed');
             destroyQQV2Runtime();
-            uninstallYuziPhonePublicApi(getInstanceHost());
+            uninstallPublicApiFromHosts();
             releaseSingletonGuard();
             handleError(error, '玉子手机初始化失败');
             // 重置初始化状态，允许重试
@@ -652,7 +673,7 @@ export function destroy() {
         handleError(error, '卸载错误');
     } finally {
         destroyYuziPhonePublicApiRuntime();
-        uninstallYuziPhonePublicApi(getInstanceHost());
+        uninstallPublicApiFromHosts();
         setOwnedInstanceStatus('destroyed');
         cancelPendingHomeRefresh('destroy-finally');
         clearInitRetryTimeout();
