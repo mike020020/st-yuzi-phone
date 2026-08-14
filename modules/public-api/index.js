@@ -5,7 +5,7 @@
  * runtime modules. New public operations must be added only when implemented.
  */
 // 新增 transaction.execute 是向后兼容的公共能力扩展，因此按语义化版本提升 minor。
-export const PUBLIC_API_VERSION = '1.1.0';
+export const PUBLIC_API_VERSION = '1.2.0';
 
 export { PublicApiErrorCodes } from './errors.js';
 import { PublicApiErrorCodes } from './errors.js';
@@ -38,6 +38,7 @@ export const PublicApiCapabilities = Object.freeze({
     MESSAGE_IMPORT: 'message.import',
     CONTEXT_READ: 'context.read',
     ACTION_EXECUTE: 'action.execute',
+    QUERY_EXECUTE: 'query.execute',
     TRANSACTION_EXECUTE: 'transaction.execute',
 });
 
@@ -71,6 +72,10 @@ const capabilityDefinitions = Object.freeze([
     }),
     Object.freeze({
         name: PublicApiCapabilities.ACTION_EXECUTE,
+        available: true,
+    }),
+    Object.freeze({
+        name: PublicApiCapabilities.QUERY_EXECUTE,
         available: true,
     }),
     Object.freeze({
@@ -200,6 +205,27 @@ async function executePublicSqlTransaction(request = {}) {
     return result;
 }
 
+async function executePublicSqlQuery(request = {}) {
+    if (!request || typeof request !== 'object' || Array.isArray(request)) {
+        throw publicApiError('query.execute 请求必须是对象', PublicApiErrorCodes.INVALID_ARGUMENT);
+    }
+    const statement = normalizeTransactionStatement({ sql: request.sql, params: request.params ?? [] }, 0);
+    // 此公开能力只提供投影读取。写入一律通过 transaction.execute，避免外部扩展以
+    // 看似查询的入口绕过幂等收据和 shujuku 的批量事务边界。
+    if (!/^\s*(?:SELECT|WITH)\b/i.test(statement.sql)) {
+        throw publicApiError('query.execute 仅允许 SELECT 或 WITH 查询', PublicApiErrorCodes.INVALID_ARGUMENT);
+    }
+    const api = runtimeAdapters.getSqlApi?.();
+    if (!api || typeof api.executeSqlQuery !== 'function') {
+        throw publicApiError('SQLite 查询运行时不可用', PublicApiErrorCodes.API_UNAVAILABLE);
+    }
+    const result = await api.executeSqlQuery({ sql: bindTransactionStatement(statement, 0) });
+    if (!result || result.success === false || (Array.isArray(result.errors) && result.errors.length > 0)) {
+        throw publicApiError('SQLite 查询失败', PublicApiErrorCodes.API_UNAVAILABLE, { result });
+    }
+    return Array.isArray(result) ? { rows: result } : result;
+}
+
 function copyCapabilities() {
     // 不暴露冻结的源定义；调用方可标注返回副本，不能改变其他调用方的能力检测。
     return capabilityDefinitions.map((capability) => ({ ...capability }));
@@ -248,6 +274,9 @@ function createPublicApi() {
         },
         async importMessageHistory(payload) {
             return this.getMessageRuntime().importHistory(payload);
+        },
+        async executeSqlQuery(request) {
+            return executePublicSqlQuery(request);
         },
         /**
          * Runs parameterized write statements as one shujuku table-write transaction.

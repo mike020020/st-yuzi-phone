@@ -15,7 +15,7 @@ async function main() {
     const api = publicApi.installYuziPhonePublicApi(host);
     assert.ok(api, 'install must create the public API');
     assert.equal(host.YuziPhoneAPI, api, 'API must be installed on the supplied host');
-    assert.equal(api.getVersion(), '1.1.0');
+    assert.equal(api.getVersion(), '1.2.0');
     assert.equal(publicApi.installYuziPhonePublicApi(host), api, 'repeat install must be idempotent');
 
     // 每次读取能力都必须返回独立快照，防止调用方修改内部能力定义。
@@ -32,6 +32,7 @@ async function main() {
             ['message.import', true],
             ['context.read', true],
             ['action.execute', true],
+            ['query.execute', true],
             ['transaction.execute', true],
         ],
     );
@@ -52,6 +53,7 @@ async function main() {
     assert.equal(typeof api.registerProactiveCandidateProvider, 'function');
     assert.equal(typeof api.registerActionHandler, 'function');
     assert.equal(typeof api.executeAction, 'function');
+    assert.equal(typeof api.executeSqlQuery, 'function');
     assert.equal(typeof api.executeSqlTransaction, 'function');
 
     // App/Scene 注册和注销验证生命周期事件不会阻断宿主，并检查公开路由格式。
@@ -82,12 +84,21 @@ async function main() {
     const transactionCalls = [];
     publicApi.configureYuziPhonePublicApiRuntime({
         getSqlApi: () => ({
+            async executeSqlQuery(request) {
+                return { rows: [{ sql: request.sql, value: 'query-result' }] };
+            },
             async executeSqlBatch(request) {
                 transactionCalls.push(request);
                 return { success: true, changes: 2, errors: [] };
             },
         }),
     });
+    const queryResult = await api.executeSqlQuery({ sql: 'SELECT ? AS value', params: ["O'Brien"] });
+    assert.deepEqual(queryResult.rows, [{ sql: "SELECT 'O''Brien' AS value", value: 'query-result' }]);
+    await assert.rejects(
+        () => api.executeSqlQuery({ sql: 'UPDATE ledger SET note = ?', params: ['forbidden'] }),
+        (error) => error?.code === publicApi.PublicApiErrorCodes.INVALID_ARGUMENT,
+    );
     const transactionResult = await api.executeSqlTransaction({
         statements: [
             { sql: 'INSERT INTO ledger (external_key, note, amount, enabled) VALUES (?, ?, ?, ?)', params: ['event-001', "O'Brien", 2.5, true] },
