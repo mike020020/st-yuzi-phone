@@ -5,10 +5,13 @@
  * runtime modules. New public operations must be added only when implemented.
  */
 // 新增 transaction.execute 是向后兼容的公共能力扩展，因此按语义化版本提升 minor。
-export const PUBLIC_API_VERSION = '1.2.0';
+export const PUBLIC_API_VERSION = '1.3.0';
 
 export { PublicApiErrorCodes } from './errors.js';
+export { createActionContext, createScopeHost, SCOPE_FIELDS } from './current-scope.js';
+export { createRenderContext } from './scene-context.js';
 import { PublicApiErrorCodes } from './errors.js';
+import { createActionContext } from './current-scope.js';
 import {
     addPublicEventListener,
     destroyPublicAppSceneRegistry,
@@ -40,6 +43,11 @@ export const PublicApiCapabilities = Object.freeze({
     ACTION_EXECUTE: 'action.execute',
     QUERY_EXECUTE: 'query.execute',
     TRANSACTION_EXECUTE: 'transaction.execute',
+    CURRENT_SCOPE: 'context.currentScope',
+    SCOPE_CHANGED: 'scope.changed',
+    SCENE_RENDER_CONTEXT: 'scene.renderContext',
+    SCENE_ACTION_CONTEXT: 'scene.actionContext',
+    SCENE_RENDER_LIFECYCLE: 'scene.render-lifecycle',
 });
 
 // 私有标记防止无关扩展伪装成此 API；Symbol.for 让第二份模块副本能够识别
@@ -49,7 +57,8 @@ const API_OWNER_MARKER = Symbol.for('st-yuzi-phone.public-api.owner');
 const PUBLIC_API_PROPERTY = 'YuziPhoneAPI';
 // SQL runtime 仅通过函数在调用时取得，不能缓存宿主 API；聊天切换、插件重载后，旧引用
 // 可能已经指向被销毁的数据库实例。
-let runtimeAdapters = Object.freeze({ navigate: null, refresh: null, getMessageRuntime: null, getSqlApi: null });
+let runtimeAdapters = Object.freeze({ navigate: null, refresh: null, getMessageRuntime: null, getSqlApi: null, getScopeHost: null });
+const scopeEventUnsubscribers = new Map();
 
 const capabilityDefinitions = Object.freeze([
     Object.freeze({ name: PublicApiCapabilities.VERSION, available: true }),
@@ -82,7 +91,42 @@ const capabilityDefinitions = Object.freeze([
         name: PublicApiCapabilities.TRANSACTION_EXECUTE,
         available: true,
     }),
+    Object.freeze({ name: PublicApiCapabilities.CURRENT_SCOPE, available: true }),
+    Object.freeze({ name: PublicApiCapabilities.SCOPE_CHANGED, available: true }),
+    Object.freeze({ name: PublicApiCapabilities.SCENE_RENDER_CONTEXT, available: true }),
+    Object.freeze({ name: PublicApiCapabilities.SCENE_ACTION_CONTEXT, available: true }),
+    Object.freeze({ name: PublicApiCapabilities.SCENE_RENDER_LIFECYCLE, available: true }),
 ]);
+
+function getCurrentScopeHost() {
+    const scopeHost = runtimeAdapters.getScopeHost?.();
+    if (!scopeHost || typeof scopeHost.getCurrentScope !== 'function') {
+        throw publicApiError('当前聊天尚未形成 WCMHConversationScope', 'YUZI_SCOPE_UNAVAILABLE');
+    }
+    return scopeHost;
+}
+
+function addScopeEventListener(handler) {
+    if (typeof handler !== 'function') {
+        throw publicApiError('事件名或处理器无效', PublicApiErrorCodes.INVALID_ARGUMENT);
+    }
+    if (scopeEventUnsubscribers.has(handler)) return true;
+    const unsubscribe = getCurrentScopeHost().on('scope.changed', handler);
+    scopeEventUnsubscribers.set(handler, unsubscribe);
+    return true;
+}
+
+function removeScopeEventListener(handler) {
+    const unsubscribe = scopeEventUnsubscribers.get(handler);
+    if (!unsubscribe) return false;
+    scopeEventUnsubscribers.delete(handler);
+    return unsubscribe();
+}
+
+function destroyScopeEventListeners() {
+    for (const unsubscribe of scopeEventUnsubscribers.values()) unsubscribe();
+    scopeEventUnsubscribers.clear();
+}
 
 function publicApiError(message, code, details = {}) {
     // 与其余 public-api 模块保持同一种可识别错误形状，调用方可只根据 code 显示降级状态。
@@ -306,10 +350,22 @@ function createPublicApi() {
         async executeAction(actionType, input) {
             return executePublicAction(actionType, input);
         },
+        getCurrentScope() {
+            return getCurrentScopeHost().getCurrentScope();
+        },
+        createActionContext() {
+            return createActionContext(getCurrentScopeHost());
+        },
         on(eventName, handler) {
+            if (String(eventName || '').trim() === PublicApiCapabilities.SCOPE_CHANGED) {
+                return addScopeEventListener(handler);
+            }
             return addPublicEventListener(eventName, handler);
         },
         off(eventName, handler) {
+            if (String(eventName || '').trim() === PublicApiCapabilities.SCOPE_CHANGED) {
+                return removeScopeEventListener(handler);
+            }
             return removePublicEventListener(eventName, handler);
         },
     };
@@ -370,13 +426,21 @@ export function configureYuziPhonePublicApiRuntime(adapters = {}) {
         getMessageRuntime: typeof adapters.getMessageRuntime === 'function' ? adapters.getMessageRuntime : null,
         // 事务 API 使用宿主的 executeSqlBatch，只有该方法存在时 capability 才能实际执行。
         getSqlApi: typeof adapters.getSqlApi === 'function' ? adapters.getSqlApi : null,
+        // Scope host is read lazily because a chat switch may replace its owner while the
+        // public API object remains installed on the host window.
+        getScopeHost: typeof adapters.getScopeHost === 'function'
+            ? adapters.getScopeHost
+            : (adapters.scopeHost && typeof adapters.scopeHost.getCurrentScope === 'function'
+                ? () => adapters.scopeHost
+                : null),
     });
 }
 
 export function destroyYuziPhonePublicApiRuntime() {
     // 清理注册表时，每个仍在注册的场景只会尝试执行一次 destroy；场景会先从注册表
     // 移除，避免 destroy 钩子重新访问已注销的场景。钩子和适配器不得比手机实例存活更久。
-    runtimeAdapters = Object.freeze({ navigate: null, refresh: null, getMessageRuntime: null, getSqlApi: null });
+    runtimeAdapters = Object.freeze({ navigate: null, refresh: null, getMessageRuntime: null, getSqlApi: null, getScopeHost: null });
+    destroyScopeEventListeners();
     destroyPublicAppSceneRegistry();
     destroyPublicIntegrationHooks();
 }
