@@ -1664,6 +1664,7 @@ export function createQQV2ProductionRuntime(options = {}) {
 
     const facade = createQQV2Facade({ runtime: application });
     const publicMessageRuntime = Object.freeze({
+        getActiveScopeId: () => activeScopeId,
         append: (payload = {}) => application.appendPublicMessages({
             scopeId: payload.scopeId,
             conversationId: payload.conversationId,
@@ -1674,6 +1675,93 @@ export function createQQV2ProductionRuntime(options = {}) {
             conversationId: payload.conversationId,
             messages: Array.isArray(payload.messages) ? payload.messages : [],
         }),
+        async getCurrentConversation({ scopeId, conversationId }) {
+            const conversation = await repository.getConversation(scopeId, asText(conversationId, 256));
+            if (!conversation) {
+                const error = new Error('目标 QQ 会话不存在');
+                error.code = 'conversation_not_found';
+                throw error;
+            }
+            if (conversation.kind === 'group') {
+                const group = await repository.getGroup(scopeId, conversation.groupId);
+                return Object.freeze({
+                    conversationId: conversation.conversationId,
+                    type: 'group',
+                    title: asText(group?.name, 120) || conversation.conversationId,
+                });
+            }
+            const person = await repository.getPerson(scopeId, conversation.personId);
+            return Object.freeze({
+                conversationId: conversation.conversationId,
+                type: 'private',
+                title: asText(conversation.remark, 120) || asText(person?.formalName, 120) || conversation.conversationId,
+            });
+        },
+        async listMessages({ scopeId, conversationId, limit, beforeMessageId = '' }) {
+            const messages = await repository.listMessages(scopeId, asText(conversationId, 256));
+            const beforeId = asText(beforeMessageId, 256);
+            const beforeIndex = beforeId ? messages.findIndex((message) => message.messageId === beforeId) : messages.length;
+            if (beforeId && beforeIndex < 0) {
+                const error = new Error('beforeMessageId 不属于目标 QQ 会话');
+                error.code = 'message_not_found';
+                throw error;
+            }
+            const max = Number(limit);
+            const selected = messages
+                .slice(0, beforeIndex)
+                .sort((left, right) => String(left.createdAt || left.storyTime || '').localeCompare(String(right.createdAt || right.storyTime || ''))
+                    || Number(left.sequence || 0) - Number(right.sequence || 0)
+                    || String(left.messageId).localeCompare(String(right.messageId)))
+                .slice(-max);
+            return Object.freeze(selected.map((message) => Object.freeze({
+                messageId: message.messageId,
+                conversationId: message.conversationId,
+                senderId: message.senderId,
+                senderName: message.senderName,
+                body: message.content,
+                createdAt: message.createdAt || message.storyTime || '',
+                status: message.status || message.transfer?.status || 'sent',
+                replyToMessageId: message.quoteMessageId || null,
+            })));
+        },
+        async listParticipants({ scopeId, conversationId }) {
+            const conversation = await repository.getConversation(scopeId, asText(conversationId, 256));
+            if (!conversation) {
+                const error = new Error('目标 QQ 会话不存在');
+                error.code = 'conversation_not_found';
+                throw error;
+            }
+            if (conversation.kind === 'private') {
+                const person = await repository.getPerson(scopeId, conversation.personId);
+                return Object.freeze([
+                    Object.freeze({ participantId: '__self__', displayName: '我', role: 'self' }),
+                    Object.freeze({ participantId: conversation.personId, displayName: asText(person?.formalName, 120) || conversation.personId, role: 'member' }),
+                ]);
+            }
+            const group = await repository.getGroup(scopeId, conversation.groupId);
+            const memberIds = [
+                ...(group?.selfExited ? [] : ['__self__']),
+                ...(Array.isArray(group?.memberIds) ? group.memberIds : []),
+            ];
+            const people = await Promise.all(memberIds.map(async (participantId) => ({
+                participantId,
+                person: participantId === '__self__' ? null : await repository.getPerson(scopeId, participantId),
+            })));
+            return Object.freeze(people.map(({ participantId, person }) => Object.freeze({
+                participantId,
+                displayName: participantId === '__self__' ? '我' : asText(person?.formalName, 120) || participantId,
+                role: group?.ownerId === participantId ? 'owner' : group?.adminIds?.includes(participantId) ? 'admin' : 'member',
+            })));
+        },
+        async getUnreadCount({ scopeId, conversationId }) {
+            const conversation = await repository.getConversation(scopeId, asText(conversationId, 256));
+            if (!conversation) {
+                const error = new Error('目标 QQ 会话不存在');
+                error.code = 'conversation_not_found';
+                throw error;
+            }
+            return Math.max(0, Number(conversation.unreadCount) || 0);
+        },
     });
 
     return Object.freeze({

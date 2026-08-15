@@ -4,8 +4,8 @@
  * This module deliberately exposes capability metadata instead of leaking UI or
  * runtime modules. New public operations must be added only when implemented.
  */
-// 新增 transaction.execute 是向后兼容的公共能力扩展，因此按语义化版本提升 minor。
-export const PUBLIC_API_VERSION = '1.2.0';
+// 新增受控消息读取和 transaction.execute 都是向后兼容的公共能力扩展，因此提升 minor。
+export const PUBLIC_API_VERSION = '1.3.0';
 
 export { PublicApiErrorCodes } from './errors.js';
 import { PublicApiErrorCodes } from './errors.js';
@@ -36,6 +36,7 @@ export const PublicApiCapabilities = Object.freeze({
     APP_REGISTER: 'app.register',
     SCENE_REGISTER: 'scene.register',
     MESSAGE_IMPORT: 'message.import',
+    MESSAGE_READ: 'message.read',
     CONTEXT_READ: 'context.read',
     ACTION_EXECUTE: 'action.execute',
     QUERY_EXECUTE: 'query.execute',
@@ -64,6 +65,10 @@ const capabilityDefinitions = Object.freeze([
     }),
     Object.freeze({
         name: PublicApiCapabilities.MESSAGE_IMPORT,
+        available: true,
+    }),
+    Object.freeze({
+        name: PublicApiCapabilities.MESSAGE_READ,
         available: true,
     }),
     Object.freeze({
@@ -266,8 +271,13 @@ function createPublicApi() {
             await runtimeAdapters.refresh?.(sceneId);
             return result;
         },
-        getMessageRuntime() {
-            return createQQV2PublicMessageRuntime({ getRuntime: runtimeAdapters.getMessageRuntime });
+        getMessageRuntime(scopeId = '') {
+            // scopeId is captured by the facade rather than resolved again after a chat
+            // switch. Existing callers that omit it retain append/import compatibility.
+            return createQQV2PublicMessageRuntime({
+                getRuntime: runtimeAdapters.getMessageRuntime,
+                scopeId,
+            });
         },
         async appendMessage(payload) {
             return this.getMessageRuntime().append(payload);
