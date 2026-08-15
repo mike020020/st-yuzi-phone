@@ -533,6 +533,8 @@ function appendOneMessage(scope, conversation, input, options = {}) {
     const senderId = requireText(input?.senderId, '消息发送者', 256);
     const senderType = requireText(input?.senderType, '消息发送者类型', 32);
     const storyTime = asText(input?.storyTime, 128);
+    const createdAt = asText(input?.createdAt, 128) || storyTime || new Date().toISOString();
+    const status = asText(input?.status, 32) || 'sent';
     const content = String(input?.content ?? '');
     const externalKey = asText(input?.externalKey, 256);
     const sender = messageSenderSnapshot(scope, input, senderId, senderType);
@@ -585,6 +587,8 @@ function appendOneMessage(scope, conversation, input, options = {}) {
         type,
         content,
         storyTime,
+        createdAt,
+        status,
         quoteMessageId,
         mentionIds,
         mentionAll: input?.mentionAll === true,
