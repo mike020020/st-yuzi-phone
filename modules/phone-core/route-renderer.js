@@ -7,7 +7,11 @@ import { registerRoutePageCleanup, removeRoutePage } from './route-page-lifecycl
 import { clearRouteHistory } from './routing.js';
 import { bindPhoneScrollGuards, hardenPhoneInteractionDefaults, logRouteScrollDebugSnapshot } from './scroll-guards.js';
 import { getPhoneCoreState, phoneRuntime } from './state.js';
-import { getPublicAppForRoute, renderPublicScene } from '../public-api/app-scene-registry.js';
+import { executePublicSceneAction, getPublicAppForRoute, renderPublicScene } from '../public-api/app-scene-registry.js';
+import { createRenderContext } from '../public-api/scene-context.js';
+import { sanitizeControlledHtml } from '../public-api/controlled-html.js';
+import { getConfiguredScopeHost } from '../public-api/internal-runtime.js';
+import { createDelegatedActionBridge } from '../qq-v2/application/delegated-action-bridge.js';
 
 // 公开 App 路由只在注册表命中时接管；未命中则继续走内置路由，避免改变原有页面分派。
 
@@ -16,6 +20,59 @@ const EXIT_ANIM_MS = 220;
 const ROUTE_COMMIT_DELAY_MS = 16;
 const TABLE_GENERIC_ROUTE_PREFIX = 'table-generic:';
 const TABLE_ROUTE_PREFIX = 'table:';
+const CONTROLLED_SCENE_STATES = new Set(['loading', 'empty', 'error', 'submitting', 'ready', 'stale']);
+
+function setControlledSceneState(root, state) {
+    if (root instanceof HTMLElement && CONTROLLED_SCENE_STATES.has(state)) {
+        root.dataset.yuziSceneState = state;
+    }
+}
+
+function hasDeclaredActions(actions) {
+    if (actions instanceof Set || Array.isArray(actions)) return actions.size > 0 || actions.length > 0;
+    return !!actions && typeof actions === 'object' && Object.keys(actions).some((actionId) => actions[actionId]);
+}
+
+function mountControlledPublicScene(page, view, renderContext, scopeHost) {
+    const sanitized = sanitizeControlledHtml(view.html, view.styles);
+    page.replaceChildren();
+    const root = document.createElement('div');
+    root.className = 'phone-public-app-scene';
+    root.innerHTML = sanitized.html;
+    if (sanitized.styles) {
+        const style = document.createElement('style');
+        style.textContent = sanitized.styles;
+        root.append(style);
+    }
+    page.append(root);
+    const initialState = String(view.html).trim() ? 'ready' : 'empty';
+    setControlledSceneState(page, initialState);
+    setControlledSceneState(root, initialState);
+
+    if (!hasDeclaredActions(view.actions)) return;
+    const bridge = createDelegatedActionBridge({
+        scopeHost,
+        sceneId: renderContext.sceneId,
+        onAction: async (input) => {
+            setControlledSceneState(page, 'submitting');
+            setControlledSceneState(root, 'submitting');
+            try {
+                const result = await executePublicSceneAction(renderContext.sceneId, input);
+                renderContext.assertCurrentRevision(input.revision);
+                setControlledSceneState(page, 'ready');
+                setControlledSceneState(root, 'ready');
+                return result;
+            } catch (error) {
+                const state = error?.code === 'YUZI_SCOPE_STALE' ? 'stale' : 'error';
+                setControlledSceneState(page, state);
+                setControlledSceneState(root, state);
+                throw error;
+            }
+        },
+    });
+    bridge.mount({ root, actions: view.actions, revision: renderContext.revision });
+    registerRoutePageCleanup(page, () => bridge.dispose());
+}
 
 function isActiveRouteRender(renderToken, state = getPhoneCoreState()) {
     if (!Number.isFinite(renderToken)) {
@@ -92,20 +149,42 @@ async function loadRouteRenderer(route, renderToken, deps = {}, opts = {}) {
         return {
             routeType: 'public-app',
             async render(page) {
-                const rendered = await renderPublicScene(publicApp, route);
-                const view = rendered.view || {};
-                const heading = String(view.title || rendered.app.name).slice(0, 160);
-                const body = String(view.text || view.message || '').slice(0, 4000);
-                page.replaceChildren();
-                const title = document.createElement('h1');
-                title.className = 'phone-public-app-title';
-                title.textContent = heading;
-                page.append(title);
-                if (body) {
-                    const content = document.createElement('p');
-                    content.className = 'phone-public-app-content';
-                    content.textContent = body;
-                    page.append(content);
+                setControlledSceneState(page, 'loading');
+                let renderContext = null;
+                try {
+                    const scopeHost = getConfiguredScopeHost();
+                    renderContext = createRenderContext(scopeHost, publicApp.sceneId);
+                    const rendered = await renderPublicScene(publicApp, route, {
+                        scope: renderContext.scope,
+                        revision: renderContext.revision,
+                        renderToken: renderContext.renderToken,
+                        abortSignal: renderContext.abortSignal,
+                    });
+                    renderContext.assertCurrentRevision(renderContext.revision);
+                    const view = rendered.view || {};
+                    if (typeof view.html === 'string') {
+                        mountControlledPublicScene(page, view, renderContext, scopeHost);
+                    } else {
+                        const heading = String(view.title || rendered.app.name).slice(0, 160);
+                        const body = String(view.text || view.message || '').slice(0, 4000);
+                        page.replaceChildren();
+                        const title = document.createElement('h1');
+                        title.className = 'phone-public-app-title';
+                        title.textContent = heading;
+                        page.append(title);
+                        if (body) {
+                            const content = document.createElement('p');
+                            content.className = 'phone-public-app-content';
+                            content.textContent = body;
+                            page.append(content);
+                        }
+                        setControlledSceneState(page, 'ready');
+                    }
+                    registerRoutePageCleanup(page, () => renderContext.dispose());
+                } catch (error) {
+                    renderContext?.dispose();
+                    setControlledSceneState(page, error?.code === 'YUZI_SCOPE_STALE' ? 'stale' : 'error');
+                    throw error;
                 }
             },
         };

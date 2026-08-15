@@ -15,7 +15,7 @@ async function main() {
     const api = publicApi.installYuziPhonePublicApi(host);
     assert.ok(api, 'install must create the public API');
     assert.equal(host.YuziPhoneAPI, api, 'API must be installed on the supplied host');
-    assert.equal(api.getVersion(), '1.2.0');
+    assert.equal(api.getVersion(), '1.3.0');
     assert.equal(publicApi.installYuziPhonePublicApi(host), api, 'repeat install must be idempotent');
 
     // 每次读取能力都必须返回独立快照，防止调用方修改内部能力定义。
@@ -30,15 +30,30 @@ async function main() {
             ['app.register', true],
             ['scene.register', true],
             ['message.import', true],
+            ['message.read', true],
             ['context.read', true],
             ['action.execute', true],
             ['query.execute', true],
             ['transaction.execute', true],
+            ['context.currentScope', true],
+            ['scope.changed', true],
+            ['scene.renderContext', true],
+            ['scene.actionContext', true],
+            ['scene.controlled-html', true],
+            ['scene.delegated-action-bridge', true],
+            ['scene.render-lifecycle', true],
         ],
     );
     assert.equal(api.hasCapability('public-api.version'), true);
     assert.equal(api.hasCapability('app.register'), true);
     assert.equal(api.hasCapability('scene.register'), true);
+    assert.equal(api.hasCapability('context.currentScope'), true);
+    assert.equal(api.hasCapability('scope.changed'), true);
+    assert.equal(api.hasCapability('scene.renderContext'), true);
+    assert.equal(api.hasCapability('scene.actionContext'), true);
+    assert.equal(api.hasCapability('scene.controlled-html'), true);
+    assert.equal(api.hasCapability('scene.delegated-action-bridge'), true);
+    assert.equal(api.hasCapability('scene.render-lifecycle'), true);
     assert.equal(api.hasCapability('unknown.capability'), false);
     assert.equal(typeof api.registerApp, 'function');
     assert.equal(typeof api.unregisterApp, 'function');
@@ -56,14 +71,44 @@ async function main() {
     assert.equal(typeof api.executeSqlQuery, 'function');
     assert.equal(typeof api.executeSqlTransaction, 'function');
 
+    const publicMessageRuntime = {
+        append: async () => ({ messageId: 'compat-message' }),
+        importHistory: async () => [{ messageId: 'compat-history' }],
+        getCurrentConversation: async ({ conversationId }) => ({ conversationId, type: 'private', title: 'Contract' }),
+        listMessages: async ({ limit }) => [{ messageId: 'contract-message', conversationId: 'contract-conversation', senderId: '__self__', senderName: '我', body: 'ok', createdAt: '2026-01-01T00:00:00.000Z', status: 'sent', replyToMessageId: null }].slice(0, limit),
+        listParticipants: async () => [{ participantId: '__self__', displayName: '我', role: 'self' }],
+        getUnreadCount: async () => 2,
+    };
+    publicApi.configureYuziPhonePublicApiRuntime({ getMessageRuntime: () => publicMessageRuntime });
+    const contractFacade = api.getMessageRuntime('contract-scope');
+    assert.deepEqual(await contractFacade.getCurrentConversation({ scopeId: 'contract-scope', conversationId: 'contract-conversation' }), { conversationId: 'contract-conversation', type: 'private', title: 'Contract' });
+    assert.equal((await contractFacade.listMessages({ scopeId: 'contract-scope', conversationId: 'contract-conversation' })).length, 1);
+    assert.deepEqual(await contractFacade.listParticipants({ scopeId: 'contract-scope', conversationId: 'contract-conversation' }), [{ participantId: '__self__', displayName: '我', role: 'self' }]);
+    assert.equal(await contractFacade.getUnreadCount({ scopeId: 'contract-scope', conversationId: 'contract-conversation' }), 2);
+    await assert.rejects(() => contractFacade.listMessages({ scopeId: 'other-scope', conversationId: 'contract-conversation' }), (error) => error?.code === publicApi.PublicApiErrorCodes.MESSAGE_SCOPE_MISMATCH);
+    assert.equal(await api.appendMessage({ scopeId: 'contract-scope', conversationId: 'contract-conversation', message: { externalKey: 'compat-key', senderId: '__self__', senderType: 'self', type: 'text', content: 'ok' } }).then((result) => result.messageId), 'compat-message');
+    assert.deepEqual(await api.importMessageHistory({ scopeId: 'contract-scope', conversationId: 'contract-conversation', messages: [{ externalKey: 'compat-history-key', senderId: '__self__', senderType: 'self', type: 'text', content: 'ok' }] }), [{ messageId: 'compat-history' }]);
+    assert.deepEqual(Object.keys(contractFacade).sort(), ['append', 'getCurrentConversation', 'getUnreadCount', 'importHistory', 'listMessages', 'listParticipants']);
+    assert.equal('indexedDB' in contractFacade, false);
+    assert.equal('repository' in contractFacade, false);
+
     // App/Scene 注册和注销验证生命周期事件不会阻断宿主，并检查公开路由格式。
     const events = [];
     const listener = (event) => events.push(event.eventName);
     assert.equal(api.on('app.registered', listener), true);
-    const scene = await api.registerScene({ sceneId: 'contract.scene', render: () => ({ title: 'Contract' }) });
+    const actionInputs = [];
+    const scene = await api.registerScene({
+        sceneId: 'contract.scene',
+        render: () => ({ title: 'Contract' }),
+        action: (input) => { actionInputs.push(input); return { accepted: true }; },
+    });
     const app = await api.registerApp({ appId: 'contract.app', name: 'Contract app', sceneId: scene.sceneId });
     assert.equal(app.route, 'public-app:contract.app');
     assert.deepEqual(events, ['app.registered']);
+    const { executePublicSceneAction } = await import(pathToFileURL(path.join(ROOT, 'modules/public-api/app-scene-registry.js')).href);
+    assert.deepEqual(await executePublicSceneAction('contract.scene', { actionId: 'contract.accept', revision: 1 }), { accepted: true });
+    assert.equal(actionInputs[0].sceneId, 'contract.scene');
+    assert.equal(actionInputs[0].actionId, 'contract.accept');
     assert.equal(await api.unregisterApp('contract.app'), true);
     assert.equal(await api.unregisterScene('contract.scene'), true);
     assert.equal(api.off('app.registered', listener), true);

@@ -108,12 +108,25 @@ export function registerPublicScene(definition = {}) {
     const scene = Object.freeze({
         sceneId,
         render: definition.render,
+        action: typeof definition.action === 'function' ? definition.action : null,
         refresh: typeof definition.refresh === 'function' ? definition.refresh : null,
         destroy: typeof definition.destroy === 'function' ? definition.destroy : null,
     });
     scenes.set(sceneId, scene);
     emit('scene.registered', { sceneId });
     return Object.freeze({ sceneId });
+}
+
+export async function executePublicSceneAction(sceneId, actionContext) {
+    const normalizedSceneId = asId(sceneId, 'sceneId');
+    const scene = scenes.get(normalizedSceneId);
+    if (!scene) throw publicApiError('Scene 未注册', PublicApiErrorCodes.NOT_FOUND, { sceneId: normalizedSceneId });
+    if (!scene.action) {
+        throw publicApiError('Scene 未注册 action 处理器', PublicApiErrorCodes.API_UNAVAILABLE, {
+            sceneId: normalizedSceneId,
+        });
+    }
+    return scene.action(Object.freeze({ ...actionContext, sceneId: normalizedSceneId }));
 }
 
 export function unregisterPublicScene(sceneId) {
@@ -147,7 +160,7 @@ export function getPublicAppForRoute(route) {
  * @returns {Promise<Readonly<{app:object,sceneId:string,view:object}>>} 渲染结果。
  * @throws {YuziPhonePublicApiError} Scene 不存在时抛出 NOT_FOUND；render 的异常原样传播。
  */
-export async function renderPublicScene(app, route) {
+export async function renderPublicScene(app, route, renderContext = {}) {
     const scene = scenes.get(app?.sceneId);
     if (!scene) {
         throw publicApiError('App 对应的 Scene 未注册', PublicApiErrorCodes.NOT_FOUND, {
@@ -158,6 +171,7 @@ export async function renderPublicScene(app, route) {
     // 不向场景提供注册表对象；场景代码可能在本次渲染后仍保留输入，而注册随时可能
     // 被移除。
     const view = await scene.render(Object.freeze({
+        ...renderContext,
         app: copyApp(app),
         route: String(route || app.route),
     }));
