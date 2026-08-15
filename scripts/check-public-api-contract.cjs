@@ -15,7 +15,7 @@ async function main() {
     const api = publicApi.installYuziPhonePublicApi(host);
     assert.ok(api, 'install must create the public API');
     assert.equal(host.YuziPhoneAPI, api, 'API must be installed on the supplied host');
-    assert.equal(api.getVersion(), '1.2.0');
+    assert.equal(api.getVersion(), '1.3.0');
     assert.equal(publicApi.installYuziPhonePublicApi(host), api, 'repeat install must be idempotent');
 
     // 每次读取能力都必须返回独立快照，防止调用方修改内部能力定义。
@@ -34,11 +34,21 @@ async function main() {
             ['action.execute', true],
             ['query.execute', true],
             ['transaction.execute', true],
+            ['context.currentScope', true],
+            ['scope.changed', true],
+            ['scene.renderContext', true],
+            ['scene.actionContext', true],
+            ['scene.render-lifecycle', true],
         ],
     );
     assert.equal(api.hasCapability('public-api.version'), true);
     assert.equal(api.hasCapability('app.register'), true);
     assert.equal(api.hasCapability('scene.register'), true);
+    assert.equal(api.hasCapability('context.currentScope'), true);
+    assert.equal(api.hasCapability('scope.changed'), true);
+    assert.equal(api.hasCapability('scene.renderContext'), true);
+    assert.equal(api.hasCapability('scene.actionContext'), true);
+    assert.equal(api.hasCapability('scene.render-lifecycle'), true);
     assert.equal(api.hasCapability('unknown.capability'), false);
     assert.equal(typeof api.registerApp, 'function');
     assert.equal(typeof api.unregisterApp, 'function');
