@@ -108,12 +108,25 @@ export function registerPublicScene(definition = {}) {
     const scene = Object.freeze({
         sceneId,
         render: definition.render,
+        action: typeof definition.action === 'function' ? definition.action : null,
         refresh: typeof definition.refresh === 'function' ? definition.refresh : null,
         destroy: typeof definition.destroy === 'function' ? definition.destroy : null,
     });
     scenes.set(sceneId, scene);
     emit('scene.registered', { sceneId });
     return Object.freeze({ sceneId });
+}
+
+export async function executePublicSceneAction(sceneId, actionContext) {
+    const normalizedSceneId = asId(sceneId, 'sceneId');
+    const scene = scenes.get(normalizedSceneId);
+    if (!scene) throw publicApiError('Scene 未注册', PublicApiErrorCodes.NOT_FOUND, { sceneId: normalizedSceneId });
+    if (!scene.action) {
+        throw publicApiError('Scene 未注册 action 处理器', PublicApiErrorCodes.API_UNAVAILABLE, {
+            sceneId: normalizedSceneId,
+        });
+    }
+    return scene.action(Object.freeze({ ...actionContext, sceneId: normalizedSceneId }));
 }
 
 export function unregisterPublicScene(sceneId) {

@@ -7,7 +7,7 @@ import { registerRoutePageCleanup, removeRoutePage } from './route-page-lifecycl
 import { clearRouteHistory } from './routing.js';
 import { bindPhoneScrollGuards, hardenPhoneInteractionDefaults, logRouteScrollDebugSnapshot } from './scroll-guards.js';
 import { getPhoneCoreState, phoneRuntime } from './state.js';
-import { getPublicAppForRoute, renderPublicScene } from '../public-api/app-scene-registry.js';
+import { executePublicSceneAction, getPublicAppForRoute, renderPublicScene } from '../public-api/app-scene-registry.js';
 import { createRenderContext } from '../public-api/scene-context.js';
 import { sanitizeControlledHtml } from '../public-api/controlled-html.js';
 import { getConfiguredScopeHost } from '../public-api/internal-runtime.js';
@@ -57,7 +57,7 @@ function mountControlledPublicScene(page, view, renderContext, scopeHost) {
             setControlledSceneState(page, 'submitting');
             setControlledSceneState(root, 'submitting');
             try {
-                const result = await view.onAction(input);
+                const result = await executePublicSceneAction(renderContext.sceneId, input);
                 renderContext.assertCurrentRevision(input.revision);
                 setControlledSceneState(page, 'ready');
                 setControlledSceneState(root, 'ready');

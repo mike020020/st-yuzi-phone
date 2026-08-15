@@ -74,10 +74,19 @@ async function main() {
     const events = [];
     const listener = (event) => events.push(event.eventName);
     assert.equal(api.on('app.registered', listener), true);
-    const scene = await api.registerScene({ sceneId: 'contract.scene', render: () => ({ title: 'Contract' }) });
+    const actionInputs = [];
+    const scene = await api.registerScene({
+        sceneId: 'contract.scene',
+        render: () => ({ title: 'Contract' }),
+        action: (input) => { actionInputs.push(input); return { accepted: true }; },
+    });
     const app = await api.registerApp({ appId: 'contract.app', name: 'Contract app', sceneId: scene.sceneId });
     assert.equal(app.route, 'public-app:contract.app');
     assert.deepEqual(events, ['app.registered']);
+    const { executePublicSceneAction } = await import(pathToFileURL(path.join(ROOT, 'modules/public-api/app-scene-registry.js')).href);
+    assert.deepEqual(await executePublicSceneAction('contract.scene', { actionId: 'contract.accept', revision: 1 }), { accepted: true });
+    assert.equal(actionInputs[0].sceneId, 'contract.scene');
+    assert.equal(actionInputs[0].actionId, 'contract.accept');
     assert.equal(await api.unregisterApp('contract.app'), true);
     assert.equal(await api.unregisterScene('contract.scene'), true);
     assert.equal(api.off('app.registered', listener), true);
