@@ -38,6 +38,8 @@ async function main() {
             ['scope.changed', true],
             ['scene.renderContext', true],
             ['scene.actionContext', true],
+            ['scene.controlled-html', true],
+            ['scene.delegated-action-bridge', true],
             ['scene.render-lifecycle', true],
         ],
     );
@@ -48,6 +50,8 @@ async function main() {
     assert.equal(api.hasCapability('scope.changed'), true);
     assert.equal(api.hasCapability('scene.renderContext'), true);
     assert.equal(api.hasCapability('scene.actionContext'), true);
+    assert.equal(api.hasCapability('scene.controlled-html'), true);
+    assert.equal(api.hasCapability('scene.delegated-action-bridge'), true);
     assert.equal(api.hasCapability('scene.render-lifecycle'), true);
     assert.equal(api.hasCapability('unknown.capability'), false);
     assert.equal(typeof api.registerApp, 'function');

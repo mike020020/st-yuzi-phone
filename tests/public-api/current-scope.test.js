@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createActionContext, createScopeHost } from '../../modules/public-api/current-scope.js';
+import * as publicApiModule from '../../modules/public-api/index.js';
 import {
     configureYuziPhonePublicApiRuntime,
     destroyYuziPhonePublicApiRuntime,
@@ -94,10 +95,13 @@ test('public API advertises the scope lifecycle capabilities without removing ex
     assert.equal(api.hasCapability('scope.changed'), true);
     assert.equal(api.hasCapability('scene.renderContext'), true);
     assert.equal(api.hasCapability('scene.actionContext'), true);
+    assert.equal(api.hasCapability('scene.controlled-html'), true);
+    assert.equal(api.hasCapability('scene.delegated-action-bridge'), true);
     assert.equal(api.hasCapability('scene.render-lifecycle'), true);
     assert.equal(typeof api.getCurrentScope, 'function');
     assert.equal(typeof api.on, 'function');
     assert.equal(typeof api.off, 'function');
+    assert.equal('getPublicScopeHost' in publicApiModule, false);
 });
 
 test('public API forwards scope.changed through its existing on and off methods', () => {

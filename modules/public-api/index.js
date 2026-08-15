@@ -10,8 +10,11 @@ export const PUBLIC_API_VERSION = '1.3.0';
 export { PublicApiErrorCodes } from './errors.js';
 export { createActionContext, createScopeHost, SCOPE_FIELDS } from './current-scope.js';
 export { createRenderContext } from './scene-context.js';
+export { sanitizeControlledHtml } from './controlled-html.js';
+export { createDelegatedActionBridge } from '../qq-v2/application/delegated-action-bridge.js';
 import { PublicApiErrorCodes } from './errors.js';
 import { createActionContext } from './current-scope.js';
+import { clearPublicScopeHost, configurePublicScopeHost, getConfiguredScopeHost } from './internal-runtime.js';
 import {
     addPublicEventListener,
     destroyPublicAppSceneRegistry,
@@ -47,6 +50,8 @@ export const PublicApiCapabilities = Object.freeze({
     SCOPE_CHANGED: 'scope.changed',
     SCENE_RENDER_CONTEXT: 'scene.renderContext',
     SCENE_ACTION_CONTEXT: 'scene.actionContext',
+    SCENE_CONTROLLED_HTML: 'scene.controlled-html',
+    SCENE_DELEGATED_ACTION_BRIDGE: 'scene.delegated-action-bridge',
     SCENE_RENDER_LIFECYCLE: 'scene.render-lifecycle',
 });
 
@@ -95,11 +100,13 @@ const capabilityDefinitions = Object.freeze([
     Object.freeze({ name: PublicApiCapabilities.SCOPE_CHANGED, available: true }),
     Object.freeze({ name: PublicApiCapabilities.SCENE_RENDER_CONTEXT, available: true }),
     Object.freeze({ name: PublicApiCapabilities.SCENE_ACTION_CONTEXT, available: true }),
+    Object.freeze({ name: PublicApiCapabilities.SCENE_CONTROLLED_HTML, available: true }),
+    Object.freeze({ name: PublicApiCapabilities.SCENE_DELEGATED_ACTION_BRIDGE, available: true }),
     Object.freeze({ name: PublicApiCapabilities.SCENE_RENDER_LIFECYCLE, available: true }),
 ]);
 
 function getCurrentScopeHost() {
-    const scopeHost = runtimeAdapters.getScopeHost?.();
+    const scopeHost = getConfiguredScopeHost();
     if (!scopeHost || typeof scopeHost.getCurrentScope !== 'function') {
         throw publicApiError('当前聊天尚未形成 WCMHConversationScope', 'YUZI_SCOPE_UNAVAILABLE');
     }
@@ -434,12 +441,14 @@ export function configureYuziPhonePublicApiRuntime(adapters = {}) {
                 ? () => adapters.scopeHost
                 : null),
     });
+    configurePublicScopeHost(runtimeAdapters.getScopeHost);
 }
 
 export function destroyYuziPhonePublicApiRuntime() {
     // 清理注册表时，每个仍在注册的场景只会尝试执行一次 destroy；场景会先从注册表
     // 移除，避免 destroy 钩子重新访问已注销的场景。钩子和适配器不得比手机实例存活更久。
     runtimeAdapters = Object.freeze({ navigate: null, refresh: null, getMessageRuntime: null, getSqlApi: null, getScopeHost: null });
+    clearPublicScopeHost();
     destroyScopeEventListeners();
     destroyPublicAppSceneRegistry();
     destroyPublicIntegrationHooks();
